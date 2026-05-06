@@ -1,28 +1,31 @@
-# nomi
+# Nomi / 知己
 
-English version: [`nomi`](https://github.com/iFurySt/nomi)
+Nomi / 知己 是一个个人身体与生活记录产品，定位为 AI personal body log。第一阶段目标是低 effort 记录饮食、身体数据、图片 / 截图和日常上下文，并用 AI 帮用户整理、回顾和基于已有记录提问。
 
-## 简介
+Nomi 不是医疗产品，不提供诊断、治疗、药物或急症判断。
 
-一个面向 Agent 协作开发的基础仓库模板，可以用来启动任何你想做的产品或服务。
+## 当前状态
 
-## 快速开始
+- 产品规格：`docs/product-specs/nomi-mvp.md`
+- 设计方向：`docs/DESIGN.md`
+- 执行计划：`docs/exec-plans/active/2026-05-06-nomi-mvp-skeleton.md`
+- Mobile skeleton：`apps/mobile/`
 
-可以在这个仓库右上角直接使用 GitHub 的模板流程：
-
-1. 选择 **Use this template**。
-2. 选择 [**Create a new repository**](https://github.com/new?template_name=nomi&template_owner=iFurySt)。
-
-也可以在新仓库或已有仓库里用 `harness-cli` 初始化：
+## Mobile 本地启动
 
 ```sh
-harness-cli init --language zh
+cd apps/mobile
+npm install
+npm run typecheck
+npx expo start --web --port 8081
+```
+
+## 仓库检查
+
+```sh
+make check-docs
 ```
 
 ## 许可证
 
 [MIT](LICENSE)
-
-## 备注
-
-这套方法主要来自我们自己的持续实践和整理，同时也吸收了 OpenAI 在 [harness engineering 文章](https://openai.com/index/harness-engineering/) 中的一部分思路，最后汇总成了这个模板。
