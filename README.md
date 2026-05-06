@@ -33,17 +33,17 @@ make check-docs
 docker exec postgres17 createdb -U bytedance nomi
 cd apps/server
 go test ./...
-go run ./cmd/nomi-server --addr :8088
+NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088
 ```
 
-## SeedX Daemon 本地验证
+## SeedX 本地验证
 
-先启动 server，再运行：
+SeedX 在相邻仓库 `../seedx`。先启动 Nomi server，再运行 SeedX 自带 daemon：
 
 ```sh
-cd apps/seedx-daemon
-go test ./...
-go run ./cmd/nomi-seedx-daemon --server-url ws://localhost:8088/seedx/ws --once
+cd ../seedx
+go test ./internal/transport/daemonclient ./internal/cli
+go run ./cmd/seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once
 ```
 
 ## 许可证

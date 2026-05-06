@@ -2,8 +2,14 @@ package app
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 )
 
 func TestMarshalSeedXEvent(t *testing.T) {
@@ -30,4 +36,119 @@ func TestMarshalSeedXEvent(t *testing.T) {
 	if decoded.Type != "seedx.request" {
 		t.Fatalf("unexpected type: %s", decoded.Type)
 	}
+}
+
+func TestValidSeedXBearer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		header   string
+		expected string
+		want     bool
+	}{
+		{
+			name:     "disabled",
+			header:   "",
+			expected: "",
+			want:     true,
+		},
+		{
+			name:     "valid",
+			header:   "Bearer dev-key",
+			expected: "dev-key",
+			want:     true,
+		},
+		{
+			name:     "missing bearer",
+			header:   "dev-key",
+			expected: "dev-key",
+			want:     false,
+		},
+		{
+			name:     "wrong key",
+			header:   "Bearer other",
+			expected: "dev-key",
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := validSeedXBearer(tt.header, tt.expected); got != tt.want {
+				t.Fatalf("validSeedXBearer() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeedXWebSocketRequiresAPIKey(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(nil, zap.NewNop(), "dev-key")
+	server := httptest.NewServer(handler.Routes())
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/daemon/connect"
+	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err == nil {
+		_ = conn.Close()
+		t.Fatal("dial succeeded without API key")
+	}
+	if resp == nil || resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status = %v, err = %v", respStatus(resp), err)
+	}
+}
+
+func TestSeedXWebSocketAcceptsSeedXHello(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(nil, zap.NewNop(), "dev-key")
+	server := httptest.NewServer(handler.Routes())
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/daemon/connect"
+	header := http.Header{}
+	header.Set("Authorization", "Bearer dev-key")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, header)
+	if err != nil {
+		t.Fatalf("dial failed: %v", err)
+	}
+	defer conn.Close()
+
+	if err := conn.WriteJSON(SeedXEvent{Type: "daemon:hello"}); err != nil {
+		t.Fatalf("write hello: %v", err)
+	}
+
+	var ping SeedXEvent
+	if err := conn.ReadJSON(&ping); err != nil {
+		t.Fatalf("read ping: %v", err)
+	}
+	if ping.Type != "daemon:ping" {
+		t.Fatalf("ping type = %q", ping.Type)
+	}
+
+	if err := conn.WriteJSON(SeedXEvent{ID: ping.ID, Type: "daemon:pong"}); err != nil {
+		t.Fatalf("write pong: %v", err)
+	}
+
+	if err := conn.SetReadDeadline(time.Now().Add(50 * time.Millisecond)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
+	var next SeedXEvent
+	err = conn.ReadJSON(&next)
+	if err == nil {
+		t.Fatalf("unexpected message after pong: %#v", next)
+	}
+	if !strings.Contains(err.Error(), "i/o timeout") {
+		t.Fatalf("session was closed after pong: %v", err)
+	}
+}
+
+func respStatus(resp *http.Response) any {
+	if resp == nil {
+		return nil
+	}
+	return resp.StatusCode
 }

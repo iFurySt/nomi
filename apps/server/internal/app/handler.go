@@ -18,14 +18,16 @@ type Store interface {
 }
 
 type Handler struct {
-	store  Store
-	logger *zap.Logger
+	store       Store
+	logger      *zap.Logger
+	seedXAPIKey string
 }
 
-func NewHandler(store Store, logger *zap.Logger) *Handler {
+func NewHandler(store Store, logger *zap.Logger, seedXAPIKey string) *Handler {
 	return &Handler{
-		store:  store,
-		logger: logger,
+		store:       store,
+		logger:      logger,
+		seedXAPIKey: seedXAPIKey,
 	}
 }
 
@@ -35,6 +37,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /records", h.listRecords)
 	mux.HandleFunc("POST /records", h.createRecord)
 	mux.HandleFunc("POST /ask", h.ask)
+	mux.HandleFunc("GET /daemon/connect", h.seedXWebSocket)
 	mux.HandleFunc("GET /seedx/ws", h.seedXWebSocket)
 	return withJSONHeaders(mux)
 }

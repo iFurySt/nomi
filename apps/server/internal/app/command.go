@@ -19,12 +19,14 @@ const defaultDatabaseURL = "postgres://bytedance:bytedance@localhost:5432/nomi?s
 type Config struct {
 	Addr        string
 	DatabaseURL string
+	SeedXAPIKey string
 }
 
 func NewRootCommand() *cobra.Command {
 	cfg := Config{
 		Addr:        envOrDefault("NOMI_SERVER_ADDR", ":8088"),
 		DatabaseURL: envOrDefault("NOMI_DATABASE_URL", defaultDatabaseURL),
+		SeedXAPIKey: envOrDefault("NOMI_SEEDX_API_KEY", ""),
 	}
 
 	cmd := &cobra.Command{
@@ -37,6 +39,7 @@ func NewRootCommand() *cobra.Command {
 
 	cmd.Flags().StringVar(&cfg.Addr, "addr", cfg.Addr, "HTTP listen address")
 	cmd.Flags().StringVar(&cfg.DatabaseURL, "database-url", cfg.DatabaseURL, "Postgres connection URL")
+	cmd.Flags().StringVar(&cfg.SeedXAPIKey, "seedx-api-key", cfg.SeedXAPIKey, "SeedX daemon API key")
 
 	return cmd
 }
@@ -68,7 +71,7 @@ func run(ctx context.Context, cfg Config) error {
 		return err
 	}
 
-	handler := NewHandler(store, logger)
+	handler := NewHandler(store, logger, cfg.SeedXAPIKey)
 	server := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           handler.Routes(),

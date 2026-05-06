@@ -1,5 +1,9 @@
 # Nomi MVP Skeleton Execution Plan
 
+## 后续校正
+
+2026-05-06 后续 dogfood 确认 `../seedx` 已提供 `seedx daemon connect --server-url --api-key`、`/daemon/connect` 和 Bearer API key header。Nomi 已移除自有 `apps/seedx-daemon` skeleton，当前运行入口以 `docs/ARCHITECTURE.md` 和 `README.md` 为准。本计划下方的 `apps/seedx-daemon` 内容只记录当时已完成的 milestone，不再代表当前架构。
+
 ## 目标
 
 把当前模板仓库推进到 Nomi / 知己 的第一阶段可运行骨架：React Native + Expo mobile app、Go server、SeedX local daemon、Postgres 本地依赖和可验证的 mock AI / domain boundary。每完成一个可独立验收的 milestone，都要先验证、截图或记录证据，再提交。

@@ -14,9 +14,9 @@
 | 区域 | 评分 | 原因 | 下一步 |
 | --- | --- | --- | --- |
 | 产品面 | B | 已有 Nomi MVP spec、非医疗边界、设计原则和 mobile skeleton。 | 下一步让 capture 真正写入本地 record store。 |
-| 架构文档 | B | 已替换为 Nomi 的 mobile / server / daemon / Postgres 目标结构。 | server、daemon 和 Postgres 落地后继续补启动与数据流细节。 |
+| 架构文档 | B | 已替换为 Nomi 的 mobile / server / Postgres 目标结构，并明确复用 `../seedx` daemon。 | server、SeedX command 调度和 Postgres 落地后继续补启动与数据流细节。 |
 | 前端 | B | Expo app 可启动，六个必需界面可切换，Capture 能写入本地 records，Timeline 和 Ask 会读取本地状态。 | 接入持久化、本地图表派生数据和真实 API adapter。 |
 | 测试 | C | 已有 mobile TypeScript 检查、domain smoke、Expo web smoke 截图。 | 增加更细的组件 / store 测试和仓库级 mobile check 命令。 |
-| 后端 | B | Go server 可启动，health、records、Ask mock、Postgres schema 和 SeedX websocket endpoint 已落地；daemon 能主动连接并完成 mock exchange。 | 补 API 认证边界、Postgres 集成测试和 mobile API adapter。 |
-| 可观测性 | C | Server 和 daemon 已使用 Zap 日志，websocket smoke 能看到 connected / sent / received。 | 补 metrics / traces 和结构化 request id。 |
-| 安全 | C | 已明确敏感数据、本地凭据、AI 阻断和未认证 API 限制。 | 接入真实 API 前补认证、请求大小限制、CORS、删除实现和第三方 AI 同意流程。 |
+| 后端 | B | Go server 可启动，health、records、Ask mock、Postgres schema 和 SeedX `/daemon/connect` endpoint 已落地；SeedX websocket 支持 Bearer API key。 | 补 records / Ask 用户认证、Postgres 集成测试和 mobile API adapter。 |
+| 可观测性 | C | Server 已使用 Zap 日志，websocket smoke 能看到 connected / sent / received。 | 补 metrics / traces、websocket 指标和结构化 request id。 |
+| 安全 | C | 已明确敏感数据、本地凭据、AI 阻断、未认证 API 限制，并给 SeedX websocket 补了 API key header 认证。 | 接入真实 API 前补用户认证、请求大小限制、CORS、删除实现和第三方 AI 同意流程。 |

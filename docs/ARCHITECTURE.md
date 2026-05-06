@@ -1,12 +1,11 @@
 # 架构总览
 
-Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是先交付可运行的 MVP skeleton：移动端用 React Native + Expo，后端和 SeedX daemon 用 Go，数据库使用 Postgres。真实 SeedX 接入、云端部署、家庭协作和 Apple Watch 接入在后续阶段处理。
+Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是先交付可运行的 MVP skeleton：移动端用 React Native + Expo，后端用 Go，数据库使用 Postgres，并复用相邻 `../seedx` 仓库自带的 daemon 主动建连能力。云端部署、家庭协作和 Apple Watch 接入在后续阶段处理。
 
 ## 当前仓库结构
 
 - `apps/mobile/`：Expo mobile app。当前包含 Home、Timeline、Capture、Trends、Ask、Settings 六个基础界面，本地内存 record flow，mock trends 数据和 AI boundary smoke。
-- `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary 和 Postgres schema 初始化。
-- `apps/seedx-daemon/`：Go local daemon。当前主动连接 server websocket，完成 mock SeedX event exchange。
+- `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、Postgres schema 初始化和 SeedX daemon websocket 控制面。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。
 - `docs/exec-plans/completed/`：已完成的跨 milestone 执行计划。
 - `docs/generated/verification/`：本地验证生成物，例如 UI 截图。
@@ -14,9 +13,8 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 
 ## 计划中的结构
 
-- `apps/server/`：Go API server，负责 record、ask/mock、Postgres 访问和 SeedX websocket endpoint。
-- `apps/seedx-daemon/`：Go daemon，启动后主动连接服务端 websocket，并在本机侧适配 SeedX 事件。
-- `packages/`：跨 mobile / server / daemon 共享的契约、领域类型或生成物。只有真正出现跨端重复时再新增。
+- `apps/server/`：Go API server，负责 record、ask/mock、Postgres 访问和 SeedX daemon control endpoint。
+- `packages/`：跨 mobile / server 共享的契约、领域类型或生成物。只有真正出现跨端重复时再新增。
 - `infra/local/`：本地 Postgres、服务编排和开发依赖配置。
 - `scripts/`：仓库级自动化脚本，供人和 Agent 直接调用。
 
@@ -26,16 +24,16 @@ MVP 目标拓扑：
 
 1. Mobile app 通过 API 读取和写入个人记录。
 2. Go server 持久化记录到 Postgres，并提供 Ask / extraction 的接口边界。
-3. SeedX daemon 在用户设备启动后主动连接 Go server 的 websocket 地址。
-4. Go server 通过 websocket 向 daemon 投递 SeedX 事件，daemon 返回 mock 或真实 SeedX response。
+3. `../seedx` 的 `seedx daemon connect` 在用户设备启动后主动连接 Go server 的 websocket 地址。
+4. Go server 通过 SeedX daemon 协议发送 `daemon:ping` / 后续 `daemon:command`，SeedX 返回 `daemon:pong` / `daemon:result`。
 
-当前 mobile app 还没有接入 server，使用本地内存 records 和 mock trends 展示核心信息架构、capture 保存路径和 AI 问答边界。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`，并在启动时初始化 Postgres records schema。SeedX daemon 已能主动连接 `GET /seedx/ws`，发送 `daemon.ready`，接收 `seedx.request`，返回 `seedx.response`。
+当前 mobile app 还没有接入 server，使用本地内存 records 和 mock trends 展示核心信息架构、capture 保存路径和 AI 问答边界。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`，并在启动时初始化 Postgres records schema。SeedX 连接使用 `GET /daemon/connect`，同时保留旧的 `GET /seedx/ws` 兼容本地 smoke；daemon API key 通过 `Authorization: Bearer ...` WebSocket 握手 header 传递。
 
 ## 边界
 
 - Mobile app 负责低 effort capture、记录回看、趋势展示、Ask 入口和隐私 / 导出入口。
 - Server 负责数据持久化、API boundary、websocket session 管理和审计友好的日志。
-- Daemon 负责本机 SeedX 连接、事件转发、重连和本机日志。
+- SeedX 负责本机 daemon 连接、事件转发、重连、runtime capability 和本机日志；Nomi 不维护重复 daemon。
 - AI 能力只做记录整理、趋势回顾和有来源的回答，不做诊断、治疗、药物或急症判断。
 
 ## 本地验证入口
@@ -44,9 +42,9 @@ MVP 目标拓扑：
 - Mobile domain smoke：`cd apps/mobile && npm run smoke`
 - Mobile web preview：`cd apps/mobile && npx expo start --web --port 8081`
 - Server tests：`cd apps/server && go test ./...`
-- Server local run：`cd apps/server && go run ./cmd/nomi-server --addr :8088`
-- Daemon tests：`cd apps/seedx-daemon && go test ./...`
-- Daemon websocket smoke：先启动 server，再运行 `cd apps/seedx-daemon && go run ./cmd/nomi-seedx-daemon --server-url ws://localhost:8088/seedx/ws --once`
+- Server local run：`cd apps/server && NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088`
+- SeedX daemon tests：`cd ../seedx && go test ./internal/transport/daemonclient ./internal/cli`
+- SeedX daemon websocket smoke：先启动 server，再运行 `cd ../seedx && go run ./cmd/seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once`
 - 文档检查：`make check-docs`
 
-随着 server、daemon 和 Postgres 落地，本节需要继续补齐对应启动、测试和观测命令。
+随着 server、SeedX command 调度和 Postgres 集成测试落地，本节需要继续补齐对应启动、测试和观测命令。

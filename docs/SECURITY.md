@@ -12,6 +12,7 @@
 
 - `postgres://bytedance:bytedance@localhost:5432/nomi?sslmode=disable` 只用于本地开发。
 - 共享、staging、production 环境必须通过环境变量或密钥管理系统提供 `NOMI_DATABASE_URL`。
+- SeedX daemon API key 通过 `NOMI_SEEDX_API_KEY` 或 `--seedx-api-key` 配置，真实 key 不得写入 README、history、日志或 URL。
 - 不要把真实数据库 URL、SeedX token、云端 websocket endpoint secret 写入仓库。
 
 ## AI 边界
@@ -22,6 +23,7 @@
 
 ## API
 
-- 当前 server skeleton 尚未实现认证，只能用于本地开发。
+- 当前 records / Ask API 尚未实现用户认证，只能用于本地开发。
+- SeedX websocket 在配置 `NOMI_SEEDX_API_KEY` 后要求 WebSocket 握手带 `Authorization: Bearer ...`，兼容 `seedx daemon connect --api-key`；API key 不放在 URL query。
 - 接入真实 mobile client 或云端前必须增加认证、授权、请求大小限制、CORS 策略和审计日志。
-- 当前 websocket origin check 只允许本地开发 host；云端模式必须改为基于 daemon 身份和短期凭据的认证。
+- Websocket origin check 允许非浏览器 daemon client；浏览器来源必须同 host 或本地开发 host。云端模式还需要补租户绑定、短期凭据轮换和审计。
