@@ -13,6 +13,8 @@
 > Follow-up: 三个展开按钮太丑；保留页面功能，Original 和 Cutout 保留原来的结构。
 >
 > Follow-up: 基于 iPhone simulator 截图继续判断问题并调整。
+>
+> Follow-up: 中间 ICON 点开后，如果失去焦点或主动点击 X，需要关闭菜单。
 
 ### Changes Overview
 
@@ -31,6 +33,8 @@
 - Verified native autolinking and Swift compilation in a temporary prebuilt iOS workspace with `xcodebuild ... iphonesimulator`; the temporary native project was not copied back into the repo.
 - Refined the three menu actions from large text cards into compact circular icon buttons, preserving camera / photos / files behavior and leaving Original / Cutout navigation intact.
 - Replaced the idle-state nested phone mock with a real Original -> Cutout preview pair so the app no longer shows an iPhone inside the iPhone simulator.
+- Added menu dismissal behavior: tapping the X closes the menu, tapping outside the open fan closes it, and choosing a source closes it before the picker opens.
+- Fixed the action fan touch layer so its empty area no longer blocks the center X button while the menu is open.
 
 ### Design Intent (Why)
 
@@ -39,6 +43,8 @@ The user requested a hard reset away from the previous broader UI. This change n
 The follow-up visual refinement removes the bulky source cards because they competed with the page headline. The source labels remain in accessibility labels while the visible control becomes a lighter iOS-style icon fan.
 
 The simulator screenshot made the nested phone mock the dominant issue. The idle state now uses artifact panels instead, which keeps the product focused on the actual original/cutout output rather than a decorative device frame.
+
+The menu now treats the open action fan as a focused transient control. A transparent dismiss layer sits below the nav/fan while open, so stray taps on the page collapse the menu without blocking the actual action buttons.
 
 ### Files Modified
 

@@ -21,7 +21,7 @@ npx expo start --web --port 8081 --clear
 
 ## 当前界面
 
-- Upload Workbench：默认主入口。底部导航中央是圆形主按钮，点开后三个来源按钮按拍摄、相册、文件的顺序用 `Animated.stagger` 顺时针展开。
+- Upload Workbench：默认主入口。底部导航中央是圆形主按钮，点开后三个来源按钮按拍摄、相册、文件的顺序用 `Animated.stagger` 顺时针展开；点击 X、点击菜单外区域或选择任一来源都会收起菜单。
 - Source pickers：拍摄和相册使用 `expo-image-picker`，文件使用 `expo-document-picker`，当前限制为 image 文件，面向 iPhone 上传路径。
 - Upload processing：选择图片后进入上传处理态，显示旋转处理动画、原图已选择、AI 分类已推断、cutout 处理中三步状态。
 - Review result：只展示原图、AI 分类、cutout 单独资产位和 Upload 动作。保存后写入本地 records；当前仍是本地内存数据，尚未接入 server persistence。

@@ -98,6 +98,7 @@ export default function App() {
 
   const handleSelect = async (source: UploadSource) => {
     setErrorMessage(null);
+    setMenuOpen(false);
 
     try {
       if (source === 'camera') {
@@ -200,10 +201,20 @@ export default function App() {
             ) : null}
           </ScrollView>
 
+          {menuOpen ? (
+            <Pressable
+              accessibilityLabel="Close upload menu"
+              accessibilityRole="button"
+              onPress={() => setMenuOpen(false)}
+              style={styles.menuDismissLayer}
+            />
+          ) : null}
+
           <UploadNav
             menuOpen={menuOpen}
             onSelect={handleSelect}
-            onToggle={() => setMenuOpen((current) => !current)}
+            onClose={() => setMenuOpen(false)}
+            onOpen={() => setMenuOpen(true)}
           />
         </View>
       </SafeAreaView>
@@ -441,11 +452,13 @@ function ResultState({
 
 function UploadNav({
   menuOpen,
-  onToggle,
+  onClose,
+  onOpen,
   onSelect,
 }: {
   menuOpen: boolean;
-  onToggle: () => void;
+  onClose: () => void;
+  onOpen: () => void;
   onSelect: (source: UploadSource) => void;
 }) {
   return (
@@ -459,7 +472,7 @@ function UploadNav({
         <Pressable
           accessibilityLabel={menuOpen ? 'Close upload menu' : 'Open upload menu'}
           accessibilityRole="button"
-          onPress={onToggle}
+          onPress={menuOpen ? onClose : onOpen}
           style={[styles.fab, menuOpen && styles.fabOpen]}
         >
           <Ionicons name={menuOpen ? 'close-outline' : 'add-outline'} size={34} color={colors.white} />
@@ -491,7 +504,7 @@ function ActionFan({ menuOpen, onSelect }: { menuOpen: boolean; onSelect: (sourc
   }, [menuOpen, optionProgress]);
 
   return (
-    <View pointerEvents={menuOpen ? 'auto' : 'none'} style={styles.fanLayer}>
+    <View pointerEvents={menuOpen ? 'box-none' : 'none'} style={styles.fanLayer}>
       {actionItems.map((item, index) => {
         const progress = optionProgress[index];
         const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [0, item.offsetX] });
@@ -651,6 +664,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 18,
     width: '100%',
+  },
+  menuDismissLayer: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 20,
   },
   header: {
     alignItems: 'center',
