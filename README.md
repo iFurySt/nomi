@@ -17,6 +17,7 @@ Nomi 不是医疗产品，不提供诊断、治疗、药物或急症判断。
 cd apps/mobile
 npm install
 npm run typecheck
+npm run smoke
 npx expo start --web --port 8081
 ```
 

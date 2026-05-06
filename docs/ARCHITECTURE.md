@@ -4,7 +4,7 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 
 ## 当前仓库结构
 
-- `apps/mobile/`：Expo mobile app。当前包含 Home、Timeline、Capture、Trends、Ask、Settings 六个基础界面，以及 mock records / trends 数据。
+- `apps/mobile/`：Expo mobile app。当前包含 Home、Timeline、Capture、Trends、Ask、Settings 六个基础界面，本地内存 record flow，mock trends 数据和 AI boundary smoke。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。
 - `docs/exec-plans/active/`：当前跨 milestone 执行计划。
 - `docs/generated/verification/`：本地验证生成物，例如 UI 截图。
@@ -27,7 +27,7 @@ MVP 目标拓扑：
 3. SeedX daemon 在用户设备启动后主动连接 Go server 的 websocket 地址。
 4. Go server 通过 websocket 向 daemon 投递 SeedX 事件，daemon 返回 mock 或真实 SeedX response。
 
-当前 mobile skeleton 还没有接入 server，使用本地 mock 数据展示核心信息架构和 UI 语言。
+当前 mobile app 还没有接入 server，使用本地内存 records 和 mock trends 展示核心信息架构、capture 保存路径和 AI 问答边界。
 
 ## 边界
 
@@ -39,6 +39,7 @@ MVP 目标拓扑：
 ## 本地验证入口
 
 - Mobile typecheck：`cd apps/mobile && npm run typecheck`
+- Mobile domain smoke：`cd apps/mobile && npm run smoke`
 - Mobile web preview：`cd apps/mobile && npx expo start --web --port 8081`
 - 文档检查：`make check-docs`
 

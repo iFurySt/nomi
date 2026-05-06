@@ -7,10 +7,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
-import { suggestedQuestions, timelineRecords, todayRecords, trendPoints } from './src/domain/mockData';
+import { answerFromRecords } from './src/domain/aiBoundary';
+import { CaptureDraft, CaptureKind, createRecordFromCapture, summarizeRecords } from './src/domain/capture';
+import { suggestedQuestions, timelineRecords, trendPoints } from './src/domain/mockData';
 import { NomiRecord, RecordType, recordTypeLabel, recordTypeTone } from './src/domain/records';
 import { colors, radii, spacing } from './src/ui/theme';
 
@@ -33,12 +36,12 @@ const tabs: TabItem[] = [
   { key: 'settings', label: 'Settings', icon: 'person-circle-outline' },
 ];
 
-const captureActions: Array<{ label: string; detail: string; icon: IconName }> = [
-  { label: 'Camera', detail: 'Meal or body data', icon: 'camera-outline' },
-  { label: 'Upload', detail: 'Screenshot or photo', icon: 'image-outline' },
-  { label: 'Food', detail: 'Manual meal', icon: 'restaurant-outline' },
-  { label: 'Body', detail: 'Stats entry', icon: 'body-outline' },
-  { label: 'Note', detail: 'Life context', icon: 'create-outline' },
+const captureActions: Array<{ kind: CaptureKind; label: string; detail: string; icon: IconName }> = [
+  { kind: 'camera', label: 'Camera', detail: 'Meal or body data', icon: 'camera-outline' },
+  { kind: 'upload', label: 'Upload', detail: 'Screenshot or photo', icon: 'image-outline' },
+  { kind: 'food', label: 'Food', detail: 'Manual meal', icon: 'restaurant-outline' },
+  { kind: 'body_stats', label: 'Body', detail: 'Stats entry', icon: 'body-outline' },
+  { kind: 'note', label: 'Note', detail: 'Life context', icon: 'create-outline' },
 ];
 
 const filters: Array<RecordType | 'all'> = ['all', 'food', 'body_stats', 'document', 'note'];
@@ -47,14 +50,24 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('today');
   const [activeFilter, setActiveFilter] = useState<RecordType | 'all'>('all');
   const [activeRange, setActiveRange] = useState('7D');
+  const [records, setRecords] = useState<NomiRecord[]>(timelineRecords);
 
   const filteredRecords = useMemo(() => {
     if (activeFilter === 'all') {
-      return timelineRecords;
+      return records;
     }
 
-    return timelineRecords.filter((record) => record.type === activeFilter);
-  }, [activeFilter]);
+    return records.filter((record) => record.type === activeFilter);
+  }, [activeFilter, records]);
+
+  const summary = useMemo(() => summarizeRecords(records), [records]);
+
+  const handleSaveCapture = (draft: CaptureDraft) => {
+    const record = createRecordFromCapture(draft, records.length);
+    setRecords((currentRecords) => [record, ...currentRecords]);
+    setActiveFilter('all');
+    setActiveTab('timeline');
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -62,7 +75,14 @@ export default function App() {
       <View style={styles.shell}>
         <AppHeader activeTab={activeTab} />
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {activeTab === 'today' && <TodayScreen onCapture={() => setActiveTab('capture')} onAsk={() => setActiveTab('ask')} />}
+          {activeTab === 'today' && (
+            <TodayScreen
+              records={records.slice(0, 3)}
+              summary={summary}
+              onCapture={() => setActiveTab('capture')}
+              onAsk={() => setActiveTab('ask')}
+            />
+          )}
           {activeTab === 'timeline' && (
             <TimelineScreen
               activeFilter={activeFilter}
@@ -70,9 +90,9 @@ export default function App() {
               onFilterChange={setActiveFilter}
             />
           )}
-          {activeTab === 'capture' && <CaptureScreen />}
+          {activeTab === 'capture' && <CaptureScreen onSave={handleSaveCapture} />}
           {activeTab === 'trends' && <TrendsScreen activeRange={activeRange} onRangeChange={setActiveRange} />}
-          {activeTab === 'ask' && <AskScreen />}
+          {activeTab === 'ask' && <AskScreen records={records} />}
           {activeTab === 'settings' && <SettingsScreen />}
         </ScrollView>
         <TabBar activeTab={activeTab} onChange={setActiveTab} />
@@ -97,16 +117,26 @@ function AppHeader({ activeTab }: { activeTab: TabKey }) {
   );
 }
 
-function TodayScreen({ onCapture, onAsk }: { onCapture: () => void; onAsk: () => void }) {
+function TodayScreen({
+  records,
+  summary,
+  onCapture,
+  onAsk,
+}: {
+  records: NomiRecord[];
+  summary: ReturnType<typeof summarizeRecords>;
+  onCapture: () => void;
+  onAsk: () => void;
+}) {
   return (
     <View style={styles.screen}>
       <View style={styles.hero}>
         <Text style={styles.kicker}>Today</Text>
         <Text style={styles.heroTitle}>A quiet daily body log.</Text>
         <View style={styles.metricRow}>
-          <Metric label="Calories" value="1,220" unit="kcal" />
-          <Metric label="Protein" value="74" unit="g" />
-          <Metric label="Weight" value="70.8" unit="kg" />
+          <Metric label="Calories" value={String(summary.calories)} unit="kcal" />
+          <Metric label="Protein" value={String(summary.protein)} unit="g" />
+          <Metric label="Weight" value={summary.latestWeight.replace(' kg', '')} unit="kg" />
         </View>
       </View>
 
@@ -117,7 +147,7 @@ function TodayScreen({ onCapture, onAsk }: { onCapture: () => void; onAsk: () =>
 
       <SectionHeader title="Recent Records" action="View all" />
       <View style={styles.list}>
-        {todayRecords.map((record) => (
+        {records.map((record) => (
           <RecordRow key={record.id} record={record} />
         ))}
       </View>
@@ -164,19 +194,54 @@ function TimelineScreen({
   );
 }
 
-function CaptureScreen() {
+function CaptureScreen({ onSave }: { onSave: (draft: CaptureDraft) => void }) {
+  const [selectedKind, setSelectedKind] = useState<CaptureKind>('food');
+  const [title, setTitle] = useState('Quick lunch');
+  const [note, setNote] = useState('Rice bowl, tofu, greens.');
+  const selectedAction = captureActions.find((action) => action.kind === selectedKind) ?? captureActions[2];
+
   return (
     <View style={styles.screen}>
       <Text style={styles.screenTitle}>Add in seconds</Text>
       <Text style={styles.screenCopy}>Start with the fastest source. AI estimates stay editable before they become part of the log.</Text>
       <View style={styles.captureGrid}>
         {captureActions.map((action) => (
-          <Pressable key={action.label} accessibilityRole="button" style={styles.captureTile}>
+          <Pressable
+            key={action.label}
+            accessibilityRole="button"
+            onPress={() => setSelectedKind(action.kind)}
+            style={[styles.captureTile, selectedKind === action.kind && styles.captureTileActive]}
+          >
             <Ionicons name={action.icon} size={24} color={colors.accent} />
             <Text style={styles.captureLabel}>{action.label}</Text>
             <Text style={styles.captureDetail}>{action.detail}</Text>
           </Pressable>
         ))}
+      </View>
+      <View style={styles.formPanel}>
+        <Text style={styles.panelTitle}>{selectedAction.label}</Text>
+        <TextInput
+          accessibilityLabel="Record title"
+          onChangeText={setTitle}
+          placeholder="Short title"
+          placeholderTextColor={colors.textMuted}
+          style={styles.input}
+          value={title}
+        />
+        <TextInput
+          accessibilityLabel="Record note"
+          multiline
+          onChangeText={setNote}
+          placeholder="What should Nomi remember?"
+          placeholderTextColor={colors.textMuted}
+          style={[styles.input, styles.textArea]}
+          value={note}
+        />
+        <PrimaryAction
+          icon="checkmark-outline"
+          label="Save to Timeline"
+          onPress={() => onSave({ kind: selectedKind, title, note })}
+        />
       </View>
       <View style={styles.extractionPanel}>
         <View style={styles.panelHeader}>
@@ -224,26 +289,38 @@ function TrendsScreen({
   );
 }
 
-function AskScreen() {
+function AskScreen({ records }: { records: NomiRecord[] }) {
+  const [question, setQuestion] = useState(suggestedQuestions[0]);
+  const answer = useMemo(() => answerFromRecords(question, records), [question, records]);
+
   return (
     <View style={styles.screen}>
       <Text style={styles.screenTitle}>Ask from your log</Text>
       <Text style={styles.screenCopy}>Answers should cite the saved records and stay inside personal review, not diagnosis or treatment.</Text>
       <View style={styles.suggestionList}>
         {suggestedQuestions.map((question) => (
-          <Pressable key={question} accessibilityRole="button" style={styles.suggestion}>
+          <Pressable key={question} accessibilityRole="button" onPress={() => setQuestion(question)} style={styles.suggestion}>
             <Ionicons name="sparkles-outline" size={17} color={colors.accent} />
             <Text style={styles.suggestionText}>{question}</Text>
           </Pressable>
         ))}
       </View>
+      <TextInput
+        accessibilityLabel="Ask Nomi"
+        onChangeText={setQuestion}
+        placeholder="Ask about saved records"
+        placeholderTextColor={colors.textMuted}
+        style={styles.input}
+        value={question}
+      />
       <View style={styles.answerBubble}>
         <Text style={styles.answerTitle}>Nomi</Text>
-        <Text style={styles.answerText}>
-          Based on records from Apr 30 to May 6, protein is usually above 100 g, with today still incomplete. I used 7 food records and 3 body records.
+        <Text style={styles.answerText}>{answer.content}</Text>
+        <Text style={styles.answerMeta}>
+          Range: {answer.range}. Records: {answer.referencedRecordIds.join(', ')}
         </Text>
       </View>
-      <View style={styles.boundaryBox}>
+      <View style={[styles.boundaryBox, answer.blocked && styles.boundaryBoxBlocked]}>
         <Ionicons name="shield-checkmark-outline" size={19} color={colors.accent} />
         <Text style={styles.boundaryText}>
           For medical decisions, Nomi helps organize records and will suggest talking with a qualified professional.
@@ -692,6 +769,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     width: '47.8%',
   },
+  captureTileActive: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accent,
+  },
   captureLabel: {
     color: colors.text,
     fontSize: 17,
@@ -711,6 +792,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: spacing.md,
     padding: spacing.lg,
+  },
+  formPanel: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    gap: spacing.md,
+    padding: spacing.lg,
+  },
+  input: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    color: colors.text,
+    fontSize: 15,
+    minHeight: 48,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  textArea: {
+    minHeight: 92,
+    textAlignVertical: 'top',
   },
   panelHeader: {
     alignItems: 'center',
@@ -814,6 +918,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 23,
   },
+  answerMeta: {
+    color: colors.accentSoft,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
   boundaryBox: {
     alignItems: 'flex-start',
     backgroundColor: colors.accentSoft,
@@ -821,6 +931,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     padding: spacing.md,
+  },
+  boundaryBoxBlocked: {
+    borderColor: colors.accent,
+    borderWidth: 1,
   },
   boundaryText: {
     color: colors.accent,

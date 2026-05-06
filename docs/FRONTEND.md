@@ -8,6 +8,7 @@
 cd apps/mobile
 npm install
 npm run typecheck
+npm run smoke
 npx expo start --web --port 8081
 ```
 
@@ -20,11 +21,11 @@ npx expo start --web --port 8081 --clear
 
 ## 当前界面
 
-- Home / Today：今日摘要、主记录入口、最近记录。
-- Timeline：mock records、类型筛选。
-- Capture：拍照、上传、手动饮食、身体数据、笔记入口，以及 AI extraction preview。
+- Home / Today：基于本地 records 计算今日摘要、主记录入口、最近记录。
+- Timeline：本地 records、类型筛选，Capture 保存后会立即插入最新记录。
+- Capture：拍照、上传、手动饮食、身体数据、笔记入口，轻量表单保存，以及 AI extraction preview。
 - Trends：7D / 30D / 90D 分段控件和基础趋势图。
-- Ask：建议问题、mock answer、医疗边界提示。
+- Ask：建议问题、基于本地 records 的 mock answer、引用记录 id、医疗边界阻断。
 - Settings：profile、单位、导出、删除和隐私入口。
 
 ## 设计约束
@@ -37,9 +38,10 @@ npx expo start --web --port 8081 --clear
 ## 验收方式
 
 - 每个 UI milestone 至少运行 `npm run typecheck`。
+- 触及 domain flow 或 AI boundary 时运行 `npm run smoke`。
 - 需要启动 Expo web 并检查关键屏幕能渲染和切换。
 - 有明显视觉改动时，生成或保留截图证据到 `docs/generated/verification/`，并在 history 里记录命令。
 
 ## 测试策略
 
-当前 mobile skeleton 只有 TypeScript 检查和手工 / 截图 smoke。后续 domain flow milestone 应补充可自动执行的 store、AI boundary 和 capture flow 测试。
+当前 mobile app 有 TypeScript 检查、domain smoke 和手工 / 截图 smoke。后续应把 capture store、AI boundary 和 timeline filtering 升级为更完整的自动化测试。
