@@ -11,3 +11,7 @@
 ## 初始文档
 
 - `core-beliefs.md`
+
+## 移动端设计
+
+- `mobile-uiux-less-is-more/`：上一轮基于 Snap / Log / Review 的 less-is-more 页面设计图，当前作为视觉参考保留；现行 mobile 已进一步收口到 upload-only 工作台。
