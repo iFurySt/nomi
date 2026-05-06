@@ -68,10 +68,11 @@
 - [x] 完成 mobile domain flow。
 - [x] 完成 Go server + Postgres skeleton。
 - [x] 完成 SeedX daemon + websocket skeleton。
-- [ ] 完成最终验收和 plan 归档。
+- [x] 完成最终验收和 plan 归档。
 
 ## 决策记录
 
 - 2026-05-06：第一阶段使用 mock AI adapter 先固定产品入口、领域模型和安全边界，避免真实 SeedX 接入阻塞 MVP skeleton。
 - 2026-05-06：移动端使用 React Native + Expo，服务端和 daemon 使用 Go；Postgres 作为本地和后续云端一致的数据存储方向。
 - 2026-05-06：每个 milestone 都必须先做本地验证再提交，降低跨端脚手架一次性堆叠的回归风险。
+- 2026-05-06：第一阶段 skeleton 已完成并归档；真实 mobile API adapter、认证、Postgres 集成测试、metrics / traces 和真实 SeedX payload 进入后续计划。

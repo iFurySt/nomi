@@ -8,7 +8,7 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 - `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary 和 Postgres schema 初始化。
 - `apps/seedx-daemon/`：Go local daemon。当前主动连接 server websocket，完成 mock SeedX event exchange。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。
-- `docs/exec-plans/active/`：当前跨 milestone 执行计划。
+- `docs/exec-plans/completed/`：已完成的跨 milestone 执行计划。
 - `docs/generated/verification/`：本地验证生成物，例如 UI 截图。
 - `docs/`：仓库知识库，也是本地规则和上下文的正式来源。
 
