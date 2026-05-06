@@ -1,5 +1,5 @@
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import {
   Pressable,
@@ -12,13 +12,12 @@ import {
 } from 'react-native';
 
 import { answerFromRecords } from './src/domain/aiBoundary';
-import { CaptureDraft, CaptureKind, createRecordFromCapture, summarizeRecords } from './src/domain/capture';
+import { CaptureDraft, createRecordFromCapture, summarizeRecords } from './src/domain/capture';
 import { suggestedQuestions, timelineRecords, trendPoints } from './src/domain/mockData';
 import { NomiRecord, RecordType, recordTypeLabel, recordTypeTone } from './src/domain/records';
-import { colors, radii, spacing } from './src/ui/theme';
+import { colors, radii, shadows, spacing } from './src/ui/theme';
 
-type TabKey = 'today' | 'timeline' | 'capture' | 'trends' | 'ask' | 'settings';
-
+type TabKey = 'capture' | 'calendar' | 'insights';
 type IconName = keyof typeof Ionicons.glyphMap;
 
 type TabItem = {
@@ -27,29 +26,42 @@ type TabItem = {
   icon: IconName;
 };
 
+type Option = {
+  label: string;
+  value: string;
+  icon: IconName;
+};
+
 const tabs: TabItem[] = [
-  { key: 'today', label: 'Today', icon: 'today-outline' },
-  { key: 'timeline', label: 'Timeline', icon: 'list-outline' },
-  { key: 'capture', label: 'Add', icon: 'add-circle-outline' },
-  { key: 'trends', label: 'Trends', icon: 'analytics-outline' },
-  { key: 'ask', label: 'Ask', icon: 'chatbubble-ellipses-outline' },
-  { key: 'settings', label: 'Settings', icon: 'person-circle-outline' },
+  { key: 'capture', label: 'Snap', icon: 'camera-outline' },
+  { key: 'calendar', label: 'Log', icon: 'calendar-clear-outline' },
+  { key: 'insights', label: 'Review', icon: 'stats-chart-outline' },
 ];
 
-const captureActions: Array<{ kind: CaptureKind; label: string; detail: string; icon: IconName }> = [
-  { kind: 'camera', label: 'Camera', detail: 'Meal or body data', icon: 'camera-outline' },
-  { kind: 'upload', label: 'Upload', detail: 'Screenshot or photo', icon: 'image-outline' },
-  { kind: 'food', label: 'Food', detail: 'Manual meal', icon: 'restaurant-outline' },
-  { kind: 'body_stats', label: 'Body', detail: 'Stats entry', icon: 'body-outline' },
-  { kind: 'note', label: 'Note', detail: 'Life context', icon: 'create-outline' },
+const recordTypeOptions: Option[] = [
+  { label: 'Food', value: 'Food', icon: 'fast-food-outline' },
+  { label: 'Drink', value: 'Drink', icon: 'cafe-outline' },
+  { label: 'Workout', value: 'Workout', icon: 'walk-outline' },
+  { label: 'Daily', value: 'Daily', icon: 'camera-outline' },
+  { label: 'Other', value: 'Other', icon: 'add-outline' },
 ];
 
-const filters: Array<RecordType | 'all'> = ['all', 'food', 'body_stats', 'document', 'note'];
+const foodSubtypes: Option[] = [
+  { label: 'Breakfast', value: 'Breakfast', icon: 'sunny-outline' },
+  { label: 'Lunch', value: 'Lunch', icon: 'restaurant-outline' },
+  { label: 'Dinner', value: 'Dinner', icon: 'moon-outline' },
+  { label: 'Snack', value: 'Snack', icon: 'ice-cream-outline' },
+  { label: 'Dessert', value: 'Dessert', icon: 'nutrition-outline' },
+];
+
+const mealTimeOptions = ['Morning', 'Noon', 'Afternoon', 'Evening'];
+const portionOptions = ['Light', 'Normal', 'Large'];
+const confidenceOptions = ['AI sure', 'Review', 'Unsure'];
+const timelineFilters: Array<RecordType | 'all'> = ['all', 'food', 'body_stats', 'document', 'note'];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabKey>('today');
+  const [activeTab, setActiveTab] = useState<TabKey>('capture');
   const [activeFilter, setActiveFilter] = useState<RecordType | 'all'>('all');
-  const [activeRange, setActiveRange] = useState('7D');
   const [records, setRecords] = useState<NomiRecord[]>(timelineRecords);
 
   const filteredRecords = useMemo(() => {
@@ -66,337 +78,550 @@ export default function App() {
     const record = createRecordFromCapture(draft, records.length);
     setRecords((currentRecords) => [record, ...currentRecords]);
     setActiveFilter('all');
-    setActiveTab('timeline');
+    setActiveTab('calendar');
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <View style={styles.shell}>
-        <AppHeader activeTab={activeTab} />
+      <View style={styles.appFrame}>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {activeTab === 'today' && (
-            <TodayScreen
-              records={records.slice(0, 3)}
-              summary={summary}
-              onCapture={() => setActiveTab('capture')}
-              onAsk={() => setActiveTab('ask')}
-            />
-          )}
-          {activeTab === 'timeline' && (
-            <TimelineScreen
+          {activeTab === 'capture' && <CaptureScreen onSave={handleSaveCapture} />}
+          {activeTab === 'calendar' && (
+            <CalendarScreen
               activeFilter={activeFilter}
               records={filteredRecords}
+              summary={summary}
+              totalRecords={records.length}
+              onCapture={() => setActiveTab('capture')}
               onFilterChange={setActiveFilter}
             />
           )}
-          {activeTab === 'capture' && <CaptureScreen onSave={handleSaveCapture} />}
-          {activeTab === 'trends' && <TrendsScreen activeRange={activeRange} onRangeChange={setActiveRange} />}
-          {activeTab === 'ask' && <AskScreen records={records} />}
-          {activeTab === 'settings' && <SettingsScreen />}
+          {activeTab === 'insights' && <InsightsScreen records={records} />}
         </ScrollView>
-        <TabBar activeTab={activeTab} onChange={setActiveTab} />
+        <FloatingTabBar activeTab={activeTab} onChange={setActiveTab} />
       </View>
     </SafeAreaView>
   );
 }
 
-function AppHeader({ activeTab }: { activeTab: TabKey }) {
-  const title = activeTab === 'today' ? 'Nomi' : tabs.find((tab) => tab.key === activeTab)?.label;
+function CaptureScreen({ onSave }: { onSave: (draft: CaptureDraft) => void }) {
+  const [hasPhoto, setHasPhoto] = useState(false);
+  const [category, setCategory] = useState('Food');
+  const [subtype, setSubtype] = useState('Lunch');
+  const [mealTime, setMealTime] = useState('Noon');
+  const [portion, setPortion] = useState('Normal');
+  const [confidence, setConfidence] = useState('Review');
+  const [title, setTitle] = useState('');
 
-  return (
-    <View style={styles.header}>
-      <View>
-        <Text style={styles.brand}>知己</Text>
-        <Text style={styles.title}>{title}</Text>
-      </View>
-      <View style={styles.headerMark}>
-        <Text style={styles.headerMarkText}>N</Text>
-      </View>
-    </View>
-  );
-}
+  const aiTitle = hasPhoto ? 'AI found a food record' : 'Ready for a photo';
+  const aiCopy = hasPhoto
+    ? 'Detected bottled drink and meal context. Confirm the suggested chips, then save.'
+    : 'Take a photo or choose one from your library. Nomi will fill the first pass for you.';
 
-function TodayScreen({
-  records,
-  summary,
-  onCapture,
-  onAsk,
-}: {
-  records: NomiRecord[];
-  summary: ReturnType<typeof summarizeRecords>;
-  onCapture: () => void;
-  onAsk: () => void;
-}) {
+  const saveDraft = () => {
+    onSave({
+      kind: 'camera',
+      category,
+      subtype,
+      mealTime,
+      title: title.trim() || `${subtype} ${category}`,
+      note: `${portion} portion. ${confidence.toLowerCase()} AI classification; user can edit later.`,
+      calories: portion === 'Large' ? '680 kcal' : portion === 'Light' ? '360 kcal' : '540 kcal',
+      protein: category === 'Drink' ? '4 g' : '28 g',
+      confidence: confidence === 'AI sure' ? 0.84 : confidence === 'Unsure' ? 0.48 : 0.66,
+    });
+    setHasPhoto(true);
+  };
+
   return (
     <View style={styles.screen}>
-      <View style={styles.hero}>
-        <Text style={styles.kicker}>Today</Text>
-        <Text style={styles.heroTitle}>A quiet daily body log.</Text>
-        <View style={styles.metricRow}>
-          <Metric label="Calories" value={String(summary.calories)} unit="kcal" />
-          <Metric label="Protein" value={String(summary.protein)} unit="g" />
-          <Metric label="Weight" value={summary.latestWeight.replace(' kg', '')} unit="kg" />
+      <View style={styles.captureTopBar}>
+        <PillButton label="Cancel" icon="close-outline" muted onPress={() => setHasPhoto(false)} />
+        <View style={styles.captureTitleBlock}>
+          <Text style={styles.kicker}>Nomi</Text>
+          <Text style={styles.largeTitle}>Snap</Text>
+        </View>
+        <PillButton label="Save" icon="checkmark-outline" onPress={saveDraft} />
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => setHasPhoto(true)}
+        style={[styles.photoStage, hasPhoto && styles.photoStageFilled]}
+      >
+        {hasPhoto ? (
+          <View style={styles.photoPreview}>
+            <View style={styles.photoObjectTall} />
+            <View style={styles.photoObjectSmall} />
+            <View style={styles.photoLabel}>
+              <Ionicons name="sparkles-outline" size={15} color={colors.accent} />
+              <Text style={styles.photoLabelText}>Cutout on</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.photoEmpty}>
+            <Ionicons name="camera-outline" size={44} color={colors.accent} />
+            <Text style={styles.photoEmptyTitle}>Add photo</Text>
+            <Text style={styles.photoEmptyCopy}>Capture the moment</Text>
+          </View>
+        )}
+      </Pressable>
+
+      <View style={styles.actionSheet}>
+        <ActionRow
+          icon="camera-outline"
+          title="Take Photo"
+          detail="Use camera to capture"
+          onPress={() => setHasPhoto(true)}
+        />
+        <ActionRow
+          icon="image-outline"
+          title="Choose from Library"
+          detail="Select from photo library"
+          onPress={() => setHasPhoto(true)}
+        />
+        <View style={styles.actionToggleRow}>
+          <View style={styles.actionIcon}>
+            <Ionicons name="crop-outline" size={22} color={colors.accent} />
+          </View>
+          <View style={styles.actionCopy}>
+            <Text style={styles.actionTitle}>Auto Cutout</Text>
+            <Text style={styles.actionDetail}>Clean background for review</Text>
+          </View>
+          <View style={styles.toggleTrack}>
+            <View style={styles.toggleKnob} />
+          </View>
         </View>
       </View>
 
-      <View style={styles.commandRow}>
-        <PrimaryAction icon="add-outline" label="Capture" onPress={onCapture} />
-        <SecondaryAction icon="chatbubble-outline" label="Ask" onPress={onAsk} />
-      </View>
+      <View style={styles.aiPanel}>
+        <View style={styles.panelHeader}>
+          <View>
+            <Text style={styles.panelEyebrow}>AI review</Text>
+            <Text style={styles.panelTitle}>{aiTitle}</Text>
+          </View>
+          <View style={styles.estimatePill}>
+            <Ionicons name="sparkles-outline" size={14} color={colors.accent} />
+            <Text style={styles.estimatePillText}>Editable</Text>
+          </View>
+        </View>
+        <Text style={styles.panelCopy}>{aiCopy}</Text>
 
-      <SectionHeader title="Recent Records" action="View all" />
-      <View style={styles.list}>
-        {records.map((record) => (
-          <RecordRow key={record.id} record={record} />
-        ))}
+        <OptionSection title="Record type">
+          <HorizontalOptions options={recordTypeOptions} selected={category} onSelect={setCategory} />
+        </OptionSection>
+
+        <OptionSection title="Subtype">
+          <HorizontalOptions options={foodSubtypes} selected={subtype} onSelect={setSubtype} />
+        </OptionSection>
+
+        <OptionSection title="Details">
+          <ChipGroup options={mealTimeOptions} selected={mealTime} onSelect={setMealTime} />
+          <ChipGroup options={portionOptions} selected={portion} onSelect={setPortion} />
+          <ChipGroup options={confidenceOptions} selected={confidence} onSelect={setConfidence} />
+        </OptionSection>
+
+        <View style={styles.optionalField}>
+          <Text style={styles.fieldLabel}>Name (optional)</Text>
+          <TextInput
+            accessibilityLabel="Optional record name"
+            onChangeText={setTitle}
+            placeholder={`${subtype} ${category}`}
+            placeholderTextColor={colors.textMuted}
+            style={styles.input}
+            value={title}
+          />
+        </View>
       </View>
     </View>
   );
 }
 
-function TimelineScreen({
+function CalendarScreen({
   activeFilter,
   records,
+  summary,
+  totalRecords,
+  onCapture,
   onFilterChange,
 }: {
   activeFilter: RecordType | 'all';
   records: NomiRecord[];
+  summary: ReturnType<typeof summarizeRecords>;
+  totalRecords: number;
+  onCapture: () => void;
   onFilterChange: (filter: RecordType | 'all') => void;
 }) {
+  const dailyAverage = Math.max(0.1, totalRecords / 12).toFixed(1);
+
   return (
     <View style={styles.screen}>
-      <Text style={styles.screenTitle}>All records</Text>
-      <Text style={styles.screenCopy}>Grouped later by day. For now this skeleton shows the record language and filter behavior.</Text>
-      <View style={styles.segmented}>
-        {filters.map((filter) => (
-          <Pressable
-            key={filter}
-            accessibilityRole="button"
-            onPress={() => onFilterChange(filter)}
-            style={[styles.segment, activeFilter === filter && styles.segmentActive]}
-          >
-            <Text style={[styles.segmentText, activeFilter === filter && styles.segmentTextActive]}>
-              {filter === 'all' ? 'All' : recordTypeLabel[filter]}
-            </Text>
-          </Pressable>
-        ))}
+      <View style={styles.monthHeader}>
+        <View>
+          <Text style={styles.kicker}>May 2026</Text>
+          <Text style={styles.hugeTitle}>May</Text>
+        </View>
+        <View style={styles.monthControls}>
+          <IconBubble icon="chevron-back-outline" muted />
+          <View style={styles.monthChip}>
+            <Text style={styles.monthChipText}>May 2026</Text>
+          </View>
+          <IconBubble icon="chevron-forward-outline" muted />
+        </View>
       </View>
-      <View style={styles.dateGroup}>
-        <Text style={styles.dateLabel}>May 6</Text>
-        <View style={styles.list}>
+
+      <View style={styles.calendarCard}>
+        <View style={styles.weekRow}>
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+            <Text key={`${day}-${index}`} style={styles.weekLabel}>
+              {day}
+            </Text>
+          ))}
+        </View>
+        <View style={styles.calendarGrid}>
+          {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
+            <View key={day} style={[styles.dayCell, day === 6 && styles.dayCellActive]}>
+              {day === 6 ? <MiniPhoto /> : <Text style={styles.dayText}>{day}</Text>}
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <Pressable accessibilityRole="button" onPress={onCapture} style={styles.addRecordButton}>
+        <Ionicons name="add-outline" size={28} color={colors.white} />
+        <Text style={styles.addRecordText}>Add Record</Text>
+      </Pressable>
+
+      <View style={styles.summaryCard}>
+        <SectionTitle title="Today's Summary" />
+        <View style={styles.summaryGrid}>
+          <SummaryTile icon="fast-food-outline" label="Food" value={String(records.filter((record) => record.type === 'food').length)} active />
+          <SummaryTile icon="cafe-outline" label="Drink" value="0" />
+          <SummaryTile icon="walk-outline" label="Workout" value="0" />
+          <SummaryTile icon="camera-outline" label="Daily" value={String(records.filter((record) => record.source === 'photo').length)} />
+        </View>
+      </View>
+
+      <View style={styles.statsStrip}>
+        <StatBlock label="Total Records" value={String(totalRecords)} />
+        <StatBlock label="Daily Avg" value={dailyAverage} alignRight />
+      </View>
+
+      <View style={styles.timelinePanel}>
+        <SectionTitle title="Recent records" />
+        <FilterBar activeFilter={activeFilter} onFilterChange={onFilterChange} />
+        <View style={styles.recordList}>
           {records.map((record) => (
             <RecordRow key={record.id} record={record} />
           ))}
         </View>
       </View>
-    </View>
-  );
-}
 
-function CaptureScreen({ onSave }: { onSave: (draft: CaptureDraft) => void }) {
-  const [selectedKind, setSelectedKind] = useState<CaptureKind>('food');
-  const [title, setTitle] = useState('Quick lunch');
-  const [note, setNote] = useState('Rice bowl, tofu, greens.');
-  const selectedAction = captureActions.find((action) => action.kind === selectedKind) ?? captureActions[2];
-
-  return (
-    <View style={styles.screen}>
-      <Text style={styles.screenTitle}>Add in seconds</Text>
-      <Text style={styles.screenCopy}>Start with the fastest source. AI estimates stay editable before they become part of the log.</Text>
-      <View style={styles.captureGrid}>
-        {captureActions.map((action) => (
-          <Pressable
-            key={action.label}
-            accessibilityRole="button"
-            onPress={() => setSelectedKind(action.kind)}
-            style={[styles.captureTile, selectedKind === action.kind && styles.captureTileActive]}
-          >
-            <Ionicons name={action.icon} size={24} color={colors.accent} />
-            <Text style={styles.captureLabel}>{action.label}</Text>
-            <Text style={styles.captureDetail}>{action.detail}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <View style={styles.formPanel}>
-        <Text style={styles.panelTitle}>{selectedAction.label}</Text>
-        <TextInput
-          accessibilityLabel="Record title"
-          onChangeText={setTitle}
-          placeholder="Short title"
-          placeholderTextColor={colors.textMuted}
-          style={styles.input}
-          value={title}
-        />
-        <TextInput
-          accessibilityLabel="Record note"
-          multiline
-          onChangeText={setNote}
-          placeholder="What should Nomi remember?"
-          placeholderTextColor={colors.textMuted}
-          style={[styles.input, styles.textArea]}
-          value={note}
-        />
-        <PrimaryAction
-          icon="checkmark-outline"
-          label="Save to Timeline"
-          onPress={() => onSave({ kind: selectedKind, title, note })}
-        />
-      </View>
-      <View style={styles.extractionPanel}>
-        <View style={styles.panelHeader}>
-          <Text style={styles.panelTitle}>AI extraction preview</Text>
-          <Text style={styles.estimatePill}>Estimate</Text>
-        </View>
-        <Text style={styles.extractionCopy}>Lunch photo: rice bowl, greens, and tofu. Confidence 66%. Review calories and protein before saving.</Text>
-        <View style={styles.editRow}>
-          <ValueChip label="Calories" value="540 kcal" />
-          <ValueChip label="Protein" value="28 g" />
-          <ValueChip label="Fiber" value="7 g" />
-        </View>
+      <View style={styles.microMetricRow}>
+        <MicroMetric label="Calories" value={String(summary.calories)} unit="kcal" />
+        <MicroMetric label="Protein" value={String(summary.protein)} unit="g" />
+        <MicroMetric label="Weight" value={summary.latestWeight.replace(' kg', '')} unit="kg" />
       </View>
     </View>
   );
 }
 
-function TrendsScreen({
-  activeRange,
-  onRangeChange,
-}: {
-  activeRange: string;
-  onRangeChange: (range: string) => void;
-}) {
-  return (
-    <View style={styles.screen}>
-      <Text style={styles.screenTitle}>Gentle trends</Text>
-      <Text style={styles.screenCopy}>A compact reflection surface for calories, protein, weight, and body fat.</Text>
-      <View style={styles.segmented}>
-        {['7D', '30D', '90D'].map((range) => (
-          <Pressable
-            key={range}
-            accessibilityRole="button"
-            onPress={() => onRangeChange(range)}
-            style={[styles.segment, activeRange === range && styles.segmentActive]}
-          >
-            <Text style={[styles.segmentText, activeRange === range && styles.segmentTextActive]}>{range}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <TrendChart label="Calories" value="1,904 kcal avg" metric="calories" />
-      <TrendChart label="Protein" value="116 g avg" metric="proteinG" />
-      <TrendChart label="Weight" value="70.8 kg latest" metric="weightKg" />
-    </View>
-  );
-}
-
-function AskScreen({ records }: { records: NomiRecord[] }) {
+function InsightsScreen({ records }: { records: NomiRecord[] }) {
+  const [range, setRange] = useState('Week');
   const [question, setQuestion] = useState(suggestedQuestions[0]);
   const answer = useMemo(() => answerFromRecords(question, records), [question, records]);
 
   return (
     <View style={styles.screen}>
-      <Text style={styles.screenTitle}>Ask from your log</Text>
-      <Text style={styles.screenCopy}>Answers should cite the saved records and stay inside personal review, not diagnosis or treatment.</Text>
-      <View style={styles.suggestionList}>
-        {suggestedQuestions.map((question) => (
-          <Pressable key={question} accessibilityRole="button" onPress={() => setQuestion(question)} style={styles.suggestion}>
-            <Ionicons name="sparkles-outline" size={17} color={colors.accent} />
-            <Text style={styles.suggestionText}>{question}</Text>
+      <View style={styles.monthHeader}>
+        <View>
+          <Text style={styles.kicker}>Review</Text>
+          <Text style={styles.hugeTitle}>Statistics</Text>
+        </View>
+        <View style={styles.iconCluster}>
+          <IconBubble icon="videocam-outline" />
+          <IconBubble icon="share-outline" />
+        </View>
+      </View>
+
+      <View style={styles.segmentedLarge}>
+        {['Day', 'Week', 'Month', 'Year'].map((item) => (
+          <Pressable
+            key={item}
+            accessibilityRole="button"
+            onPress={() => setRange(item)}
+            style={[styles.segmentLarge, range === item && styles.segmentLargeActive]}
+          >
+            <Text style={[styles.segmentLargeText, range === item && styles.segmentLargeTextActive]}>{item}</Text>
           </Pressable>
         ))}
       </View>
-      <TextInput
-        accessibilityLabel="Ask Nomi"
-        onChangeText={setQuestion}
-        placeholder="Ask about saved records"
-        placeholderTextColor={colors.textMuted}
-        style={styles.input}
-        value={question}
-      />
-      <View style={styles.answerBubble}>
-        <Text style={styles.answerTitle}>Nomi</Text>
-        <Text style={styles.answerText}>{answer.content}</Text>
-        <Text style={styles.answerMeta}>
-          Range: {answer.range}. Records: {answer.referencedRecordIds.join(', ')}
-        </Text>
+
+      <View style={styles.heroPreviewCard}>
+        <View style={styles.heroPreviewImage}>
+          <MiniPhoto large />
+        </View>
+        <View style={styles.heroPreviewStats}>
+          <StatBlock label="Total Records" value={String(records.length)} />
+          <StatBlock label="Daily Avg" value={(records.length / 12).toFixed(1)} alignRight />
+        </View>
       </View>
-      <View style={[styles.boundaryBox, answer.blocked && styles.boundaryBoxBlocked]}>
-        <Ionicons name="shield-checkmark-outline" size={19} color={colors.accent} />
-        <Text style={styles.boundaryText}>
-          For medical decisions, Nomi helps organize records and will suggest talking with a qualified professional.
-        </Text>
+
+      <View style={styles.chartCard}>
+        <SectionTitle title="Daily Records" />
+        <View style={styles.dailyBars}>
+          {[0, 0, 0, records.length, 1, 0, 0].map((value, index) => (
+            <View key={index} style={styles.dailyBarSlot}>
+              <Text style={styles.dailyBarValue}>{value > 0 ? value : ''}</Text>
+              <View style={[styles.dailyBar, value > 0 && { height: 96 + value * 8, backgroundColor: colors.blush }]} />
+              <Text style={styles.dailyBarLabel}>{['S', 'M', 'T', 'W', 'T', 'F', 'S'][index]}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.chartCard}>
+        <SectionTitle title="By Type" />
+        <View style={styles.donutRow}>
+          <View style={styles.donutOuter}>
+            <View style={styles.donutInner}>
+              <Text style={styles.donutValue}>{records.length}</Text>
+              <Text style={styles.donutLabel}>TOTAL</Text>
+            </View>
+          </View>
+          <View style={styles.typeLegend}>
+            <LegendDot color={colors.gold} label="Food" value={`${Math.round((records.filter((record) => record.type === 'food').length / records.length) * 100)}%`} />
+            <LegendDot color={colors.moss} label="Body" value={`${Math.round((records.filter((record) => record.type === 'body_stats').length / records.length) * 100)}%`} />
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.askCard}>
+        <View style={styles.panelHeader}>
+          <View>
+            <Text style={styles.panelEyebrow}>Ask Nomi</Text>
+            <Text style={styles.panelTitle}>Answers cite your saved records</Text>
+          </View>
+          <Ionicons name="shield-checkmark-outline" size={22} color={colors.moss} />
+        </View>
+        <View style={styles.suggestionList}>
+          {suggestedQuestions.map((item) => (
+            <Pressable key={item} accessibilityRole="button" onPress={() => setQuestion(item)} style={styles.suggestion}>
+              <Ionicons name="sparkles-outline" size={17} color={colors.accent} />
+              <Text style={styles.suggestionText}>{item}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.answerBubble}>
+          <Text style={styles.answerText}>{answer.content}</Text>
+          <Text style={styles.answerMeta}>
+            Range: {answer.range}. Sources: {answer.referencedRecordIds.join(', ')}
+          </Text>
+        </View>
       </View>
     </View>
   );
 }
 
-function SettingsScreen() {
+function OptionSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <View style={styles.screen}>
-      <Text style={styles.screenTitle}>Personal settings</Text>
-      <View style={styles.settingsList}>
-        <SettingsRow icon="person-outline" label="Profile" value="Nomi User" />
-        <SettingsRow icon="scale-outline" label="Units" value="Metric" />
-        <SettingsRow icon="download-outline" label="Data export" value="Ready later" />
-        <SettingsRow icon="trash-outline" label="Delete data" value="Available in MVP" />
-        <SettingsRow icon="lock-closed-outline" label="Privacy" value="Personal records stay sensitive" />
+    <View style={styles.optionSection}>
+      <Text style={styles.optionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function HorizontalOptions({
+  options,
+  selected,
+  onSelect,
+}: {
+  options: Option[];
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.horizontalScroller}
+      contentContainerStyle={styles.horizontalOptions}
+    >
+      {options.map((option) => (
+        <Pressable
+          key={option.value}
+          accessibilityRole="button"
+          onPress={() => onSelect(option.value)}
+          style={[styles.optionTile, selected === option.value && styles.optionTileActive]}
+        >
+          <Ionicons name={option.icon} size={26} color={selected === option.value ? colors.accent : colors.black} />
+          <Text style={[styles.optionLabel, selected === option.value && styles.optionLabelActive]}>{option.label}</Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
+function ChipGroup({
+  options,
+  selected,
+  onSelect,
+}: {
+  options: string[];
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <View style={styles.chipGroup}>
+      {options.map((option) => (
+        <Pressable
+          key={option}
+          accessibilityRole="button"
+          onPress={() => onSelect(option)}
+          style={[styles.choiceChip, selected === option && styles.choiceChipActive]}
+        >
+          <Text style={[styles.choiceChipText, selected === option && styles.choiceChipTextActive]}>{option}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function ActionRow({
+  icon,
+  title,
+  detail,
+  onPress,
+}: {
+  icon: IconName;
+  title: string;
+  detail: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.actionRow}>
+      <View style={styles.actionIcon}>
+        <Ionicons name={icon} size={24} color={colors.accent} />
       </View>
-    </View>
-  );
-}
-
-function Metric({ label, value, unit }: { label: string; value: string; unit: string }) {
-  return (
-    <View style={styles.metric}>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metricUnit}>{unit}</Text>
-      <Text style={styles.metricLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function PrimaryAction({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.primaryAction}>
-      <Ionicons name={icon} size={22} color={colors.white} />
-      <Text style={styles.primaryActionText}>{label}</Text>
+      <View style={styles.actionCopy}>
+        <Text style={styles.actionTitle}>{title}</Text>
+        <Text style={styles.actionDetail}>{detail}</Text>
+      </View>
+      <Ionicons name="chevron-forward-outline" size={22} color={colors.blush} />
     </Pressable>
   );
 }
 
-function SecondaryAction({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+function PillButton({
+  label,
+  icon,
+  muted,
+  onPress,
+}: {
+  label: string;
+  icon: IconName;
+  muted?: boolean;
+  onPress: () => void;
+}) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.secondaryAction}>
-      <Ionicons name={icon} size={21} color={colors.accent} />
-      <Text style={styles.secondaryActionText}>{label}</Text>
+    <Pressable accessibilityRole="button" onPress={onPress} style={[styles.pillButton, muted && styles.pillButtonMuted]}>
+      <Ionicons name={icon} size={18} color={colors.accent} />
+      <Text style={styles.pillButtonText}>{label}</Text>
     </Pressable>
   );
 }
 
-function SectionHeader({ title, action }: { title: string; action: string }) {
+function IconBubble({ icon, muted }: { icon: IconName; muted?: boolean }) {
   return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.sectionAction}>{action}</Text>
+    <View style={[styles.iconBubble, muted && styles.iconBubbleMuted]}>
+      <Ionicons name={icon} size={22} color={muted ? colors.textMuted : colors.accent} />
     </View>
+  );
+}
+
+function MiniPhoto({ large }: { large?: boolean }) {
+  return (
+    <View style={[styles.miniPhoto, large && styles.miniPhotoLarge]}>
+      <View style={[styles.miniBottle, large && styles.miniBottleLarge]} />
+      <View style={[styles.miniBottleBack, large && styles.miniBottleBackLarge]} />
+    </View>
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return <Text style={styles.sectionTitle}>{title}</Text>;
+}
+
+function SummaryTile({ icon, label, value, active }: { icon: IconName; label: string; value: string; active?: boolean }) {
+  return (
+    <View style={[styles.summaryTile, active && styles.summaryTileActive]}>
+      <Ionicons name={icon} size={25} color={active ? colors.accent : colors.textMuted} />
+      <Text style={[styles.summaryValue, active && styles.summaryValueActive]}>{value}</Text>
+      <Text style={styles.summaryLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function StatBlock({ label, value, alignRight }: { label: string; value: string; alignRight?: boolean }) {
+  return (
+    <View style={[styles.statBlock, alignRight && styles.statBlockRight]}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+    </View>
+  );
+}
+
+function FilterBar({
+  activeFilter,
+  onFilterChange,
+}: {
+  activeFilter: RecordType | 'all';
+  onFilterChange: (filter: RecordType | 'all') => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.horizontalScroller}
+      contentContainerStyle={styles.filterBar}
+    >
+      {timelineFilters.map((filter) => (
+        <Pressable
+          key={filter}
+          accessibilityRole="button"
+          onPress={() => onFilterChange(filter)}
+          style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
+        >
+          <Text style={[styles.filterChipText, activeFilter === filter && styles.filterChipTextActive]}>
+            {filter === 'all' ? 'All' : recordTypeLabel[filter]}
+          </Text>
+        </Pressable>
+      ))}
+    </ScrollView>
   );
 }
 
 function RecordRow({ record }: { record: NomiRecord }) {
   return (
     <View style={styles.recordRow}>
-      <View style={[styles.recordDot, { backgroundColor: recordTypeTone[record.type] }]} />
+      <View style={[styles.recordTypeMark, { backgroundColor: recordTypeTone[record.type] }]}>
+        <Ionicons name={record.type === 'food' ? 'fast-food-outline' : record.type === 'body_stats' ? 'scale-outline' : record.type === 'document' ? 'image-outline' : 'reader-outline'} size={18} color={colors.white} />
+      </View>
       <View style={styles.recordBody}>
         <View style={styles.recordHeader}>
           <Text style={styles.recordTitle}>{record.title}</Text>
           <Text style={styles.recordTime}>{record.occurredAt}</Text>
         </View>
         <Text style={styles.recordSummary}>{record.summary}</Text>
-        <View style={styles.chipRow}>
-          {Object.entries(record.values).map(([label, value]) => (
-            <ValueChip key={`${record.id}-${label}`} label={label} value={value} />
-          ))}
-          {record.confidence ? <ValueChip label="Confidence" value={`${Math.round(record.confidence * 100)}%`} /> : null}
+        <View style={styles.recordChipRow}>
+          {Object.entries(record.values)
+            .slice(0, 4)
+            .map(([label, value]) => (
+              <ValueChip key={`${record.id}-${label}`} label={label} value={value} />
+            ))}
+          {record.confidence ? <ValueChip label="AI" value={`${Math.round(record.confidence * 100)}%`} /> : null}
         </View>
       </View>
     </View>
@@ -412,53 +637,27 @@ function ValueChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TrendChart({
-  label,
-  value,
-  metric,
-}: {
-  label: string;
-  value: string;
-  metric: 'calories' | 'proteinG' | 'weightKg';
-}) {
-  const max = Math.max(...trendPoints.map((point) => Number(point[metric] ?? 0)));
-
+function MicroMetric({ label, value, unit }: { label: string; value: string; unit: string }) {
   return (
-    <View style={styles.chartPanel}>
-      <View style={styles.panelHeader}>
-        <Text style={styles.panelTitle}>{label}</Text>
-        <Text style={styles.panelValue}>{value}</Text>
-      </View>
-      <View style={styles.barRow}>
-        {trendPoints.map((point) => {
-          const rawValue = Number(point[metric] ?? 0);
-          const height = Math.max(16, Math.round((rawValue / max) * 88));
-
-          return (
-            <View key={`${label}-${point.date}`} style={styles.barSlot}>
-              <View style={[styles.bar, { height }]} />
-              <Text style={styles.barLabel}>{point.date.slice(-2)}</Text>
-            </View>
-          );
-        })}
-      </View>
+    <View style={styles.microMetric}>
+      <Text style={styles.microMetricValue}>{value}</Text>
+      <Text style={styles.microMetricUnit}>{unit}</Text>
+      <Text style={styles.microMetricLabel}>{label}</Text>
     </View>
   );
 }
 
-function SettingsRow({ icon, label, value }: { icon: IconName; label: string; value: string }) {
+function LegendDot({ color, label, value }: { color: string; label: string; value: string }) {
   return (
-    <View style={styles.settingsRow}>
-      <Ionicons name={icon} size={20} color={colors.accent} />
-      <View style={styles.settingsText}>
-        <Text style={styles.settingsLabel}>{label}</Text>
-        <Text style={styles.settingsValue}>{value}</Text>
-      </View>
+    <View style={styles.legendRow}>
+      <View style={[styles.legendDot, { backgroundColor: color }]} />
+      <Text style={styles.legendLabel}>{label}</Text>
+      <Text style={styles.legendValue}>{value}</Text>
     </View>
   );
 }
 
-function TabBar({ activeTab, onChange }: { activeTab: TabKey; onChange: (tab: TabKey) => void }) {
+function FloatingTabBar({ activeTab, onChange }: { activeTab: TabKey; onChange: (tab: TabKey) => void }) {
   return (
     <View style={styles.tabBar}>
       {tabs.map((tab) => {
@@ -467,12 +666,12 @@ function TabBar({ activeTab, onChange }: { activeTab: TabKey; onChange: (tab: Ta
         return (
           <Pressable
             key={tab.key}
+            accessibilityLabel={tab.label}
             accessibilityRole="button"
             onPress={() => onChange(tab.key)}
-            style={styles.tabButton}
+            style={[styles.tabButton, active && styles.tabButtonActive]}
           >
-            <Ionicons name={tab.icon} size={22} color={active ? colors.accent : colors.textMuted} />
-            <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{tab.label}</Text>
+            <Ionicons name={tab.icon} size={28} color={active ? colors.accent : colors.black} />
           </Pressable>
         );
       })}
@@ -485,181 +684,602 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  shell: {
-    flex: 1,
+  appFrame: {
+    alignSelf: 'center',
     backgroundColor: colors.background,
-  },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  brand: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 30,
-    fontWeight: '700',
-    letterSpacing: 0,
-    marginTop: 2,
-  },
-  headerMark: {
-    alignItems: 'center',
-    backgroundColor: colors.accentSoft,
-    borderRadius: radii.md,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-  headerMarkText: {
-    color: colors.accent,
-    fontSize: 18,
-    fontWeight: '700',
+    flex: 1,
+    maxWidth: 390,
+    overflow: 'hidden',
+    width: '100%',
   },
   scroll: {
     flex: 1,
-    width: '100%',
   },
   content: {
-    paddingBottom: 118,
-    paddingHorizontal: spacing.lg,
+    paddingBottom: 128,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
   },
   screen: {
-    gap: spacing.lg,
+    gap: spacing.xl,
     minWidth: 0,
     width: '100%',
   },
-  hero: {
-    alignSelf: 'stretch',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    padding: spacing.xl,
-    minWidth: 0,
-  },
   kicker: {
-    color: colors.accent,
+    color: colors.textMuted,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0,
-    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
   },
-  heroTitle: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: 0,
-    lineHeight: 30,
-    flexShrink: 1,
-  },
-  metricRow: {
-    flexDirection: 'column',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-  },
-  metric: {
-    backgroundColor: colors.background,
-    borderRadius: radii.md,
-    flex: 1,
-    flexShrink: 1,
-    minHeight: 88,
-    minWidth: 0,
-    padding: spacing.md,
-  },
-  metricValue: {
-    color: colors.text,
-    fontSize: 21,
-    fontWeight: '700',
+  largeTitle: {
+    color: colors.black,
+    fontSize: 32,
+    fontWeight: '800',
     letterSpacing: 0,
   },
-  metricUnit: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 1,
+  hugeTitle: {
+    color: colors.black,
+    fontSize: 58,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 64,
   },
-  metricLabel: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: spacing.md,
-  },
-  commandRow: {
-    flexDirection: 'column',
-    gap: spacing.sm,
-  },
-  primaryAction: {
+  captureTopBar: {
     alignItems: 'center',
-    backgroundColor: colors.accent,
-    borderRadius: radii.md,
-    flex: 1,
-    flexShrink: 1,
     flexDirection: 'row',
     gap: spacing.sm,
+    justifyContent: 'space-between',
+    minWidth: 0,
+  },
+  captureTitleBlock: {
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+  },
+  pillButton: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    minHeight: 46,
+    minWidth: 92,
+    paddingHorizontal: spacing.md,
     justifyContent: 'center',
-    minHeight: 52,
+    ...shadows.soft,
   },
-  primaryActionText: {
-    color: colors.white,
+  pillButtonMuted: {
+    shadowOpacity: 0.04,
+  },
+  pillButtonText: {
+    color: colors.accent,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
   },
-  secondaryAction: {
+  photoStage: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.accentSoft,
+    borderRadius: radii.md,
+    borderStyle: 'dashed',
+    borderWidth: 2,
+    justifyContent: 'center',
+    minHeight: 236,
+    overflow: 'hidden',
+  },
+  photoStageFilled: {
+    borderStyle: 'solid',
+    borderWidth: 0,
+    minHeight: 278,
+    ...shadows.soft,
+  },
+  photoEmpty: {
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  photoEmptyTitle: {
+    color: colors.accent,
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  photoEmptyCopy: {
+    color: colors.blush,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  photoPreview: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  photoObjectTall: {
+    backgroundColor: colors.moss,
+    borderColor: colors.white,
+    borderRadius: radii.md,
+    borderWidth: 5,
+    height: 148,
+    left: 156,
+    opacity: 0.78,
+    position: 'absolute',
+    top: 62,
+    transform: [{ rotate: '8deg' }],
+    width: 66,
+  },
+  photoObjectSmall: {
+    backgroundColor: colors.gold,
+    borderColor: colors.white,
+    borderRadius: radii.md,
+    borderWidth: 5,
+    height: 128,
+    left: 116,
+    opacity: 0.9,
+    position: 'absolute',
+    top: 88,
+    transform: [{ rotate: '-7deg' }],
+    width: 74,
+  },
+  photoLabel: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceWarm,
+    borderRadius: radii.md,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    position: 'absolute',
+    right: spacing.lg,
+    top: spacing.lg,
+  },
+  photoLabelText: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  actionSheet: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+    ...shadows.soft,
+  },
+  actionRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.surfaceMuted,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 82,
+    paddingHorizontal: spacing.lg,
+  },
+  actionToggleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 82,
+    paddingHorizontal: spacing.lg,
+  },
+  actionIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceWarm,
+    borderRadius: radii.md,
+    height: 46,
+    justifyContent: 'center',
+    width: 46,
+  },
+  actionCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  actionTitle: {
+    color: colors.black,
+    fontSize: 21,
+    fontWeight: '800',
+  },
+  actionDetail: {
+    color: colors.blush,
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  toggleTrack: {
+    alignItems: 'flex-end',
+    backgroundColor: colors.accent,
+    borderRadius: radii.md,
+    height: 34,
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    width: 68,
+  },
+  toggleKnob: {
+    backgroundColor: colors.white,
+    borderRadius: radii.md,
+    height: 28,
+    width: 30,
+  },
+  aiPanel: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    gap: spacing.lg,
+    minWidth: 0,
+    padding: spacing.lg,
+    ...shadows.soft,
+  },
+  panelHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+    minWidth: 0,
+  },
+  panelEyebrow: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0,
+    textTransform: 'uppercase',
+  },
+  panelTitle: {
+    color: colors.black,
+    flexShrink: 1,
+    fontSize: 21,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  panelCopy: {
+    color: colors.textMuted,
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
+  },
+  estimatePill: {
     alignItems: 'center',
     backgroundColor: colors.accentSoft,
     borderRadius: radii.md,
-    flex: 1,
-    flexShrink: 1,
+    flexShrink: 0,
     flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'center',
-    minHeight: 52,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
-  secondaryActionText: {
+  estimatePillText: {
     color: colors.accent,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '800',
   },
-  sectionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  sectionAction: {
-    color: colors.accent,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  list: {
+  optionSection: {
     gap: spacing.md,
+    minWidth: 0,
   },
-  recordRow: {
+  horizontalScroller: {
+    maxWidth: '100%',
+    width: '100%',
+  },
+  optionTitle: {
+    color: colors.textMuted,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  horizontalOptions: {
+    gap: spacing.md,
+    paddingRight: spacing.lg,
+  },
+  optionTile: {
+    alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: radii.md,
     borderWidth: 1,
+    gap: spacing.sm,
+    justifyContent: 'center',
+    minHeight: 92,
+    width: 92,
+  },
+  optionTileActive: {
+    backgroundColor: colors.surfaceWarm,
+    borderColor: colors.accent,
+    borderWidth: 2,
+  },
+  optionLabel: {
+    color: colors.black,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  optionLabelActive: {
+    color: colors.accent,
+  },
+  chipGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  choiceChip: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.surfaceMuted,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  choiceChipActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  choiceChipText: {
+    color: colors.black,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  choiceChipTextActive: {
+    color: colors.white,
+  },
+  optionalField: {
+    gap: spacing.sm,
+  },
+  fieldLabel: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  input: {
+    backgroundColor: colors.white,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    color: colors.black,
+    fontSize: 16,
+    minHeight: 54,
+    paddingHorizontal: spacing.md,
+  },
+  monthHeader: {
+    alignItems: 'flex-end',
     flexDirection: 'row',
     gap: spacing.md,
-    minWidth: 0,
-    padding: spacing.md,
+    justifyContent: 'space-between',
   },
-  recordDot: {
-    borderRadius: 4,
-    height: 8,
-    marginTop: 6,
-    width: 8,
+  monthControls: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  monthChip: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  monthChipText: {
+    color: colors.black,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  iconCluster: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  iconBubble: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceWarm,
+    borderRadius: radii.md,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  iconBubbleMuted: {
+    backgroundColor: colors.surfaceMuted,
+  },
+  calendarCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    gap: spacing.lg,
+    padding: spacing.lg,
+    ...shadows.soft,
+  },
+  weekRow: {
+    flexDirection: 'row',
+  },
+  weekLabel: {
+    color: colors.textMuted,
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  dayCell: {
+    alignItems: 'center',
+    aspectRatio: 1,
+    backgroundColor: colors.background,
+    borderRadius: radii.md,
+    justifyContent: 'center',
+    width: '12.36%',
+  },
+  dayCellActive: {
+    backgroundColor: colors.accentSoft,
+  },
+  dayText: {
+    color: colors.black,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  miniPhoto: {
+    height: 42,
+    position: 'relative',
+    width: 42,
+  },
+  miniPhotoLarge: {
+    height: 96,
+    width: 110,
+  },
+  miniBottle: {
+    backgroundColor: colors.gold,
+    borderColor: colors.white,
+    borderRadius: radii.sm,
+    borderWidth: 3,
+    height: 36,
+    left: 8,
+    position: 'absolute',
+    top: 6,
+    transform: [{ rotate: '-8deg' }],
+    width: 20,
+  },
+  miniBottleLarge: {
+    borderRadius: radii.md,
+    borderWidth: 6,
+    height: 90,
+    left: 28,
+    width: 46,
+  },
+  miniBottleBack: {
+    backgroundColor: colors.moss,
+    borderColor: colors.white,
+    borderRadius: radii.sm,
+    borderWidth: 3,
+    height: 34,
+    left: 20,
+    opacity: 0.8,
+    position: 'absolute',
+    top: 2,
+    transform: [{ rotate: '8deg' }],
+    width: 18,
+  },
+  miniBottleBackLarge: {
+    borderRadius: radii.md,
+    borderWidth: 6,
+    height: 84,
+    left: 58,
+    width: 40,
+  },
+  addRecordButton: {
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: radii.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    minHeight: 64,
+    ...shadows.soft,
+  },
+  addRecordText: {
+    color: colors.white,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  summaryCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    gap: spacing.lg,
+    padding: spacing.lg,
+    ...shadows.soft,
+  },
+  sectionTitle: {
+    color: colors.black,
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  summaryTile: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: radii.md,
+    flex: 1,
+    gap: spacing.xs,
+    minHeight: 104,
+    justifyContent: 'center',
+  },
+  summaryTileActive: {
+    backgroundColor: colors.surfaceWarm,
+  },
+  summaryValue: {
+    color: colors.textMuted,
+    fontSize: 25,
+    fontWeight: '800',
+  },
+  summaryValueActive: {
+    color: colors.accent,
+  },
+  summaryLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  statsStrip: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: spacing.lg,
+    ...shadows.soft,
+  },
+  statBlock: {
+    gap: spacing.md,
+  },
+  statBlockRight: {
+    alignItems: 'flex-end',
+  },
+  statLabel: {
+    color: colors.black,
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  statValue: {
+    color: colors.accent,
+    fontSize: 48,
+    fontWeight: '800',
+    lineHeight: 54,
+  },
+  timelinePanel: {
+    gap: spacing.lg,
+  },
+  filterBar: {
+    gap: spacing.sm,
+    paddingRight: spacing.lg,
+  },
+  filterChip: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  filterChipActive: {
+    backgroundColor: colors.accent,
+  },
+  filterChipText: {
+    color: colors.black,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  filterChipTextActive: {
+    color: colors.white,
+  },
+  recordList: {
+    gap: spacing.md,
+  },
+  recordRow: {
+    alignItems: 'flex-start',
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.md,
+    ...shadows.soft,
+  },
+  recordTypeMark: {
+    alignItems: 'center',
+    borderRadius: radii.md,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
   },
   recordBody: {
     flex: 1,
@@ -673,22 +1293,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   recordTitle: {
-    color: colors.text,
+    color: colors.black,
     flex: 1,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   recordTime: {
     color: colors.textMuted,
     fontSize: 12,
-    marginTop: 2,
+    fontWeight: '700',
+    marginTop: 3,
   },
   recordSummary: {
     color: colors.textMuted,
     fontSize: 14,
+    fontWeight: '600',
     lineHeight: 20,
   },
-  chipRow: {
+  recordChipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
@@ -702,300 +1324,241 @@ const styles = StyleSheet.create({
   valueChipLabel: {
     color: colors.textMuted,
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '800',
+    textTransform: 'uppercase',
   },
   valueChipValue: {
-    color: colors.text,
+    color: colors.black,
     fontSize: 12,
-    fontWeight: '700',
-    marginTop: 1,
+    fontWeight: '800',
   },
-  screenTitle: {
-    color: colors.text,
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: 0,
-  },
-  screenCopy: {
-    color: colors.textMuted,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  segmented: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radii.md,
+  microMetricRow: {
     flexDirection: 'row',
-    gap: spacing.xs,
-    padding: spacing.xs,
-  },
-  segment: {
-    alignItems: 'center',
-    borderRadius: radii.sm,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 36,
-    paddingHorizontal: spacing.xs,
-  },
-  segmentActive: {
-    backgroundColor: colors.surface,
-  },
-  segmentText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  segmentTextActive: {
-    color: colors.text,
-  },
-  dateGroup: {
     gap: spacing.sm,
   },
-  dateLabel: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  captureGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  captureTile: {
+  microMetric: {
     backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderRadius: radii.md,
-    borderWidth: 1,
-    minHeight: 112,
-    padding: spacing.md,
-    width: '47.8%',
-  },
-  captureTileActive: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
-  },
-  captureLabel: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: '700',
-    marginTop: spacing.md,
-  },
-  captureDetail: {
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
-    marginTop: spacing.xs,
-  },
-  extractionPanel: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    gap: spacing.md,
-    padding: spacing.lg,
-  },
-  formPanel: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    gap: spacing.md,
-    padding: spacing.lg,
-  },
-  input: {
-    backgroundColor: colors.background,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    color: colors.text,
-    fontSize: 15,
-    minHeight: 48,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  textArea: {
+    flex: 1,
     minHeight: 92,
-    textAlignVertical: 'top',
+    padding: spacing.md,
   },
-  panelHeader: {
+  microMetricValue: {
+    color: colors.black,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  microMetricUnit: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  microMetricLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: spacing.sm,
+  },
+  segmentedLarge: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  segmentLarge: {
     alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    flex: 1,
+    minHeight: 46,
+    justifyContent: 'center',
+  },
+  segmentLargeActive: {
+    backgroundColor: colors.accent,
+  },
+  segmentLargeText: {
+    color: colors.black,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  segmentLargeTextActive: {
+    color: colors.white,
+  },
+  heroPreviewCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+    ...shadows.soft,
+  },
+  heroPreviewImage: {
+    alignItems: 'flex-start',
+    backgroundColor: colors.white,
+    height: 210,
+    justifyContent: 'flex-end',
+    padding: spacing.xl,
+  },
+  heroPreviewStats: {
+    borderTopColor: colors.surfaceMuted,
+    borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  panelTitle: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  estimatePill: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: radii.sm,
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: '700',
-    overflow: 'hidden',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  extractionCopy: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  editRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  chartPanel: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    gap: spacing.lg,
     padding: spacing.lg,
   },
-  panelValue: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
+  chartCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    gap: spacing.lg,
+    padding: spacing.lg,
+    ...shadows.soft,
   },
-  barRow: {
+  dailyBars: {
     alignItems: 'flex-end',
     flexDirection: 'row',
     gap: spacing.sm,
-    height: 112,
+    height: 164,
   },
-  barSlot: {
+  dailyBarSlot: {
     alignItems: 'center',
     flex: 1,
     gap: spacing.sm,
     justifyContent: 'flex-end',
   },
-  bar: {
-    backgroundColor: colors.accent,
+  dailyBarValue: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
+    height: 20,
+  },
+  dailyBar: {
+    backgroundColor: colors.surfaceMuted,
     borderRadius: radii.sm,
-    minHeight: 16,
+    height: 7,
     width: '100%',
   },
-  barLabel: {
+  dailyBarLabel: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  donutRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xl,
+  },
+  donutOuter: {
+    alignItems: 'center',
+    backgroundColor: colors.gold,
+    borderRadius: 120,
+    height: 190,
+    justifyContent: 'center',
+    width: 190,
+  },
+  donutInner: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 80,
+    height: 86,
+    justifyContent: 'center',
+    width: 86,
+  },
+  donutValue: {
+    color: colors.black,
+    fontSize: 32,
+    fontWeight: '900',
+  },
+  donutLabel: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  typeLegend: {
+    flex: 1,
+    gap: spacing.md,
+  },
+  legendRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  legendDot: {
+    borderRadius: 5,
+    height: 10,
+    width: 10,
+  },
+  legendLabel: {
+    color: colors.black,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  legendValue: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  askCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    gap: spacing.md,
+    padding: spacing.lg,
+    ...shadows.soft,
   },
   suggestionList: {
     gap: spacing.sm,
   },
   suggestion: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: colors.background,
     borderRadius: radii.md,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
     minHeight: 48,
     paddingHorizontal: spacing.md,
   },
   suggestionText: {
-    color: colors.text,
+    color: colors.black,
     flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
   answerBubble: {
     backgroundColor: colors.inkSoft,
     borderRadius: radii.md,
     gap: spacing.sm,
-    padding: spacing.lg,
-  },
-  answerTitle: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '700',
+    padding: spacing.md,
   },
   answerText: {
     color: colors.white,
-    fontSize: 15,
-    lineHeight: 23,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 21,
   },
   answerMeta: {
     color: colors.accentSoft,
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 18,
-  },
-  boundaryBox: {
-    alignItems: 'flex-start',
-    backgroundColor: colors.accentSoft,
-    borderRadius: radii.md,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  boundaryBoxBlocked: {
-    borderColor: colors.accent,
-    borderWidth: 1,
-  },
-  boundaryText: {
-    color: colors.accent,
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 19,
-  },
-  settingsList: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-  },
-  settingsRow: {
-    alignItems: 'center',
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.md,
-    minHeight: 64,
-    paddingHorizontal: spacing.lg,
-  },
-  settingsText: {
-    flex: 1,
-  },
-  settingsLabel: {
-    color: colors.text,
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: '700',
-  },
-  settingsValue: {
-    color: colors.textMuted,
-    fontSize: 13,
-    marginTop: 2,
+    lineHeight: 17,
   },
   tabBar: {
+    alignSelf: 'center',
     backgroundColor: colors.surface,
-    borderColor: colors.border,
+    borderColor: colors.white,
     borderRadius: radii.md,
     borderWidth: 1,
-    bottom: spacing.lg,
+    bottom: spacing.xl,
     flexDirection: 'row',
-    left: spacing.lg,
-    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    minHeight: 72,
+    padding: spacing.sm,
     position: 'absolute',
-    right: spacing.lg,
+    width: 300,
+    ...shadows.soft,
   },
   tabButton: {
     alignItems: 'center',
+    borderRadius: radii.md,
     flex: 1,
-    gap: 2,
-    minHeight: 48,
     justifyContent: 'center',
   },
-  tabLabel: {
-    color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  tabLabelActive: {
-    color: colors.accent,
+  tabButtonActive: {
+    backgroundColor: colors.surfaceMuted,
   },
 });

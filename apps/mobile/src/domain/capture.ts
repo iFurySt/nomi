@@ -6,10 +6,17 @@ export type CaptureDraft = {
   kind: CaptureKind;
   title?: string;
   note?: string;
+  category?: string;
+  subtype?: string;
+  mealTime?: string;
+  energy?: string;
+  calories?: string;
+  protein?: string;
+  confidence?: number;
 };
 
 export const captureKindToRecordType: Record<CaptureKind, RecordType> = {
-  camera: 'document',
+  camera: 'food',
   upload: 'document',
   food: 'food',
   body_stats: 'body_stats',
@@ -22,20 +29,24 @@ export function createRecordFromCapture(draft: CaptureDraft, existingCount = 0):
   const id = `local-${Date.now()}-${existingCount + 1}`;
 
   if (type === 'food') {
+    const titleParts = [draft.subtype, draft.category].filter(Boolean);
+
     return {
       id,
       type,
       occurredAt,
-      source: 'manual',
-      title: draft.title || 'Quick meal',
-      summary: draft.note || 'Manual meal added from Capture.',
+      source: draft.kind === 'camera' ? 'ai_extract' : 'manual',
+      title: draft.title || titleParts.join(' ') || 'AI-reviewed meal',
+      summary: draft.note || `${draft.mealTime ?? 'Meal'} saved after AI extraction review.`,
       values: {
-        calories: '540 kcal',
-        protein: '28 g',
+        calories: draft.calories ?? '540 kcal',
+        protein: draft.protein ?? '28 g',
         carbs: '62 g',
         fat: '18 g',
+        category: draft.category ?? 'Food',
+        subtype: draft.subtype ?? 'Lunch',
       },
-      confidence: 0.72,
+      confidence: draft.confidence ?? 0.72,
     };
   }
 
@@ -78,9 +89,10 @@ export function createRecordFromCapture(draft: CaptureDraft, existingCount = 0):
     summary: draft.note || 'Image saved with AI extraction estimate ready to review.',
     values: {
       status: 'Estimate',
-      items: 'review needed',
+      items: draft.category ?? 'review needed',
+      subtype: draft.subtype ?? 'Unsorted',
     },
-    confidence: 0.66,
+    confidence: draft.confidence ?? 0.66,
   };
 }
 

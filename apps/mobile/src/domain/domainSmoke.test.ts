@@ -17,6 +17,24 @@ assert.equal(documentRecord.type, 'document');
 assert.equal(documentRecord.source, 'screenshot');
 assert.equal(documentRecord.values.status, 'Estimate');
 
+const cameraAiRecord = createRecordFromCapture(
+  {
+    kind: 'camera',
+    category: 'Food',
+    subtype: 'Lunch',
+    mealTime: 'Noon',
+    calories: '540 kcal',
+    protein: '28 g',
+    confidence: 0.66,
+  },
+  todayRecords.length + 3,
+);
+assert.equal(cameraAiRecord.type, 'food');
+assert.equal(cameraAiRecord.source, 'ai_extract');
+assert.equal(cameraAiRecord.values.category, 'Food');
+assert.equal(cameraAiRecord.values.subtype, 'Lunch');
+assert.equal(cameraAiRecord.confidence, 0.66);
+
 const summary = summarizeRecords([foodRecord, bodyRecord, documentRecord, ...todayRecords]);
 assert.equal(summary.protein > 0, true);
 assert.equal(summary.latestWeight, '70.8 kg');
