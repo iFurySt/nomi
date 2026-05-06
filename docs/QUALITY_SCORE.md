@@ -15,7 +15,7 @@
 | --- | --- | --- | --- |
 | 产品面 | B | 已有 Nomi MVP spec、非医疗边界、设计原则和 mobile skeleton。 | 下一步让 capture 真正写入本地 record store。 |
 | 架构文档 | B | 已替换为 Nomi 的 mobile / server / Postgres 目标结构，并明确复用 `../seedx` daemon。 | server、SeedX command 调度和 Postgres 落地后继续补启动与数据流细节。 |
-| 前端 | B | Expo app 可启动，已从基础六页 skeleton 收敛为 Snap / Log / Review 三入口；Capture 以拍照为主，AI review 结果可用选项 chips 修改，保存后写入本地 records。 | 接入持久化、本地图表派生数据、真实相机 / 相册能力和 API adapter。 |
+| 前端 | B | Expo app 可启动，已从 Snap / Log / Review 收口为 iPhone 优先的 upload-only 工作台；底栏中央 FAB 可动画展开拍摄、相册、文件入口，真实 picker 已接入，上传处理态和原图 / cutout / AI 分类结果可截图验证；已新增 iOS Vision cutout Expo module。 | 用 iOS development build 验证 native cutout 编译和真机输出，接入 server persistence、真实 AI 分类 adapter 和更细的组件测试。 |
 | 测试 | C | 已有 mobile TypeScript 检查、domain smoke、Expo web smoke 截图。 | 增加更细的组件 / store 测试和仓库级 mobile check 命令。 |
 | 后端 | B | Go server 可启动，health、records、Ask mock、Postgres schema 和 SeedX `/daemon/connect` endpoint 已落地；SeedX websocket 支持 Bearer API key。 | 补 records / Ask 用户认证、Postgres 集成测试和 mobile API adapter。 |
 | 可观测性 | C | Server 已使用 Zap 日志，websocket smoke 能看到 connected / sent / received。 | 补 metrics / traces、websocket 指标和结构化 request id。 |

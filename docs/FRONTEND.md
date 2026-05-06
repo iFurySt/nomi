@@ -21,16 +21,17 @@ npx expo start --web --port 8081 --clear
 
 ## 当前界面
 
-- Snap / Capture：默认主入口。用户先拍照或从相册选择，随后查看 AI review card；记录类型、子类型、时间段、分量和置信状态都优先用 chips / tiles 选择，名称输入是可选项。
-- Log / Calendar：月历作为记录概览，突出当天缩略视觉、Add Record 主按钮、今日 summary、统计 strip、本地 records 筛选和最近记录。
-- Review / Insights：统计分段控件、日记录柱状图、类型占比和 Ask Nomi。Ask 仍基于本地 records 生成 mock answer，并保留引用记录和非医疗边界。
-- Capture 保存后会立即插入本地 records，并跳转到 Log；当前仍是本地内存数据，尚未接入 server persistence。
+- Upload Workbench：默认主入口。底部导航中央是圆形主按钮，点开后三个来源按钮按拍摄、相册、文件的顺序用 `Animated.stagger` 顺时针展开。
+- Source pickers：拍摄和相册使用 `expo-image-picker`，文件使用 `expo-document-picker`，当前限制为 image 文件，面向 iPhone 上传路径。
+- Upload processing：选择图片后进入上传处理态，显示旋转处理动画、原图已选择、AI 分类已推断、cutout 处理中三步状态。
+- Review result：只展示原图、AI 分类、cutout 单独资产位和 Upload 动作。保存后写入本地 records；当前仍是本地内存数据，尚未接入 server persistence。
+- iOS cutout：`apps/mobile/src/native/imageCutout.ts` 优先调用本地 Expo module `NomiImageCutout`；该 module 位于 `modules/nomi-image-cutout/`，iOS 17+ 走 Vision foreground instance mask 输出透明 PNG。Expo web / 未包含 custom module 的 Expo Go 只展示 native unavailable 状态；真实 cutout 需要 iOS development build / prebuild。
 
 ## 设计约束
 
 - 设计方向以 `docs/DESIGN.md` 为准：quiet、personal、less is more、Apple-like。
-- 当前视觉参考 flomo / indie iOS tools：大留白、柔和背景、陶土色主动作、浮动底栏、轻量 shadow、图片记录感，但仍遵守 8px 以内卡片圆角。
-- 优先使用系统感强的排版、清晰留白、克制色彩、图标按钮和选项控件；Capture 里尽量让用户选择而不是输入。
+- 当前视觉保留暖纸背景、大留白和轻卡片，但产品功能已收口到 upload-only。
+- 优先使用系统感强的排版、清晰留白、克制色彩、图标按钮和选项控件；上传流里尽量让用户选择而不是输入，解释性文案默认删减。
 - 不使用医疗 dashboard、告警、风险评分、红黄警示或诊断 / 治疗文案。
 - Capture 是主动作；Ask 需要保持有来源、有边界的个人记录助手语气。
 
@@ -39,7 +40,8 @@ npx expo start --web --port 8081 --clear
 - 每个 UI milestone 至少运行 `npm run typecheck`。
 - 触及 domain flow 或 AI boundary 时运行 `npm run smoke`。
 - 需要启动 Expo web 并检查关键屏幕能渲染和切换。
-- 有明显视觉改动时，生成或保留截图证据到 `docs/generated/verification/`，并在 history 里记录命令。当前 UIUX 改版截图：`docs/generated/verification/mobile-uiux-capture-2026-05-06.png`。
+- 有明显视觉改动时，生成或保留截图证据到 `docs/generated/verification/`，并在 history 里记录命令。本轮 upload-only 重做截图：`mobile-upload-redesign-idle-2026-05-06.png`、`mobile-upload-redesign-menu-2026-05-06.png`、`mobile-upload-redesign-processing-2026-05-06.png`、`mobile-upload-redesign-review-2026-05-06.png`、`mobile-upload-redesign-menu-refined-2026-05-06.png`、`mobile-upload-redesign-simulator-tuned-2026-05-06.png`。
+- 触及 native module 时，在临时目录做 `expo prebuild` + `pod install` + `xcodebuild ... -sdk iphonesimulator` 编译 smoke，避免把一次性 `ios/` 产物提交回仓库。
 
 ## 测试策略
 

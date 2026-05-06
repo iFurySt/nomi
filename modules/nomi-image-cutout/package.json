@@ -1,0 +1,8 @@
+{
+  "name": "nomi-image-cutout",
+  "version": "0.1.0",
+  "description": "Nomi iOS foreground cutout Expo module.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "private": true
+}

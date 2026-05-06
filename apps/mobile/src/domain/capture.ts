@@ -13,6 +13,9 @@ export type CaptureDraft = {
   calories?: string;
   protein?: string;
   confidence?: number;
+  originalAssetUri?: string;
+  cutoutAssetUri?: string;
+  cutoutState?: 'pending' | 'ready' | 'native-unavailable';
 };
 
 export const captureKindToRecordType: Record<CaptureKind, RecordType> = {
@@ -91,6 +94,8 @@ export function createRecordFromCapture(draft: CaptureDraft, existingCount = 0):
       status: 'Estimate',
       items: draft.category ?? 'review needed',
       subtype: draft.subtype ?? 'Unsorted',
+      originalAsset: draft.originalAssetUri ? 'available' : 'pending',
+      cutoutAsset: draft.cutoutAssetUri ? 'available' : draft.cutoutState ?? 'pending',
     },
     confidence: draft.confidence ?? 0.66,
   };

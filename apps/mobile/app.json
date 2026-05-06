@@ -13,7 +13,13 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Nomi uses the camera to capture the original image for upload.",
+        "NSPhotoLibraryUsageDescription": "Nomi uses the photo library to select the original image for upload.",
+        "NSPhotoLibraryAddUsageDescription": "Nomi may save generated upload assets when you choose to keep them."
+      },
+      "bundleIdentifier": "com.anonymous.nomi"
     },
     "android": {
       "adaptiveIcon": {

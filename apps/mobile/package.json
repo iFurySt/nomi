@@ -4,8 +4,8 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "smoke": "tsx src/domain/domainSmoke.test.ts"
@@ -14,10 +14,14 @@
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.3",
     "expo": "~54.0.33",
+    "expo-document-picker": "~14.0.8",
+    "expo-image-picker": "~17.0.11",
     "expo-status-bar": "~3.0.9",
+    "nomi-image-cutout": "file:../../modules/nomi-image-cutout",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-safe-area-context": "~5.6.0",
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {

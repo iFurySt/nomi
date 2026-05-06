@@ -4,7 +4,7 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 
 ## 当前仓库结构
 
-- `apps/mobile/`：Expo mobile app。当前包含 Home、Timeline、Capture、Trends、Ask、Settings 六个基础界面，本地内存 record flow，mock trends 数据和 AI boundary smoke。
+- `apps/mobile/`：Expo mobile app。当前收敛为 iPhone 优先的单一上传工作台：底部中央圆形入口展开拍摄 / 相册 / 文件三种来源，选择后进入原图 AI 分类、上传处理动画和原图 / 抠图区分展示；保存仍写入本地内存 records，Ask boundary smoke 保留在 domain 层。
 - `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、Postgres schema 初始化和 SeedX daemon websocket 控制面。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。
 - `docs/exec-plans/completed/`：已完成的跨 milestone 执行计划。
@@ -27,7 +27,7 @@ MVP 目标拓扑：
 3. `../seedx` 的 `seedx daemon connect` 在用户设备启动后主动连接 Go server 的 websocket 地址。
 4. Go server 通过 SeedX daemon 协议发送 `daemon:ping` / 后续 `daemon:command`，SeedX 返回 `daemon:pong` / `daemon:result`。
 
-当前 mobile app 还没有接入 server，使用本地内存 records 和 mock trends 展示核心信息架构、capture 保存路径和 AI 问答边界。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`，并在启动时初始化 Postgres records schema。SeedX 连接使用 `GET /daemon/connect`，同时保留旧的 `GET /seedx/ws` 兼容本地 smoke；daemon API key 通过 `Authorization: Bearer ...` WebSocket 握手 header 传递。
+当前 mobile app 还没有接入 server，使用本地内存 records 保存上传结果，并用 mock AI 分类展示 capture 保存路径。原图选择已经通过 Expo camera / image library / document picker 接到真实 picker 边界；iPhone 端侧抠图由本地 Expo iOS module `modules/nomi-image-cutout/` 封装，使用 iOS 17+ Vision foreground instance mask 生成透明 PNG。Expo web 预览和未包含该 module 的 Expo Go 只能展示 native unavailable 状态；真实 cutout 需要 iOS development build / prebuild。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`，并在启动时初始化 Postgres records schema。SeedX 连接使用 `GET /daemon/connect`，同时保留旧的 `GET /seedx/ws` 兼容本地 smoke；daemon API key 通过 `Authorization: Bearer ...` WebSocket 握手 header 传递。
 
 ## 边界
 
