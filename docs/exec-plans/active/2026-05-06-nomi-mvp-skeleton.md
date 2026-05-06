@@ -67,7 +67,7 @@
 - [x] 完成 mobile app skeleton。
 - [x] 完成 mobile domain flow。
 - [x] 完成 Go server + Postgres skeleton。
-- [ ] 完成 SeedX daemon + websocket skeleton。
+- [x] 完成 SeedX daemon + websocket skeleton。
 - [ ] 完成最终验收和 plan 归档。
 
 ## 决策记录

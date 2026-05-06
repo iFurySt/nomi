@@ -6,6 +6,7 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 
 - `apps/mobile/`：Expo mobile app。当前包含 Home、Timeline、Capture、Trends、Ask、Settings 六个基础界面，本地内存 record flow，mock trends 数据和 AI boundary smoke。
 - `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary 和 Postgres schema 初始化。
+- `apps/seedx-daemon/`：Go local daemon。当前主动连接 server websocket，完成 mock SeedX event exchange。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。
 - `docs/exec-plans/active/`：当前跨 milestone 执行计划。
 - `docs/generated/verification/`：本地验证生成物，例如 UI 截图。
@@ -13,7 +14,7 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 
 ## 计划中的结构
 
-- `apps/server/`：Go API server，负责 record、ask/mock 和 Postgres 访问；daemon websocket endpoint 在下一 milestone 补齐。
+- `apps/server/`：Go API server，负责 record、ask/mock、Postgres 访问和 SeedX websocket endpoint。
 - `apps/seedx-daemon/`：Go daemon，启动后主动连接服务端 websocket，并在本机侧适配 SeedX 事件。
 - `packages/`：跨 mobile / server / daemon 共享的契约、领域类型或生成物。只有真正出现跨端重复时再新增。
 - `infra/local/`：本地 Postgres、服务编排和开发依赖配置。
@@ -28,7 +29,7 @@ MVP 目标拓扑：
 3. SeedX daemon 在用户设备启动后主动连接 Go server 的 websocket 地址。
 4. Go server 通过 websocket 向 daemon 投递 SeedX 事件，daemon 返回 mock 或真实 SeedX response。
 
-当前 mobile app 还没有接入 server，使用本地内存 records 和 mock trends 展示核心信息架构、capture 保存路径和 AI 问答边界。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`，并在启动时初始化 Postgres records schema。
+当前 mobile app 还没有接入 server，使用本地内存 records 和 mock trends 展示核心信息架构、capture 保存路径和 AI 问答边界。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`，并在启动时初始化 Postgres records schema。SeedX daemon 已能主动连接 `GET /seedx/ws`，发送 `daemon.ready`，接收 `seedx.request`，返回 `seedx.response`。
 
 ## 边界
 
@@ -44,6 +45,8 @@ MVP 目标拓扑：
 - Mobile web preview：`cd apps/mobile && npx expo start --web --port 8081`
 - Server tests：`cd apps/server && go test ./...`
 - Server local run：`cd apps/server && go run ./cmd/nomi-server --addr :8088`
+- Daemon tests：`cd apps/seedx-daemon && go test ./...`
+- Daemon websocket smoke：先启动 server，再运行 `cd apps/seedx-daemon && go run ./cmd/nomi-seedx-daemon --server-url ws://localhost:8088/seedx/ws --once`
 - 文档检查：`make check-docs`
 
 随着 server、daemon 和 Postgres 落地，本节需要继续补齐对应启动、测试和观测命令。

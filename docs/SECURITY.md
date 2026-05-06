@@ -24,3 +24,4 @@
 
 - 当前 server skeleton 尚未实现认证，只能用于本地开发。
 - 接入真实 mobile client 或云端前必须增加认证、授权、请求大小限制、CORS 策略和审计日志。
+- 当前 websocket origin check 只允许本地开发 host；云端模式必须改为基于 daemon 身份和短期凭据的认证。

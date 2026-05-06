@@ -35,6 +35,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /records", h.listRecords)
 	mux.HandleFunc("POST /records", h.createRecord)
 	mux.HandleFunc("POST /ask", h.ask)
+	mux.HandleFunc("GET /seedx/ws", h.seedXWebSocket)
 	return withJSONHeaders(mux)
 }
 

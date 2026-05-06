@@ -25,6 +25,20 @@ go test ./...
 go run ./cmd/nomi-server --addr :8088
 ```
 
+## SeedX Websocket
+
+The local daemon connects to:
+
+```text
+ws://localhost:8088/seedx/ws
+```
+
+Current mock flow:
+
+1. Daemon sends `daemon.ready`.
+2. Server sends `seedx.request`.
+3. Daemon sends `seedx.response`.
+
 ## Smoke
 
 ```sh

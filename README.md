@@ -36,6 +36,16 @@ go test ./...
 go run ./cmd/nomi-server --addr :8088
 ```
 
+## SeedX Daemon 本地验证
+
+先启动 server，再运行：
+
+```sh
+cd apps/seedx-daemon
+go test ./...
+go run ./cmd/nomi-seedx-daemon --server-url ws://localhost:8088/seedx/ws --once
+```
+
 ## 许可证
 
 [MIT](LICENSE)
