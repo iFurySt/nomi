@@ -12,7 +12,12 @@ const bodyRecord = createRecordFromCapture({ kind: 'body_stats' }, todayRecords.
 assert.equal(bodyRecord.type, 'body_stats');
 assert.equal(bodyRecord.values.weight, '70.8 kg');
 
-const summary = summarizeRecords([foodRecord, bodyRecord, ...todayRecords]);
+const documentRecord = createRecordFromCapture({ kind: 'upload', title: 'Smoke screenshot' }, todayRecords.length + 2);
+assert.equal(documentRecord.type, 'document');
+assert.equal(documentRecord.source, 'screenshot');
+assert.equal(documentRecord.values.status, 'Estimate');
+
+const summary = summarizeRecords([foodRecord, bodyRecord, documentRecord, ...todayRecords]);
 assert.equal(summary.protein > 0, true);
 assert.equal(summary.latestWeight, '70.8 kg');
 
