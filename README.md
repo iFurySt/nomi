@@ -27,6 +27,15 @@ npx expo start --web --port 8081
 make check-docs
 ```
 
+## Server 本地启动
+
+```sh
+docker exec postgres17 createdb -U bytedance nomi
+cd apps/server
+go test ./...
+go run ./cmd/nomi-server --addr :8088
+```
+
 ## 许可证
 
 [MIT](LICENSE)

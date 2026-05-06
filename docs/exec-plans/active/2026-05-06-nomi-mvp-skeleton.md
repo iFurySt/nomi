@@ -66,7 +66,7 @@
 - [x] 完成产品定义与执行计划 milestone 验证并提交。
 - [x] 完成 mobile app skeleton。
 - [x] 完成 mobile domain flow。
-- [ ] 完成 Go server + Postgres skeleton。
+- [x] 完成 Go server + Postgres skeleton。
 - [ ] 完成 SeedX daemon + websocket skeleton。
 - [ ] 完成最终验收和 plan 归档。
 

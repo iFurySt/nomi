@@ -17,5 +17,6 @@
 | 架构文档 | B | 已替换为 Nomi 的 mobile / server / daemon / Postgres 目标结构。 | server、daemon 和 Postgres 落地后继续补启动与数据流细节。 |
 | 前端 | B | Expo app 可启动，六个必需界面可切换，Capture 能写入本地 records，Timeline 和 Ask 会读取本地状态。 | 接入持久化、本地图表派生数据和真实 API adapter。 |
 | 测试 | C | 已有 mobile TypeScript 检查、domain smoke、Expo web smoke 截图。 | 增加更细的组件 / store 测试和仓库级 mobile check 命令。 |
-| 可观测性 | D | server / daemon 尚未实现，日志和 websocket 观测还没落地。 | Go skeleton 阶段引入 zap structured logs 和本地 websocket smoke。 |
-| 安全 | C | 产品 spec 已明确敏感数据、删除、导出和非医疗边界。 | 接入真实 API 前补隐私文案、数据删除实现和第三方 AI 同意流程。 |
+| 后端 | C | Go server 可启动，health、records、Ask mock 和 Postgres schema 已落地。 | 补 websocket endpoint、API 认证边界和 Postgres 集成测试。 |
+| 可观测性 | C | Server 已使用 Zap 日志、healthcheck 和基础错误码；daemon 还未实现。 | Daemon milestone 补 websocket connection / event logs。 |
+| 安全 | C | 已明确敏感数据、本地凭据、AI 阻断和未认证 API 限制。 | 接入真实 API 前补认证、请求大小限制、CORS、删除实现和第三方 AI 同意流程。 |
