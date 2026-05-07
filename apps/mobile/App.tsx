@@ -7,6 +7,7 @@ import {
   Animated,
   Easing,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,31 +16,19 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-import { CaptureDraft, createRecordFromCapture } from './src/domain/capture';
 import { timelineRecords } from './src/domain/mockData';
+import {
+  classifyUploadAsset,
+  createRecordFromUploadSession,
+  PickedUploadAsset,
+  UploadSession,
+  UploadSource,
+} from './src/domain/upload';
 import { generateNativeCutout } from './src/native/imageCutout';
 import { NomiRecord } from './src/domain/records';
 import { colors, radii, shadows, spacing } from './src/ui/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type UploadSource = 'camera' | 'library' | 'file';
-type UploadPhase = 'idle' | 'processing' | 'ready' | 'uploaded';
-type CutoutState = 'pending' | 'ready' | 'native-unavailable';
-
-type PickedAsset = {
-  uri?: string;
-  name: string;
-  source: UploadSource;
-};
-
-type UploadSession = {
-  asset: PickedAsset;
-  category: string;
-  confidence: number;
-  cutoutUri?: string;
-  cutoutState: CutoutState;
-  phase: UploadPhase;
-};
 
 const actionItems: Array<{
   key: UploadSource;
@@ -63,10 +52,30 @@ export default function App() {
   const savedCount = records.length - timelineRecords.length;
   const phase = session?.phase ?? 'idle';
 
-  const beginUpload = (asset: PickedAsset) => {
+  useEffect(() => {
+    const applyDeepLink = (url: string | null) => {
+      const deepLinkSession = getDeepLinkSession(url);
+      if (!deepLinkSession) {
+        return;
+      }
+
+      setErrorMessage(null);
+      setMenuOpen(false);
+      setSession(deepLinkSession);
+    };
+
+    void Linking.getInitialURL().then(applyDeepLink);
+    const subscription = Linking.addEventListener('url', ({ url }) => applyDeepLink(url));
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const beginUpload = (asset: PickedUploadAsset) => {
     setErrorMessage(null);
     setMenuOpen(false);
-    const category = classifyOriginal(asset);
+    const category = classifyUploadAsset(asset);
 
     setSession({
       asset,
@@ -79,7 +88,7 @@ export default function App() {
     void completeUploadPipeline(asset);
   };
 
-  const completeUploadPipeline = async (asset: PickedAsset) => {
+  const completeUploadPipeline = async (asset: PickedUploadAsset) => {
     const [cutout] = await Promise.all([generateNativeCutout(asset.uri), delay(720)]);
 
     setSession((current) => {
@@ -155,7 +164,11 @@ export default function App() {
         });
       }
     } catch {
-      setErrorMessage('The picker could not open. Try another source.');
+      setErrorMessage(
+        source === 'camera'
+          ? 'Camera is unavailable on this device or simulator. Try Photos or Files.'
+          : 'The picker could not open. Try another source.',
+      );
     }
   };
 
@@ -164,19 +177,7 @@ export default function App() {
       return;
     }
 
-    const draft: CaptureDraft = {
-      kind: session.asset.source === 'file' ? 'upload' : 'camera',
-      category: session.category,
-      subtype: 'AI category',
-      title: `${session.category} upload`,
-      note: buildUploadNote(session),
-      confidence: session.confidence,
-      originalAssetUri: session.asset.uri,
-      cutoutAssetUri: session.cutoutUri,
-      cutoutState: session.cutoutState,
-    };
-
-    const record = createRecordFromCapture(draft, records.length);
+    const record = createRecordFromUploadSession(session, records.length);
     setRecords((currentRecords) => [record, ...currentRecords]);
     setSession((current) => (current ? { ...current, phase: 'uploaded' } : current));
   };
@@ -226,6 +227,26 @@ function getInitialMenuOpen() {
   return getLocationHash() === '#menu-open';
 }
 
+function getDeepLinkSession(url: string | null): UploadSession | null {
+  if (!url || !url.includes('e2e/upload-camera-review')) {
+    return null;
+  }
+
+  const asset: PickedUploadAsset = {
+    name: 'e2e-camera-photo.jpg',
+    source: 'camera',
+  };
+  const category = classifyUploadAsset(asset);
+
+  return {
+    asset,
+    category: category.label,
+    confidence: category.confidence,
+    cutoutState: 'native-unavailable',
+    phase: 'ready',
+  };
+}
+
 function getInitialSession(): UploadSession | null {
   const hash = getLocationHash();
 
@@ -266,33 +287,10 @@ function getLocationHash() {
   return window.location.hash;
 }
 
-function classifyOriginal(asset: PickedAsset) {
-  const name = asset.name.toLowerCase();
-
-  if (asset.source === 'camera' || name.includes('meal') || name.includes('food') || name.includes('lunch')) {
-    return { label: 'Food', confidence: 0.82 };
-  }
-
-  if (name.includes('body') || name.includes('weight') || name.includes('scan')) {
-    return { label: 'Body', confidence: 0.76 };
-  }
-
-  return { label: 'Image', confidence: asset.source === 'file' ? 0.71 : 0.74 };
-}
-
 function delay(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
-}
-
-function buildUploadNote(session: UploadSession) {
-  const cutoutCopy =
-    session.cutoutState === 'ready'
-      ? 'iOS foreground cutout completed.'
-      : 'iOS foreground cutout requires the native Vision boundary.';
-
-  return `Original classified as ${session.category}. ${cutoutCopy}`;
 }
 
 function Header({ savedCount }: { savedCount: number }) {
@@ -423,20 +421,26 @@ function ResultState({
           color={cutoutReady ? colors.moss : colors.accent}
         />
         <View style={styles.nativeCopy}>
-          <Text style={styles.nativeTitle}>{cutoutReady ? 'iPhone cutout ready' : 'Native cutout boundary needed'}</Text>
+          <Text style={styles.nativeTitle}>{cutoutReady ? 'iPhone cutout ready' : 'Cutout unavailable'}</Text>
           <Text style={styles.nativeText}>
             {cutoutReady
               ? 'On iOS this maps to the Vision foreground mask / subject lift capability.'
-              : 'Expo web cannot run Apple Vision. The native iOS module should call the Vision foreground mask request.'}
+              : 'Cutout needs an iOS development build and a photo where Vision can find a foreground subject.'}
           </Text>
         </View>
       </View>
 
       <View style={styles.resultActions}>
-        <Pressable accessibilityRole="button" onPress={onReset} style={styles.secondaryButton}>
+        <Pressable
+          accessibilityLabel="Reset upload"
+          accessibilityRole="button"
+          onPress={onReset}
+          style={styles.secondaryButton}
+        >
           <Ionicons name="reload-outline" size={20} color={colors.text} />
         </Pressable>
         <Pressable
+          accessibilityLabel={uploaded ? 'Uploaded' : 'Upload'}
           accessibilityRole="button"
           disabled={uploaded}
           onPress={onUpload}
@@ -548,7 +552,7 @@ function AssetPanel({
 }: {
   title: string;
   icon: IconName;
-  asset?: PickedAsset;
+  asset?: PickedUploadAsset;
   mode: 'original' | 'cutout';
   unavailable?: boolean;
 }) {

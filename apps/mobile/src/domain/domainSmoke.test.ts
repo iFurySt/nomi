@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { answerFromRecords, hasMedicalIntent } from './aiBoundary';
 import { createRecordFromCapture, summarizeRecords } from './capture';
 import { todayRecords } from './mockData';
+import { buildUploadNote, classifyUploadAsset, createRecordFromUploadSession, UploadSession } from './upload';
 
 const foodRecord = createRecordFromCapture({ kind: 'food', title: 'Smoke meal' }, todayRecords.length);
 assert.equal(foodRecord.type, 'food');
@@ -34,6 +35,51 @@ assert.equal(cameraAiRecord.source, 'ai_extract');
 assert.equal(cameraAiRecord.values.category, 'Food');
 assert.equal(cameraAiRecord.values.subtype, 'Lunch');
 assert.equal(cameraAiRecord.confidence, 0.66);
+
+assert.deepEqual(classifyUploadAsset({ name: 'body-scan.png', source: 'file' }), { label: 'Body', confidence: 0.76 });
+assert.deepEqual(classifyUploadAsset({ name: 'lunch-photo.jpg', source: 'library' }), {
+  label: 'Food',
+  confidence: 0.82,
+});
+assert.deepEqual(classifyUploadAsset({ name: 'receipt.png', source: 'file' }), { label: 'Image', confidence: 0.71 });
+
+const uploadSession: UploadSession = {
+  asset: {
+    name: 'receipt.png',
+    source: 'file',
+    uri: 'file:///receipt.png',
+  },
+  category: 'Image',
+  confidence: 0.71,
+  cutoutState: 'ready',
+  cutoutUri: 'file:///cutout.png',
+  phase: 'ready',
+};
+assert.match(buildUploadNote(uploadSession), /iOS foreground cutout completed/);
+
+const uploadedFileRecord = createRecordFromUploadSession(uploadSession, todayRecords.length + 4);
+assert.equal(uploadedFileRecord.type, 'document');
+assert.equal(uploadedFileRecord.source, 'screenshot');
+assert.equal(uploadedFileRecord.values.originalAsset, 'available');
+assert.equal(uploadedFileRecord.values.cutoutAsset, 'available');
+
+const uploadedCameraRecord = createRecordFromUploadSession(
+  {
+    asset: {
+      name: 'camera-food.jpg',
+      source: 'camera',
+      uri: 'file:///camera-food.jpg',
+    },
+    category: 'Food',
+    confidence: 0.82,
+    cutoutState: 'native-unavailable',
+    phase: 'ready',
+  },
+  todayRecords.length + 5,
+);
+assert.equal(uploadedCameraRecord.type, 'food');
+assert.equal(uploadedCameraRecord.source, 'ai_extract');
+assert.match(uploadedCameraRecord.summary, /cutout was unavailable/);
 
 const summary = summarizeRecords([foodRecord, bodyRecord, documentRecord, ...todayRecords]);
 assert.equal(summary.protein > 0, true);

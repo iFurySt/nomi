@@ -23,13 +23,15 @@ export async function generateNativeCutout(uri?: string): Promise<NativeCutoutRe
 
   const module = getNativeModule();
   if (!module) {
+    console.info('NomiImageCutout native module is unavailable.');
     return { state: 'native-unavailable' };
   }
 
   try {
     const cutoutUri = await module.generateCutoutAsync(uri);
     return { state: 'ready', uri: cutoutUri };
-  } catch {
+  } catch (error) {
+    console.info('NomiImageCutout failed to generate cutout.', error);
     return { state: 'native-unavailable' };
   }
 }
