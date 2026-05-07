@@ -143,43 +143,34 @@ struct ContentView: View {
 }
 
 struct NomiBottomBar: View {
+    private enum NavSlot: Equatable {
+        case tab(NomiTab)
+        case upload
+    }
+
     @Binding var selectedTab: NomiTab
     let onAdd: () -> Void
     @State private var appeared = false
+    @State private var activeSlot: NavSlot?
+    @State private var dragStartSlot: NavSlot?
+    @State private var lastFeedbackSlot: NavSlot?
     @Namespace private var selectionNamespace
 
     var body: some View {
-        HStack(spacing: 9) {
-            tabButton(.today)
-            tabButton(.trends)
-
-            Button(action: onAdd) {
-                Image(systemName: "plus")
-                    .font(.system(size: 25, weight: .medium))
-                    .frame(width: 56, height: 56)
-                    .background {
-                        Circle()
-                            .fill(Color(red: 0.79, green: 0.44, blue: 0.34))
-                            .glassEffect(.regular.interactive(), in: .circle)
-                    }
-                    .overlay(alignment: .top) {
-                        Capsule()
-                            .fill(.white.opacity(0.36))
-                            .frame(width: 24, height: 1.4)
-                            .padding(.top, 9)
-                    }
+        GeometryReader { proxy in
+            HStack(spacing: 9) {
+                tabButton(.today)
+                tabButton(.trends)
+                uploadButton
+                tabButton(.log)
+                tabButton(.profile)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white)
-            .shadow(color: Color(red: 0.39, green: 0.17, blue: 0.12).opacity(0.18), radius: 14, y: 8)
-            .accessibilityLabel("Upload")
-
-            tabButton(.log)
-            tabButton(.profile)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Capsule(style: .continuous))
+            .gesture(navDragGesture(width: proxy.size.width))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
         .frame(maxWidth: 326)
+        .frame(height: 72)
         .background {
             Capsule(style: .continuous)
                 .fill(Color(red: 1.0, green: 0.99, blue: 0.96).opacity(0.62))
@@ -206,37 +197,113 @@ struct NomiBottomBar: View {
         }
     }
 
+    private var uploadButton: some View {
+        let isActive = activeSlot == .upload
+
+        return Image(systemName: "plus")
+            .font(.system(size: 25, weight: .medium))
+            .frame(width: 56, height: 56)
+            .background {
+                Circle()
+                    .fill(Color(red: 0.79, green: 0.44, blue: 0.34))
+                    .glassEffect(.regular.interactive(), in: .circle)
+            }
+            .overlay(alignment: .top) {
+                Capsule()
+                    .fill(.white.opacity(0.36))
+                    .frame(width: 24, height: 1.4)
+                    .padding(.top, 9)
+            }
+            .foregroundStyle(.white)
+            .scaleEffect(isActive ? 1.06 : 1)
+            .shadow(color: Color(red: 0.39, green: 0.17, blue: 0.12).opacity(isActive ? 0.24 : 0.18), radius: isActive ? 18 : 14, y: 8)
+            .accessibilityLabel("Upload")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                onAdd()
+            }
+    }
+
     private func tabButton(_ tab: NomiTab) -> some View {
         let isSelected = selectedTab == tab
+        let isActive = activeSlot == .tab(tab)
 
-        return Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation(.spring(duration: 0.35, bounce: 0.18)) {
-                selectedTab = tab
+        return VStack(spacing: 5) {
+            Image(systemName: selectedTab == tab ? tab.selectedSymbol : tab.symbol)
+                .font(.system(size: 18, weight: .medium))
+                .symbolEffect(.bounce, value: selectedTab)
+            Text(tab.title)
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .frame(width: 48, height: 50)
+        .foregroundStyle(isSelected ? Color(red: 0.21, green: 0.19, blue: 0.16) : Color(red: 0.42, green: 0.39, blue: 0.34).opacity(0.58))
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(.white.opacity(0.56))
+                    .glassEffect(.regular, in: .rect(cornerRadius: 22))
+                    .matchedGeometryEffect(id: "selectedTab", in: selectionNamespace)
+                    .transition(.scale.combined(with: .opacity))
             }
-        } label: {
-            VStack(spacing: 5) {
-                Image(systemName: selectedTab == tab ? tab.selectedSymbol : tab.symbol)
-                    .font(.system(size: 18, weight: .medium))
-                    .symbolEffect(.bounce, value: selectedTab)
-                Text(tab.title)
-                    .font(.system(size: 10, weight: .semibold))
-            }
-            .frame(width: 48, height: 50)
-            .foregroundStyle(isSelected ? Color(red: 0.21, green: 0.19, blue: 0.16) : Color(red: 0.42, green: 0.39, blue: 0.34).opacity(0.58))
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(.white.opacity(0.56))
-                        .glassEffect(.regular, in: .rect(cornerRadius: 22))
-                        .matchedGeometryEffect(id: "selectedTab", in: selectionNamespace)
-                        .transition(.scale.combined(with: .opacity))
+        }
+        .scaleEffect(isActive ? 1.07 : isSelected ? 1.03 : 1)
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            selectTab(tab)
+        }
+    }
+
+    private func navDragGesture(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .onChanged { value in
+                let slot = navSlot(at: value.location.x, width: width)
+
+                if dragStartSlot == nil {
+                    dragStartSlot = slot
+                }
+
+                if activeSlot != slot {
+                    activeSlot = slot
+                }
+
+                if lastFeedbackSlot != slot {
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    lastFeedbackSlot = slot
+                }
+
+                if case .tab(let tab) = slot, selectedTab != tab {
+                    selectTab(tab)
                 }
             }
-            .scaleEffect(isSelected ? 1.03 : 1)
+            .onEnded { value in
+                let finalSlot = navSlot(at: value.location.x, width: width)
+                let startedOnUpload = dragStartSlot == .upload
+                let wasTap = hypot(value.translation.width, value.translation.height) < 10
+
+                if finalSlot == .upload, startedOnUpload, wasTap {
+                    onAdd()
+                }
+
+                withAnimation(.spring(duration: 0.28, bounce: 0.18)) {
+                    activeSlot = nil
+                }
+                dragStartSlot = nil
+                lastFeedbackSlot = nil
+            }
+    }
+
+    private func navSlot(at x: CGFloat, width: CGFloat) -> NavSlot {
+        let slots: [NavSlot] = [.tab(.today), .tab(.trends), .upload, .tab(.log), .tab(.profile)]
+        let slotWidth = max(width / CGFloat(slots.count), 1)
+        let index = min(max(Int(x / slotWidth), 0), slots.count - 1)
+        return slots[index]
+    }
+
+    private func selectTab(_ tab: NomiTab) {
+        withAnimation(.spring(duration: 0.35, bounce: 0.18)) {
+            selectedTab = tab
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(tab.title)
     }
 }
 
