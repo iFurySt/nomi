@@ -8,7 +8,7 @@
 
 ### User Query
 
-> 将当前 React Native mobile 原型改为 Swift 原生 iOS app，先实现首页和上传上拉页；其他页面占位；风格参考 Apple / Liquid Glass，并在 iPhone 17 Pro simulator 自测截图，每个重要 milestone 提交。后续按截图反馈把上传入口移到底部导航栏中间、加大 Upload sheet 顶部留白，收紧首页 timeline，把底栏从过重的参考图样式调回 Nomi 自身的轻量玻璃语言，恢复底栏按住左右滑动的连续切换交互，并把中间上传入口内化为普通 Add 导航项。
+> 将当前 React Native mobile 原型改为 Swift 原生 iOS app，先实现首页和上传上拉页；其他页面占位；风格参考 Apple / Liquid Glass，并在 iPhone 17 Pro simulator 自测截图，每个重要 milestone 提交。后续按截图反馈把上传入口移到底部导航栏中间、加大 Upload sheet 顶部留白，收紧首页 timeline，把底栏从过重的参考图样式调回 Nomi 自身的轻量玻璃语言，恢复底栏按住左右滑动的连续切换交互，把中间上传入口内化为普通 Add 导航项，并让拖动到 Add 后松手等效于点击 Add。
 
 ### Changes Overview
 
@@ -21,7 +21,7 @@
 - **Upload sheet**: 实现上拉上传页，支持 Camera placeholder、PhotosPicker、fileImporter、图片选择后的本地 timeline 插入路径，以及上传进度动画。
 - **Feedback pass**: 根据视觉反馈移除顶部 `+`，新增自定义底部 glass nav；Upload sheet 顶部标题和关闭按钮增加上边距；timeline 改成时间 rail + 88pt 紧凑卡片。
 - **Bottom nav correction**: 将上一版过大的黑色胶囊底栏收回为较小的暖色玻璃底栏，中间上传入口保持主动作位置，tab 选中态改为滑动玻璃底托以保留按键之间的流动感。
-- **Bottom nav gesture**: 将底栏从多个孤立按钮改为整条 bar 的 `DragGesture(minimumDistance: 0)`，按住左右滑动时根据手指 x 位置实时切换 tab；松开落在 tab 上即选中，松开落在 Add 上即打开上传。
+- **Bottom nav gesture**: 将底栏从多个孤立按钮改为整条 bar 的 `DragGesture(minimumDistance: 0)`，按住左右滑动时根据手指 x 位置预览高亮；松开落在 tab 上即选中，松开落在 Add 上即打开上传。
 - **Upload nav item**: 将中间上传入口从独立圆形 `+` 改为普通 Add 导航项，和其他 tab 保持 48x50 尺寸、文字标签、轻量按压反馈与底栏调性一致。
 - **Motion / style**: 使用 SwiftUI spring / smooth 动画、symbolEffect、contentTransition、glass button style 和 glassEffect，贴近 Apple-like / Liquid Glass 方向。
 - **Verification**: 在 iPhone 17 Pro simulator build / install / launch，并保存首页和上传 sheet 截图。

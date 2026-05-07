@@ -156,6 +156,10 @@ struct NomiBottomBar: View {
     @State private var lastFeedbackSlot: NavSlot?
     @Namespace private var selectionNamespace
 
+    private var highlightedSlot: NavSlot {
+        activeSlot ?? .tab(selectedTab)
+    }
+
     var body: some View {
         GeometryReader { proxy in
             HStack(spacing: 9) {
@@ -198,26 +202,27 @@ struct NomiBottomBar: View {
     }
 
     private var uploadButton: some View {
-        let isActive = activeSlot == .upload
+        let isHighlighted = highlightedSlot == .upload
 
         return VStack(spacing: 5) {
             Image(systemName: "plus")
                 .font(.system(size: 19, weight: .semibold))
-                .symbolEffect(.bounce, value: activeSlot)
+                .symbolEffect(.bounce, value: highlightedSlot)
             Text("Add")
                 .font(.system(size: 10, weight: .semibold))
         }
         .frame(width: 48, height: 50)
-        .foregroundStyle(Color(red: 0.66, green: 0.36, blue: 0.29).opacity(isActive ? 1 : 0.76))
+        .foregroundStyle(Color(red: 0.66, green: 0.36, blue: 0.29).opacity(isHighlighted ? 1 : 0.76))
         .background {
-            if isActive {
+            if isHighlighted {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(Color(red: 0.80, green: 0.43, blue: 0.34).opacity(0.12))
                     .glassEffect(.regular, in: .rect(cornerRadius: 22))
+                    .matchedGeometryEffect(id: "highlightedSlot", in: selectionNamespace)
                     .transition(.scale.combined(with: .opacity))
             }
         }
-        .scaleEffect(isActive ? 1.07 : 1)
+        .scaleEffect(isHighlighted ? 1.07 : 1)
         .accessibilityLabel("Upload")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction {
@@ -226,28 +231,28 @@ struct NomiBottomBar: View {
     }
 
     private func tabButton(_ tab: NomiTab) -> some View {
-        let isSelected = selectedTab == tab
+        let isHighlighted = highlightedSlot == .tab(tab)
         let isActive = activeSlot == .tab(tab)
 
         return VStack(spacing: 5) {
-            Image(systemName: selectedTab == tab ? tab.selectedSymbol : tab.symbol)
+            Image(systemName: isHighlighted ? tab.selectedSymbol : tab.symbol)
                 .font(.system(size: 18, weight: .medium))
-                .symbolEffect(.bounce, value: selectedTab)
+                .symbolEffect(.bounce, value: highlightedSlot)
             Text(tab.title)
                 .font(.system(size: 10, weight: .semibold))
         }
         .frame(width: 48, height: 50)
-        .foregroundStyle(isSelected ? Color(red: 0.21, green: 0.19, blue: 0.16) : Color(red: 0.42, green: 0.39, blue: 0.34).opacity(0.58))
+        .foregroundStyle(isHighlighted ? Color(red: 0.21, green: 0.19, blue: 0.16) : Color(red: 0.42, green: 0.39, blue: 0.34).opacity(0.58))
         .background {
-            if isSelected {
+            if isHighlighted {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(.white.opacity(0.56))
                     .glassEffect(.regular, in: .rect(cornerRadius: 22))
-                    .matchedGeometryEffect(id: "selectedTab", in: selectionNamespace)
+                    .matchedGeometryEffect(id: "highlightedSlot", in: selectionNamespace)
                     .transition(.scale.combined(with: .opacity))
             }
         }
-        .scaleEffect(isActive ? 1.07 : isSelected ? 1.03 : 1)
+        .scaleEffect(isActive ? 1.07 : isHighlighted ? 1.03 : 1)
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction {
@@ -265,22 +270,23 @@ struct NomiBottomBar: View {
                 }
 
                 if activeSlot != slot {
-                    activeSlot = slot
+                    withAnimation(.spring(duration: 0.34, bounce: 0.18)) {
+                        activeSlot = slot
+                    }
                 }
 
                 if lastFeedbackSlot != slot {
                     UISelectionFeedbackGenerator().selectionChanged()
                     lastFeedbackSlot = slot
                 }
-
-                if case .tab(let tab) = slot, selectedTab != tab {
-                    selectTab(tab)
-                }
             }
             .onEnded { value in
                 let finalSlot = navSlot(at: value.location.x, width: width)
 
-                if finalSlot == .upload {
+                switch finalSlot {
+                case .tab(let tab):
+                    selectTab(tab)
+                case .upload:
                     onAdd()
                 }
 
