@@ -78,9 +78,9 @@ enum UploadSource: String, CaseIterable, Identifiable {
 
     var copy: String {
         switch self {
-        case .camera: "Capture a fresh record"
-        case .photos: "Choose from library"
-        case .files: "Import an image file"
+        case .camera: "Camera"
+        case .photos: "Library"
+        case .files: "File"
         }
     }
 }
@@ -886,52 +886,44 @@ struct UploadSheet: View {
     @State private var controlsAppeared = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            NomiBackground()
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Add")
+                .font(.system(size: 34, weight: .semibold, design: .rounded))
 
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Upload")
-                        .font(.system(size: 34, weight: .semibold, design: .rounded))
-                    Text("Add one thing from today.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+            sourcePicker
+
+            uploadPreview
+
+            Spacer(minLength: 8)
+
+            Button {
+                if importedImage == nil {
+                    choose(selectedSource)
+                } else {
+                    startUpload()
                 }
-
-                sourcePicker
-
-                uploadPreview
-
-                Spacer(minLength: 8)
-
-                Button {
-                    if importedImage == nil {
-                        choose(selectedSource)
-                    } else {
-                        startUpload()
+            } label: {
+                HStack {
+                    if isUploading {
+                        ProgressView()
+                            .controlSize(.small)
                     }
-                } label: {
-                    HStack {
-                        if isUploading {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                        Text(isUploading ? "Analyzing" : importedImage == nil ? "Choose Image" : "Upload")
-                            .font(.headline)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
+                    Text(isUploading ? "Analyzing" : importedImage == nil ? "Choose" : "Upload")
+                        .font(.headline)
                 }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.capsule)
-                .tint(.black.opacity(0.86))
-                .disabled(isUploading)
-                .accessibilityIdentifier("upload-primary-button")
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 74)
-            .padding(.bottom, 24)
-
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.capsule)
+            .tint(.black.opacity(0.86))
+            .disabled(isUploading)
+            .accessibilityIdentifier("upload-primary-button")
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 72)
+        .padding(.bottom, 24)
+        .overlay(alignment: .topTrailing) {
             Button {
                 dismiss()
             } label: {
@@ -940,7 +932,7 @@ struct UploadSheet: View {
             }
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
-            .padding(.top, 62)
+            .padding(.top, 58)
             .padding(.trailing, 26)
             .accessibilityLabel("Close")
         }
@@ -1022,7 +1014,7 @@ struct UploadSheet: View {
                         Image(systemName: selectedSource.symbol)
                             .font(.system(size: 36, weight: .semibold))
                             .foregroundStyle(.secondary)
-                        Text("Choose an image to continue")
+                        Text("Tap to choose")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -1033,7 +1025,7 @@ struct UploadSheet: View {
                         ProgressView(value: uploadProgress)
                             .progressViewStyle(.linear)
                             .tint(.primary)
-                        Text("Analyzing inputs and metadata")
+                        Text("Analyzing")
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
@@ -1068,7 +1060,7 @@ struct UploadSheet: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
 
-                    Text("Outputs: \(extraction.outputImpacts.joined(separator: ", "))")
+                    Text(extraction.outputImpacts.joined(separator: " / "))
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -1082,7 +1074,7 @@ struct UploadSheet: View {
         .background {
             RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .fill(.white.opacity(0.62))
-                .glassEffect(.regular, in: .rect(cornerRadius: 30))
+                .glassEffect(.regular, in: .rect(cornerRadius: NomiRadii.panel))
         }
         .opacity(controlsAppeared ? 1 : 0)
         .offset(y: controlsAppeared ? 0 : 18)
