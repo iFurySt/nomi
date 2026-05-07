@@ -16,6 +16,16 @@ struct TimelineItem: Identifiable, Equatable {
     let badge: String?
 }
 
+struct DailyMetric: Identifiable {
+    let id = UUID()
+    let title: String
+    let value: String
+    let detail: String
+    let symbol: String
+    let tint: Color
+    let progress: Double?
+}
+
 enum NomiTab: Int, CaseIterable {
     case today = 0
     case trends = 1
@@ -322,17 +332,17 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
-                    OverviewCard(itemCount: items.count)
+                    OverviewCard()
                         .scaleEffect(showHero ? 1 : 0.96)
                         .opacity(showHero ? 1 : 0)
                         .blur(radius: showHero ? 0 : 12)
 
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 14) {
                         HStack(alignment: .firstTextBaseline) {
-                            Text("Today")
+                            Text("Today's Log")
                                 .font(.title2.weight(.semibold))
                             Spacer()
-                            Text("\(items.count) uploads")
+                            Text("\(items.count) entries")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .contentTransition(.numericText())
@@ -361,18 +371,68 @@ struct HomeView: View {
 }
 
 struct OverviewCard: View {
-    let itemCount: Int
     @State private var breathe = false
 
+    private let metrics: [DailyMetric] = [
+        DailyMetric(
+            title: "Calories",
+            value: "1,840",
+            detail: "620 left",
+            symbol: "flame.fill",
+            tint: Color(red: 0.77, green: 0.47, blue: 0.21),
+            progress: 0.75
+        ),
+        DailyMetric(
+            title: "Protein",
+            value: "92g",
+            detail: "120g target",
+            symbol: "circle.hexagongrid.fill",
+            tint: Color(red: 0.38, green: 0.50, blue: 0.38),
+            progress: 0.77
+        ),
+        DailyMetric(
+            title: "Strength",
+            value: "48m",
+            detail: "348 kcal",
+            symbol: "dumbbell.fill",
+            tint: Color(red: 0.40, green: 0.45, blue: 0.55),
+            progress: nil
+        ),
+        DailyMetric(
+            title: "Walk",
+            value: "32m",
+            detail: "112 kcal",
+            symbol: "figure.walk",
+            tint: Color(red: 0.39, green: 0.54, blue: 0.47),
+            progress: nil
+        ),
+        DailyMetric(
+            title: "Sitting",
+            value: "5h 10m",
+            detail: "2 breaks logged",
+            symbol: "chair.fill",
+            tint: Color(red: 0.51, green: 0.48, blue: 0.42),
+            progress: nil
+        ),
+        DailyMetric(
+            title: "Sleep",
+            value: "7h 42m",
+            detail: "Good rhythm",
+            symbol: "moon.fill",
+            tint: Color(red: 0.38, green: 0.43, blue: 0.53),
+            progress: nil
+        )
+    ]
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Global Overview")
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("Daily Balance")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
-                    Text("A quiet day with a few useful signals.")
-                        .font(.system(size: 27, weight: .semibold, design: .rounded))
+                    Text("On track today.")
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
                         .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -382,34 +442,32 @@ struct OverviewCard: View {
                 ZStack {
                     Circle()
                         .fill(.white.opacity(0.72))
-                        .frame(width: 62, height: 62)
+                        .frame(width: 50, height: 50)
                         .glassEffect(.regular.interactive(), in: .circle)
-                    Image(systemName: "sparkle.magnifyingglass")
-                        .font(.system(size: 23, weight: .semibold))
+                    Image(systemName: "heart.text.square.fill")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.33, green: 0.40, blue: 0.32))
                         .symbolEffect(.pulse, options: .repeating, value: breathe)
                 }
                 .scaleEffect(breathe ? 1.035 : 0.985)
             }
 
-            HStack(spacing: 10) {
-                MetricPill(value: "\(itemCount)", label: "uploads", symbol: "tray.and.arrow.up.fill")
-                MetricPill(value: "2", label: "themes", symbol: "tag.fill")
-                MetricPill(value: "8h", label: "span", symbol: "clock.fill")
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ], spacing: 8) {
+                ForEach(metrics) { metric in
+                    MetricTile(metric: metric)
+                }
             }
         }
-        .padding(20)
+        .padding(18)
         .background {
             RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .fill(.white.opacity(0.72))
                 .glassEffect(.regular, in: .rect(cornerRadius: 30))
                 .shadow(color: .black.opacity(0.08), radius: 28, y: 18)
-        }
-        .overlay(alignment: .topTrailing) {
-            Canvas { context, size in
-                let rect = CGRect(x: size.width - 96, y: 14, width: 88, height: 88)
-                context.stroke(Path(ellipseIn: rect), with: .color(.white.opacity(0.8)), lineWidth: 1)
-            }
-            .allowsHitTesting(false)
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
@@ -419,29 +477,49 @@ struct OverviewCard: View {
     }
 }
 
-struct MetricPill: View {
-    let value: String
-    let label: String
-    let symbol: String
+struct MetricTile: View {
+    let metric: DailyMetric
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: symbol)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(value)
-                    .font(.headline.weight(.semibold))
-                    .contentTransition(.numericText())
-                Text(label)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: metric.symbol)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(metric.tint)
+                    .frame(width: 20, height: 20)
+                    .background(metric.tint.opacity(0.11), in: Circle())
+
+                Text(metric.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Spacer(minLength: 0)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(metric.value)
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                Text(metric.detail)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+
+            if let progress = metric.progress {
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(metric.tint)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 10)
-        .padding(.horizontal, 11)
-        .background(.thinMaterial, in: Capsule())
+        .frame(height: 78, alignment: .topLeading)
+        .padding(10)
+        .background(.white.opacity(0.48), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -453,49 +531,49 @@ struct TimelineRow: View {
     @State private var appeared = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 11) {
             Text(item.time)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 48, alignment: .trailing)
-                .padding(.top, 22)
+                .padding(.top, 18)
 
             VStack(spacing: 0) {
                 Rectangle()
-                    .fill(isFirst ? .clear : Color.secondary.opacity(0.2))
-                    .frame(width: 1, height: 18)
+                    .fill(isFirst ? .clear : Color.secondary.opacity(0.14))
+                    .frame(width: 1, height: 16)
 
                 Circle()
-                    .strokeBorder(item.tint.opacity(0.36), lineWidth: 2)
-                    .background(Circle().fill(item.tint.opacity(0.82)))
-                    .frame(width: 10, height: 10)
+                    .strokeBorder(Color.white.opacity(0.86), lineWidth: 2)
+                    .background(Circle().fill(item.tint.opacity(0.68)))
+                    .frame(width: 9, height: 9)
                     .scaleEffect(appeared ? 1 : 0.4)
 
                 Rectangle()
-                    .fill(isLast ? .clear : Color.secondary.opacity(0.2))
+                    .fill(isLast ? .clear : Color.secondary.opacity(0.14))
                     .frame(width: 1)
                     .frame(maxHeight: .infinity)
             }
-            .frame(width: 12, height: 88)
+            .frame(width: 10, height: 74)
 
-            HStack(spacing: 12) {
+            HStack(spacing: 11) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(item.tint.opacity(0.14))
+                    Circle()
+                        .fill(item.tint.opacity(0.1))
                     if let image = item.image {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
                             .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                            .clipShape(Circle())
                     } else {
                         Image(systemName: item.symbol)
-                            .font(.body.weight(.semibold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(item.tint)
                             .symbolEffect(.bounce, value: appeared)
                     }
                 }
-                .frame(width: 52, height: 52)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .frame(width: 34, height: 34)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.subtitle)
@@ -506,7 +584,7 @@ struct TimelineRow: View {
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                     Text(item.detail)
-                        .font(.caption)
+                        .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -515,23 +593,26 @@ struct TimelineRow: View {
 
                 if let badge = item.badge {
                     Text(badge)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(item.tint)
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 9)
-                        .background(item.tint.opacity(0.1), in: Capsule())
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 8)
+                        .background(.white.opacity(0.46), in: Capsule())
                 }
             }
-            .padding(.vertical, 11)
+            .padding(.vertical, 10)
             .padding(.horizontal, 12)
             .background {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(index == 3 ? item.tint.opacity(0.16) : Color.white.opacity(0.68))
-                    .glassEffect(.regular, in: .rect(cornerRadius: 22))
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.56))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(.white.opacity(0.55), lineWidth: 1)
+                    }
             }
         }
-        .frame(height: 88)
-        .offset(y: appeared ? 0 : 20)
+        .frame(height: 74)
+        .offset(y: appeared ? 0 : 12)
         .opacity(appeared ? 1 : 0)
         .onAppear {
             withAnimation(.spring(duration: 0.55, bounce: 0.18).delay(Double(index) * 0.07)) {
@@ -873,36 +954,58 @@ extension TimelineItem {
     static let samples: [TimelineItem] = [
         TimelineItem(
             time: "07:45",
-            title: "Breakfast photo",
-            subtitle: "Image upload",
-            detail: "AI tags ready for review",
-            symbol: "fork.knife.circle.fill",
-            tint: .orange,
+            title: "Greek yogurt bowl",
+            subtitle: "Nutrition",
+            detail: "520 kcal / 34g protein",
+            symbol: "fork.knife",
+            tint: Color(red: 0.42, green: 0.52, blue: 0.39),
             image: nil,
             minutesAgo: 18,
-            badge: "34P"
+            badge: "520"
         ),
         TimelineItem(
             time: "09:30",
-            title: "Walk note",
-            subtitle: "Light movement",
-            detail: "Recorded after lunch",
-            symbol: "figure.walk.circle.fill",
-            tint: .mint,
+            title: "Desk block",
+            subtitle: "Sitting",
+            detail: "2h 05m / break logged",
+            symbol: "chair",
+            tint: Color(red: 0.50, green: 0.48, blue: 0.42),
             image: nil,
             minutesAgo: 74,
-            badge: "48m"
+            badge: "2h"
         ),
         TimelineItem(
             time: "12:20",
-            title: "Evening snack",
-            subtitle: "Quick capture",
-            detail: "Private memory saved",
-            symbol: "camera.macro.circle.fill",
-            tint: .purple,
+            title: "Strength training",
+            subtitle: "Workout",
+            detail: "48 min / 348 kcal",
+            symbol: "dumbbell",
+            tint: Color(red: 0.40, green: 0.45, blue: 0.55),
             image: nil,
             minutesAgo: 126,
-            badge: nil
+            badge: "48m"
+        ),
+        TimelineItem(
+            time: "17:40",
+            title: "Evening walk",
+            subtitle: "Movement",
+            detail: "32 min / 112 kcal",
+            symbol: "figure.walk",
+            tint: Color(red: 0.39, green: 0.54, blue: 0.47),
+            image: nil,
+            minutesAgo: 188,
+            badge: "32m"
+        ),
+        TimelineItem(
+            time: "23:10",
+            title: "Sleep window",
+            subtitle: "Recovery",
+            detail: "7h 42m / good rhythm",
+            symbol: "moon",
+            tint: Color(red: 0.38, green: 0.43, blue: 0.53),
+            image: nil,
+            minutesAgo: 236,
+            badge: "7h"
         )
     ]
 }
