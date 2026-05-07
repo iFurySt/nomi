@@ -47,7 +47,7 @@ npx expo start --web --port 8081 --clear
 
 ## 当前界面
 
-- Native iOS Home：顶部是全局总览玻璃卡片，下面是时间轴 rail + 紧凑记录卡片；底部悬浮导航栏中央 `+` 打开上拉上传 sheet。Trends / Log / Me 暂时是占位 tab。
+- Native iOS Home：顶部是全局总览玻璃卡片，下面是时间轴 rail + 紧凑记录卡片；底部是较小的暖色悬浮玻璃导航栏，中央 `+` 打开上拉上传 sheet，选中 tab 使用滑动玻璃底托过渡。Trends / Log / Me 暂时是占位 tab。
 - Native iOS Upload Sheet：提供 Camera / Photos / Files 三个来源，并为 sheet 顶部标题和关闭按钮保留额外上边距。Photos 使用 `PhotosPicker`，Files 使用 SwiftUI `fileImporter`，选择图片后可通过 Upload 写入本地 timeline；Simulator 上 Camera 暂为 unavailable placeholder。
 - Upload Workbench：默认主入口。底部导航是悬浮玻璃胶囊，中央是圆形主按钮，点开后三个来源按钮按拍摄、相册、文件的顺序用 `Animated.stagger` 顺时针展开；点击 X、点击菜单外区域或选择任一来源都会收起菜单。
 - Source pickers：拍摄和相册使用 `expo-image-picker`，文件使用 `expo-document-picker`，当前限制为 image 文件，面向 iPhone 上传路径。

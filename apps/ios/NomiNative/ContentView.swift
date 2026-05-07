@@ -146,34 +146,56 @@ struct NomiBottomBar: View {
     @Binding var selectedTab: NomiTab
     let onAdd: () -> Void
     @State private var appeared = false
+    @Namespace private var selectionNamespace
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 9) {
             tabButton(.today)
             tabButton(.trends)
 
             Button(action: onAdd) {
                 Image(systemName: "plus")
-                    .font(.system(size: 27, weight: .medium))
-                    .frame(width: 66, height: 66)
+                    .font(.system(size: 25, weight: .medium))
+                    .frame(width: 56, height: 56)
+                    .background {
+                        Circle()
+                            .fill(Color(red: 0.79, green: 0.44, blue: 0.34))
+                            .glassEffect(.regular.interactive(), in: .circle)
+                    }
+                    .overlay(alignment: .top) {
+                        Capsule()
+                            .fill(.white.opacity(0.36))
+                            .frame(width: 24, height: 1.4)
+                            .padding(.top, 9)
+                    }
             }
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.circle)
-            .tint(Color(red: 0.98, green: 0.77, blue: 0.38))
-            .foregroundStyle(.black.opacity(0.86))
-            .shadow(color: Color(red: 0.82, green: 0.52, blue: 0.12).opacity(0.24), radius: 18, y: 8)
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .shadow(color: Color(red: 0.39, green: 0.17, blue: 0.12).opacity(0.18), radius: 14, y: 8)
             .accessibilityLabel("Upload")
 
             tabButton(.log)
             tabButton(.profile)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: 326)
         .background {
             Capsule(style: .continuous)
-                .fill(.black.opacity(0.76))
+                .fill(Color(red: 1.0, green: 0.99, blue: 0.96).opacity(0.62))
                 .glassEffect(.regular.interactive(), in: .capsule)
-                .shadow(color: .black.opacity(0.24), radius: 22, y: 12)
+                .overlay {
+                    Capsule(style: .continuous)
+                        .stroke(.white.opacity(0.72), lineWidth: 1)
+                }
+                .overlay(alignment: .top) {
+                    Capsule()
+                        .fill(.white.opacity(0.5))
+                        .frame(height: 1)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 8)
+                }
+                .shadow(color: Color(red: 0.16, green: 0.13, blue: 0.11).opacity(0.13), radius: 24, y: 16)
         }
         .scaleEffect(appeared ? 1 : 0.96)
         .opacity(appeared ? 1 : 0)
@@ -185,7 +207,9 @@ struct NomiBottomBar: View {
     }
 
     private func tabButton(_ tab: NomiTab) -> some View {
-        Button {
+        let isSelected = selectedTab == tab
+
+        return Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             withAnimation(.spring(duration: 0.35, bounce: 0.18)) {
                 selectedTab = tab
@@ -193,21 +217,23 @@ struct NomiBottomBar: View {
         } label: {
             VStack(spacing: 5) {
                 Image(systemName: selectedTab == tab ? tab.selectedSymbol : tab.symbol)
-                    .font(.system(size: 21, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .symbolEffect(.bounce, value: selectedTab)
                 Text(tab.title)
-                    .font(.caption2.weight(.semibold))
+                    .font(.system(size: 10, weight: .semibold))
             }
-            .frame(width: 56, height: 56)
-            .foregroundStyle(selectedTab == tab ? .white : .white.opacity(0.42))
+            .frame(width: 48, height: 50)
+            .foregroundStyle(isSelected ? Color(red: 0.21, green: 0.19, blue: 0.16) : Color(red: 0.42, green: 0.39, blue: 0.34).opacity(0.58))
             .background {
-                if selectedTab == tab {
-                    Circle()
-                        .fill(.white.opacity(0.16))
-                        .glassEffect(.regular, in: .circle)
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(.white.opacity(0.56))
+                        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+                        .matchedGeometryEffect(id: "selectedTab", in: selectionNamespace)
                         .transition(.scale.combined(with: .opacity))
                 }
             }
+            .scaleEffect(isSelected ? 1.03 : 1)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tab.title)
@@ -255,7 +281,7 @@ struct HomeView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
-                .padding(.bottom, 122)
+                .padding(.bottom, 104)
             }
             .scrollIndicators(.hidden)
         }
