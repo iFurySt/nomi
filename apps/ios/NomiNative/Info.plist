@@ -24,6 +24,11 @@
 	<string>public.app-category.healthcare-fitness</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Nomi can import selected photos into your private timeline.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

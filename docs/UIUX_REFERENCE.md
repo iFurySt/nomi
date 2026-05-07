@@ -80,9 +80,9 @@
 
 ## 组件规则
 
-- 图标：原生 iOS 优先使用 SF Symbols；跨端 Web / Expo 参考 `lucide` 或现有项目图标体系，保持线性、轻量、一致 stroke。
+- 图标：原生 iOS 优先使用 SF Symbols；保持线性、轻量、一致 stroke。
 - 按钮：明确命令使用文字或 icon+text；工具按钮优先 icon，并保证可访问 label。
-- Tab / nav：active 状态用轻 glass pill / matched geometry 流动，不使用大黑胶囊、强阴影或突兀圆形 FAB，除非产品明确切回旧 Expo 原型方向。
+- Tab / nav：active 状态用轻 glass pill / matched geometry 流动，不使用大黑胶囊、强阴影或突兀圆形 FAB。
 - Sheet：优先系统 sheet，顶部留白充分，关闭按钮清晰，主动作靠底部但不遮挡内容。
 - Timeline：时间在左、rail 居中、卡片在右；圆点对齐卡片垂直中心，卡片间距稳定。
 - 指标卡：少量指标、明确单位、短文案；不要做复杂环形图、风险分或医疗解释。
@@ -92,7 +92,7 @@
 每次可见 UI 变更至少检查：
 
 - 截图：iPhone simulator 首页 / 关键 sheet；明显视觉改动要保存到 `docs/generated/verification/`。
-- 构建：原生 iOS 运行 `xcodebuild ... build`；Expo 运行对应 `npm run typecheck` / smoke。
+- 构建：原生 iOS 运行 `xcodebuild ... build`；触及上传真实路径时运行对应 XCUITest。
 - 视觉：首屏是否能看出当前任务；卡片、timeline、底栏是否有稳定间距；文字是否溢出。
 - 交互：tap、drag、release、sheet dismiss、picker 边界是否符合预期。
 - 动效：是否服务状态变化；是否过慢、过强或抢内容注意力。

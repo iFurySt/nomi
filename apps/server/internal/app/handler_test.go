@@ -1,8 +1,15 @@
 package app
 
 import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func TestHasMedicalIntent(t *testing.T) {
@@ -54,5 +61,92 @@ func TestCreateRecordInputValidate(t *testing.T) {
 	input.Type = "diagnosis"
 	if err := input.Validate(); err == nil {
 		t.Fatal("expected invalid record type")
+	}
+}
+
+func TestBuildImageExtractionFoodMetadata(t *testing.T) {
+	t.Parallel()
+
+	extraction := BuildImageExtraction(ImageExtractionRequest{
+		AssetName:   "lunch-photo.jpg",
+		Source:      "library",
+		MimeType:    "image/jpeg",
+		ImageBase64: "aGVsbG8=",
+	})
+
+	if extraction.Direction != "input" {
+		t.Fatalf("direction = %q", extraction.Direction)
+	}
+	if extraction.InputCategory != "food" {
+		t.Fatalf("input category = %q", extraction.InputCategory)
+	}
+	if extraction.Metadata.CaloriesKcal == 0 || extraction.Metadata.ProteinG == 0 {
+		t.Fatalf("expected nutrition metadata: %#v", extraction.Metadata)
+	}
+	if len(extraction.OutputImpacts) == 0 {
+		t.Fatal("expected output impacts")
+	}
+}
+
+func TestBuildImageExtractionFileImageDefaultsFood(t *testing.T) {
+	t.Parallel()
+
+	extraction := BuildImageExtraction(ImageExtractionRequest{
+		AssetName: "IMG_7624.HEIC",
+		Source:    "file",
+		MimeType:  "image/heic",
+	})
+
+	if extraction.InputCategory != "food" {
+		t.Fatalf("input category = %q", extraction.InputCategory)
+	}
+	if extraction.Metadata.OriginalMimeType != "image/heic" {
+		t.Fatalf("mime = %q", extraction.Metadata.OriginalMimeType)
+	}
+}
+
+func TestBuildImageExtractionNicotine(t *testing.T) {
+	t.Parallel()
+
+	extraction := BuildImageExtraction(ImageExtractionRequest{
+		AssetName: "vape-note.jpg",
+		Source:    "library",
+		MimeType:  "image/jpeg",
+	})
+
+	if extraction.InputCategory != "nicotine" {
+		t.Fatalf("input category = %q", extraction.InputCategory)
+	}
+	if extraction.Metadata.NicotineMg == 0 {
+		t.Fatalf("expected nicotine metadata: %#v", extraction.Metadata)
+	}
+	if !containsAny(strings.Join(extraction.OutputImpacts, ","), "focus") {
+		t.Fatalf("expected focus impact: %#v", extraction.OutputImpacts)
+	}
+}
+
+func TestExtractImageHandler(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(nil, zap.NewNop(), "")
+	server := httptest.NewServer(handler.Routes())
+	defer server.Close()
+
+	payload := bytes.NewBufferString(`{"asset_name":"coffee.jpg","source":"library","mime_type":"image/jpeg"}`)
+	resp, err := http.Post(server.URL+"/ai/extract-image", "application/json", payload)
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var extraction ImageExtraction
+	if err := json.NewDecoder(resp.Body).Decode(&extraction); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if extraction.InputCategory != "caffeine" {
+		t.Fatalf("input category = %q", extraction.InputCategory)
 	}
 }

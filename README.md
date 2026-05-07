@@ -9,16 +9,16 @@ Nomi 不是医疗产品，不提供诊断、治疗、药物或急症判断。
 - 产品规格：`docs/product-specs/nomi-mvp.md`
 - 设计方向：`docs/DESIGN.md`
 - 执行计划：`docs/exec-plans/completed/2026-05-06-nomi-mvp-skeleton.md`
-- Mobile skeleton：`apps/mobile/`
+- iOS app：`apps/ios/`
 
-## Mobile 本地启动
+## iOS 本地启动
 
 ```sh
-cd apps/mobile
-npm install
-npm run typecheck
-npm run smoke
-npx expo start --web --port 8081
+xcodebuild -project apps/ios/NomiNative.xcodeproj \
+  -scheme Nomi \
+  -configuration Debug \
+  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
+  build
 ```
 
 ## 仓库检查

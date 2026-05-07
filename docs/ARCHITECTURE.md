@@ -1,12 +1,11 @@
 # 架构总览
 
-Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是先交付可运行的 MVP skeleton：移动端已从 React Native + Expo 原型开始迁移到原生 SwiftUI iOS app，后端用 Go，数据库使用 Postgres，并复用相邻 `../seedx` 仓库自带的 daemon 主动建连能力。云端部署、家庭协作和 Apple Watch 接入在后续阶段处理。
+Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是先交付可运行的 MVP skeleton：移动端现在收敛到原生 SwiftUI iOS app，后端用 Go，数据库使用 Postgres，并复用相邻 `../seedx` 仓库自带的 daemon 主动建连能力。云端部署、家庭协作和 Apple Watch 接入在后续阶段处理。
 
 ## 当前仓库结构
 
-- `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 mobile skeleton：首页包含摄入能量、蛋白质、训练、步行、久坐、睡眠等今日数据总览、低装饰的紧凑今日 timeline 和底部暖色小玻璃导航栏；中间 Add 上传项以普通导航项样式打开上拉上传 sheet，Trends / Log / Me 先作为占位 tab。视觉方向使用系统字体、SwiftUI sheet、Liquid Glass 风格按钮 / 玻璃卡片、轻量动画和可按住左右滑动的连续选中态流动。
-- `apps/mobile/`：Expo mobile app。保留为迁移前的 React Native 原型和 domain smoke 载体。当前收敛为 iPhone 优先的单一上传工作台：底部使用悬浮玻璃导航，中央圆形入口展开拍摄 / 相册 / 文件三种来源，选择后进入原图 AI 分类、上传处理动画和原图 / 抠图区分展示；保存仍写入本地内存 records，Ask boundary smoke 保留在 domain 层。
-- `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、Postgres schema 初始化和 SeedX daemon websocket 控制面。
+- `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 mobile skeleton：首页默认不填假 timeline，摄入能量、蛋白质、训练、步行、久坐、睡眠等今日总览从真实上传记录派生；timeline 为空时显示真实空态。底部是暖色小玻璃导航栏，中间 Add 上传项以普通导航项样式打开上拉上传 sheet，并在真实 PhotosPicker / fileImporter 选择图片后调用 server image extraction contract 生成 timeline 项。Trends / Log / Me 先作为占位 tab。视觉方向使用系统字体、SwiftUI sheet、Liquid Glass 风格按钮 / 玻璃卡片、轻量动画和可按住左右滑动的连续选中态流动。
+- `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、图片 AI 提取边界、Postgres schema 初始化和 SeedX daemon websocket 控制面。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。
 - `docs/exec-plans/completed/`：已完成的跨 milestone 执行计划。
 - `docs/generated/verification/`：本地验证生成物，例如 UI 截图。
@@ -28,7 +27,7 @@ MVP 目标拓扑：
 3. `../seedx` 的 `seedx daemon connect` 在用户设备启动后主动连接 Go server 的 websocket 地址。
 4. Go server 通过 SeedX daemon 协议发送 `daemon:ping` / 后续 `daemon:command`，SeedX 返回 `daemon:pong` / `daemon:result`。
 
-当前原生 iOS app 还没有接入 server，首页 timeline 使用本地 SwiftUI state 展示示例记录；上传 sheet 通过 PhotosPicker / fileImporter 选择图片，保存后插入本地 timeline。React Native app 仍使用本地内存 records 保存上传结果，并用 mock AI 分类展示 capture 保存路径。原图选择已经通过 Expo camera / image library / document picker 接到真实 picker 边界；iPhone 端侧抠图由本地 Expo iOS module `modules/nomi-image-cutout/` 封装，使用 iOS 17+ Vision foreground instance mask 生成透明 PNG。Expo web 预览和未包含该 module 的 Expo Go 只能展示 native unavailable 状态；真实 cutout 需要 iOS development build / prebuild。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`，并在启动时初始化 Postgres records schema。SeedX 连接使用 `GET /daemon/connect`，同时保留旧的 `GET /seedx/ws` 兼容本地 smoke；daemon API key 通过 `Authorization: Bearer ...` WebSocket 握手 header 传递。
+当前原生 iOS app 首页 timeline 使用本地 SwiftUI state 保存本次运行内的真实上传记录，初始状态不注入假数据；上传 sheet 通过 PhotosPicker / fileImporter 选择图片，上传时把 image data base64、来源和 MIME type 发送到 `POST /ai/extract-image`，再用返回的 extraction title、input category、confidence 和 metadata 插入本地 timeline。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`、`POST /ai/extract-image`，并在启动时初始化 Postgres records schema。图片提取 schema 覆盖 input category（food、beverage、caffeine、alcohol、nicotine、information、exercise、sunlight、social）、output impacts（energy、mood、sleep、recovery、focus、health）和 kcal、protein、fat、carbs、fiber、water、caffeine、nicotine、duration 等 metadata；当前实现是服务端 deterministic 边界，后续接真实模型时保持该 contract。SeedX 连接使用 `GET /daemon/connect`，同时保留旧的 `GET /seedx/ws` 兼容本地 smoke；daemon API key 通过 `Authorization: Bearer ...` WebSocket 握手 header 传递。
 
 ## 边界
 
@@ -39,11 +38,9 @@ MVP 目标拓扑：
 
 ## 本地验证入口
 
-- Mobile typecheck：`cd apps/mobile && npm run typecheck`
-- Mobile domain smoke：`cd apps/mobile && npm run smoke`
-- Mobile web preview：`cd apps/mobile && npx expo start --web --port 8081`
-- Native iOS build：`xcodebuild -project apps/ios/NomiNative.xcodeproj -scheme NomiNative -configuration Debug -destination 'platform=iOS Simulator,id=<simulator-udid>' build`
-- Native iOS simulator run：`xcrun simctl install <simulator-udid> ~/Library/Developer/Xcode/DerivedData/NomiNative-*/Build/Products/Debug-iphonesimulator/NomiNative.app && xcrun simctl launch --terminate-running-process <simulator-udid> dev.nomi.native`
+- Native iOS build：`xcodebuild -project apps/ios/NomiNative.xcodeproj -scheme Nomi -configuration Debug -destination 'platform=iOS Simulator,id=<simulator-udid>' build`
+- Native iOS simulator run：`xcrun simctl install <simulator-udid> ~/Library/Developer/Xcode/DerivedData/NomiNative-*/Build/Products/Debug-iphonesimulator/Nomi.app && xcrun simctl launch --terminate-running-process <simulator-udid> dev.nomi.native`
+- Native iOS upload UI test：`xcodebuild test -project apps/ios/NomiNative.xcodeproj -scheme Nomi -configuration Debug -destination 'platform=iOS Simulator,id=<simulator-udid>' -only-testing:NomiNativeUITests/NomiNativeUploadFlowUITests`
 - Server tests：`cd apps/server && go test ./...`
 - Server local run：`cd apps/server && NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088`
 - SeedX daemon tests：`cd ../seedx && go test ./internal/transport/daemonclient ./internal/cli`

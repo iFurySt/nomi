@@ -1,0 +1,154 @@
+import XCTest
+
+@MainActor
+final class NomiNativeUploadFlowUITests: XCTestCase {
+    private let uploadTimeout: TimeInterval = 12
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+    }
+
+    func testPhotosUploadCreatesRealTimelineEntry() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["No real uploads yet"].waitForExistence(timeout: 5))
+
+        app.buttons.matching(identifier: "bottom-add").firstMatch.tap()
+        let primaryButton = app.buttons.matching(identifier: "upload-primary-button").firstMatch
+        XCTAssertTrue(primaryButton.waitForExistence(timeout: 5))
+        primaryButton.tap()
+
+        selectFirstPhoto()
+
+        XCTAssertTrue(primaryButton.waitForExistence(timeout: 8), app.debugDescription)
+        primaryButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Food input"].waitForExistence(timeout: uploadTimeout))
+        XCTAssertTrue(app.staticTexts["1 entries"].waitForExistence(timeout: 2))
+        saveScreenshot(named: "nomi-native-real-upload-photos-2026-05-07.png")
+    }
+
+    func testFilesUploadCreatesRealTimelineEntry() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["No real uploads yet"].waitForExistence(timeout: 5))
+
+        app.buttons.matching(identifier: "bottom-add").firstMatch.tap()
+        let fileButton = app.buttons.matching(identifier: "upload-source-file").firstMatch
+        XCTAssertTrue(fileButton.waitForExistence(timeout: 5))
+        fileButton.tap()
+
+        selectPreparedFile(named: "IMG_7624")
+
+        let primaryButton = app.buttons.matching(identifier: "upload-primary-button").firstMatch
+        XCTAssertTrue(primaryButton.waitForExistence(timeout: 8), app.debugDescription)
+        primaryButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Food input"].waitForExistence(timeout: uploadTimeout))
+        XCTAssertTrue(app.staticTexts["1 entries"].waitForExistence(timeout: 2))
+        saveScreenshot(named: "nomi-native-real-upload-files-2026-05-07.png")
+    }
+
+    private func selectFirstPhoto() {
+        let app = XCUIApplication()
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        tapIfExists(springboard.buttons["Continue"])
+        tapIfExists(springboard.buttons["Allow Full Access"])
+        tapIfExists(springboard.buttons["Allow Access to All Photos"])
+
+        Thread.sleep(forTimeInterval: 1.2)
+
+        let firstCell = app.collectionViews.cells.firstMatch
+        if firstCell.waitForExistence(timeout: 3), firstCell.isHittable {
+            firstCell.tap()
+        } else {
+            let firstImage = app.images.firstMatch
+            if firstImage.waitForExistence(timeout: 1), firstImage.isHittable {
+                firstImage.tap()
+            } else {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.22, dy: 0.46)).tap()
+            }
+        }
+
+        Thread.sleep(forTimeInterval: 0.7)
+
+        tapFirstButton(containing: "Add", in: app)
+        tapFirstButton(containing: "Done", in: app)
+        tapFirstButton(containing: "Choose", in: app)
+    }
+
+    private func selectPreparedFile(named fileName: String) {
+        let app = XCUIApplication()
+
+        if tapFirstElement(containing: fileName, in: app, timeout: 4) {
+            return
+        }
+
+        tapIfExists(app.buttons["Browse"])
+        _ = tapFirstElement(containing: "On My iPhone", in: app, timeout: 1)
+
+        if tapFirstElement(containing: fileName, in: app, timeout: 4) {
+            return
+        }
+
+        let firstCell = app.collectionViews.cells.firstMatch
+        if firstCell.waitForExistence(timeout: 2), firstCell.isHittable {
+            firstCell.tap()
+        } else {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.30, dy: 0.25)).tap()
+        }
+    }
+
+    private func tapIfExists(_ element: XCUIElement) {
+        if element.waitForExistence(timeout: 1), element.isHittable {
+            element.tap()
+        }
+    }
+
+    private func tapFirstButton(containing text: String, in app: XCUIApplication) {
+        let predicate = NSPredicate(format: "label CONTAINS[c] %@", text)
+        let button = app.buttons.matching(predicate).firstMatch
+        if button.waitForExistence(timeout: 1), button.isHittable {
+            button.tap()
+        }
+    }
+
+    @discardableResult
+    private func tapFirstElement(containing text: String, in app: XCUIApplication, timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "label CONTAINS[c] %@", text)
+        let element = app.descendants(matching: .any).matching(predicate).firstMatch
+        if element.waitForExistence(timeout: timeout), element.isHittable {
+            element.tap()
+            return true
+        }
+        return false
+    }
+
+    private func saveScreenshot(named fileName: String) {
+        Thread.sleep(forTimeInterval: 1.8)
+
+        let screenshot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = fileName
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        guard let directory = ProcessInfo.processInfo.environment["NOMI_SCREENSHOT_DIR"],
+              !directory.isEmpty else {
+            return
+        }
+
+        let url = URL(fileURLWithPath: directory, isDirectory: true).appendingPathComponent(fileName)
+        do {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try screenshot.pngRepresentation.write(to: url)
+        } catch {
+            XCTFail("Could not save screenshot \(fileName): \(error)")
+        }
+    }
+}

@@ -1,3 +1,4 @@
+import Foundation
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -17,7 +18,7 @@ struct TimelineItem: Identifiable, Equatable {
 }
 
 struct DailyMetric: Identifiable {
-    let id = UUID()
+    var id: String { title }
     let title: String
     let value: String
     let detail: String
@@ -84,11 +85,101 @@ enum UploadSource: String, CaseIterable, Identifiable {
     }
 }
 
+struct ImageExtractionRequest: Encodable {
+    let assetName: String
+    let source: String
+    let mimeType: String
+    let imageBase64: String
+
+    enum CodingKeys: String, CodingKey {
+        case assetName = "asset_name"
+        case source
+        case mimeType = "mime_type"
+        case imageBase64 = "image_base64"
+    }
+}
+
+struct ImageExtraction: Decodable, Equatable {
+    let schemaVersion: String
+    let direction: String
+    let inputCategory: String
+    let outputImpacts: [String]
+    let title: String
+    let summary: String
+    let confidence: Double
+    let metadata: ExtractionMetadata
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion = "schema_version"
+        case direction
+        case inputCategory = "input_category"
+        case outputImpacts = "output_impacts"
+        case title
+        case summary
+        case confidence
+        case metadata
+    }
+}
+
+struct ExtractionMetadata: Decodable, Equatable {
+    let foodCategory: String?
+    let portionEstimate: String?
+    let weightG: Int?
+    let caloriesKcal: Int?
+    let proteinG: Int?
+    let fatG: Int?
+    let carbsG: Int?
+    let fiberG: Int?
+    let waterMl: Int?
+    let caffeineMg: Int?
+    let alcoholG: Int?
+    let nicotineMg: Int?
+    let durationMin: Int?
+    let micronutrients: [String]?
+    let minerals: [String]?
+    let vitamins: [String]?
+    let estimatedFrom: [String]?
+    let reviewNeeded: [String]?
+    let originalMimeType: String?
+
+    enum CodingKeys: String, CodingKey {
+        case foodCategory = "food_category"
+        case portionEstimate = "portion_estimate"
+        case weightG = "weight_g"
+        case caloriesKcal = "calories_kcal"
+        case proteinG = "protein_g"
+        case fatG = "fat_g"
+        case carbsG = "carbs_g"
+        case fiberG = "fiber_g"
+        case waterMl = "water_ml"
+        case caffeineMg = "caffeine_mg"
+        case alcoholG = "alcohol_g"
+        case nicotineMg = "nicotine_mg"
+        case durationMin = "duration_min"
+        case micronutrients
+        case minerals
+        case vitamins
+        case estimatedFrom = "estimated_from"
+        case reviewNeeded = "review_needed"
+        case originalMimeType = "original_mime_type"
+    }
+}
+
+struct E2EUploadManifest: Decodable {
+    let items: [E2EUploadItem]
+}
+
+struct E2EUploadItem: Decodable {
+    let fileName: String
+    let source: String
+    let mimeType: String
+}
+
 struct ContentView: View {
     @State private var selectedTab: NomiTab = .today
     @State private var showUploadSheet = false
     @State private var showHero = false
-    @State private var timelineItems: [TimelineItem] = TimelineItem.samples
+    @State private var timelineItems: [TimelineItem] = []
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -120,6 +211,9 @@ struct ContentView: View {
                 try? await Task.sleep(for: .milliseconds(450))
                 openUploadSheet()
             }
+            if ProcessInfo.processInfo.environment["NOMI_E2E_AUTO_UPLOADS"] == "1" {
+                await runE2EUploads()
+            }
         }
     }
 
@@ -148,6 +242,61 @@ struct ContentView: View {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         withAnimation(.bouncy(duration: 0.45)) {
             showUploadSheet = true
+        }
+    }
+
+    private func runE2EUploads() async {
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let manifestURL = documentsURL.appendingPathComponent("nomi-e2e-uploads.json")
+        let resultsURL = documentsURL.appendingPathComponent("nomi-e2e-results.log")
+        try? "".write(to: resultsURL, atomically: true, encoding: .utf8)
+
+        do {
+            let manifestData = try Data(contentsOf: manifestURL)
+            let manifest = try JSONDecoder().decode(E2EUploadManifest.self, from: manifestData)
+
+            for item in manifest.items {
+                guard let source = UploadSource(apiValue: item.source) else {
+                    writeE2EResult("NOMI_E2E_UPLOAD_RESULT skipped invalid-source \(item.fileName) \(item.source)", to: resultsURL)
+                    continue
+                }
+
+                let fileURL = documentsURL.appendingPathComponent(item.fileName)
+                let imageData = try Data(contentsOf: fileURL)
+                guard let image = UIImage(data: imageData) else {
+                    writeE2EResult("NOMI_E2E_UPLOAD_RESULT skipped invalid-image \(item.fileName)", to: resultsURL)
+                    continue
+                }
+
+                let extraction = await ImageExtractionClient.analyze(
+                    data: imageData,
+                    assetName: item.fileName,
+                    source: source,
+                    mimeType: item.mimeType
+                )
+
+                await MainActor.run {
+                    timelineItems.insert(extraction.timelineItem(source: source, image: image), at: 0)
+                    writeE2EResult(
+                        "NOMI_E2E_UPLOAD_RESULT ok \(source.apiValue) \(item.fileName) \(extraction.schemaVersion) \(extraction.inputCategory) \(extraction.title) \(Int((extraction.confidence * 100).rounded()))",
+                        to: resultsURL
+                    )
+                }
+            }
+        } catch {
+            writeE2EResult("NOMI_E2E_UPLOAD_RESULT failed \(error.localizedDescription)", to: resultsURL)
+        }
+    }
+
+    private func writeE2EResult(_ line: String, to url: URL) {
+        print(line)
+        let data = Data((line + "\n").utf8)
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+        } else {
+            try? data.write(to: url)
         }
     }
 }
@@ -234,6 +383,7 @@ struct NomiBottomBar: View {
         }
         .scaleEffect(isHighlighted ? 1.07 : 1)
         .accessibilityLabel("Upload")
+        .accessibilityIdentifier("bottom-add")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction {
             onAdd()
@@ -332,7 +482,7 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
-                    OverviewCard()
+                    OverviewCard(items: items)
                         .scaleEffect(showHero ? 1 : 0.96)
                         .opacity(showHero ? 1 : 0)
                         .blur(radius: showHero ? 0 : 12)
@@ -349,14 +499,18 @@ struct HomeView: View {
                         }
                         .padding(.horizontal, 4)
 
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                TimelineRow(
-                                    item: item,
-                                    index: index,
-                                    isFirst: index == 0,
-                                    isLast: index == items.count - 1
-                                )
+                        if items.isEmpty {
+                            EmptyTimelineState()
+                        } else {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                    TimelineRow(
+                                        item: item,
+                                        index: index,
+                                        isFirst: index == 0,
+                                        isLast: index == items.count - 1
+                                    )
+                                }
                             }
                         }
                     }
@@ -371,58 +525,68 @@ struct HomeView: View {
 }
 
 struct OverviewCard: View {
+    let items: [TimelineItem]
     @State private var breathe = false
 
-    private let metrics: [DailyMetric] = [
-        DailyMetric(
-            title: "Calories",
-            value: "1,840",
-            detail: "620 left",
-            symbol: "flame.fill",
-            tint: Color(red: 0.77, green: 0.47, blue: 0.21),
-            progress: 0.75
-        ),
-        DailyMetric(
-            title: "Protein",
-            value: "92g",
-            detail: "120g target",
-            symbol: "circle.hexagongrid.fill",
-            tint: Color(red: 0.38, green: 0.50, blue: 0.38),
-            progress: 0.77
-        ),
-        DailyMetric(
-            title: "Strength",
-            value: "48m",
-            detail: "348 kcal",
-            symbol: "dumbbell.fill",
-            tint: Color(red: 0.40, green: 0.45, blue: 0.55),
-            progress: nil
-        ),
-        DailyMetric(
-            title: "Walk",
-            value: "32m",
-            detail: "112 kcal",
-            symbol: "figure.walk",
-            tint: Color(red: 0.39, green: 0.54, blue: 0.47),
-            progress: nil
-        ),
-        DailyMetric(
-            title: "Sitting",
-            value: "5h 10m",
-            detail: "2 breaks logged",
-            symbol: "chair.fill",
-            tint: Color(red: 0.51, green: 0.48, blue: 0.42),
-            progress: nil
-        ),
-        DailyMetric(
-            title: "Sleep",
-            value: "7h 42m",
-            detail: "Good rhythm",
-            symbol: "moon.fill",
-            tint: Color(red: 0.38, green: 0.43, blue: 0.53),
-            progress: nil
-        )
-    ]
+    private var metrics: [DailyMetric] {
+        let calories = items.map { $0.caloriesKcal }.reduce(0, +)
+        let protein = items.map { $0.proteinG }.reduce(0, +)
+        let strength = items.filter { $0.symbol == "dumbbell" }.map(\.durationMin).reduce(0, +)
+        let walk = items.filter { $0.symbol == "figure.walk" }.map(\.durationMin).reduce(0, +)
+        let sitting = items.filter { $0.symbol == "chair" }.map(\.durationMin).reduce(0, +)
+        let sleep = items.filter { $0.symbol == "moon" }.map(\.durationMin).reduce(0, +)
+
+        return [
+            DailyMetric(
+                title: "Calories",
+                value: "\(calories)",
+                detail: items.isEmpty ? "No entries yet" : "\(max(0, 2200 - calories)) left",
+                symbol: "flame.fill",
+                tint: Color(red: 0.77, green: 0.47, blue: 0.21),
+                progress: items.isEmpty ? 0 : min(Double(calories) / 2200, 1)
+            ),
+            DailyMetric(
+                title: "Protein",
+                value: "\(protein)g",
+                detail: "120g target",
+                symbol: "circle.hexagongrid.fill",
+                tint: Color(red: 0.38, green: 0.50, blue: 0.38),
+                progress: min(Double(protein) / 120, 1)
+            ),
+            DailyMetric(
+                title: "Strength",
+                value: "\(strength)m",
+                detail: items.isEmpty ? "No entries yet" : "Logged today",
+                symbol: "dumbbell.fill",
+                tint: Color(red: 0.40, green: 0.45, blue: 0.55),
+                progress: nil
+            ),
+            DailyMetric(
+                title: "Walk",
+                value: "\(walk)m",
+                detail: items.isEmpty ? "No entries yet" : "Logged today",
+                symbol: "figure.walk",
+                tint: Color(red: 0.39, green: 0.54, blue: 0.47),
+                progress: nil
+            ),
+            DailyMetric(
+                title: "Sitting",
+                value: "\(sitting)m",
+                detail: items.isEmpty ? "No entries yet" : "Logged today",
+                symbol: "chair.fill",
+                tint: Color(red: 0.51, green: 0.48, blue: 0.42),
+                progress: nil
+            ),
+            DailyMetric(
+                title: "Sleep",
+                value: "\(sleep)m",
+                detail: items.isEmpty ? "No entries yet" : "Logged today",
+                symbol: "moon.fill",
+                tint: Color(red: 0.38, green: 0.43, blue: 0.53),
+                progress: nil
+            )
+        ]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -431,7 +595,7 @@ struct OverviewCard: View {
                     Text("Daily Balance")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
-                    Text("On track today.")
+                    Text(items.isEmpty ? "Start with one upload." : "Logged \(items.count) real \(items.count == 1 ? "item" : "items").")
                         .font(.system(size: 24, weight: .semibold, design: .rounded))
                         .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -509,6 +673,10 @@ struct MetricTile: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
+            .id("\(metric.title)-\(metric.value)-\(metric.detail)")
+            .transaction { transaction in
+                transaction.animation = nil
+            }
 
             if let progress = metric.progress {
                 ProgressView(value: progress)
@@ -520,6 +688,26 @@ struct MetricTile: View {
         .frame(height: 78, alignment: .topLeading)
         .padding(10)
         .background(.white.opacity(0.48), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+struct EmptyTimelineState: View {
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "tray")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text("No real uploads yet")
+                .font(.headline)
+            Text("Use Add to import a photo or file.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 34)
+        .background(.white.opacity(0.5), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .glassEffect(.regular, in: .rect(cornerRadius: 26))
+        .accessibilityIdentifier("empty-timeline")
     }
 }
 
@@ -618,6 +806,7 @@ struct TimelineRow: View {
         .frame(height: cardHeight + rowGap, alignment: .top)
         .offset(y: appeared ? 0 : 12)
         .opacity(appeared ? 1 : 0)
+        .accessibilityIdentifier("timeline-row-\(index)")
         .onAppear {
             withAnimation(.spring(duration: 0.55, bounce: 0.18).delay(Double(index) * 0.07)) {
                 appeared = true
@@ -634,10 +823,13 @@ struct UploadSheet: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var showPhotoPicker = false
     @State private var importedImage: UIImage?
+    @State private var importedImageData: Data?
     @State private var importedName = "No file selected"
+    @State private var importedMimeType = "image/jpeg"
     @State private var showFileImporter = false
     @State private var isUploading = false
     @State private var uploadProgress = 0.0
+    @State private var extraction: ImageExtraction?
     @State private var cameraMessage: String?
     @State private var controlsAppeared = false
 
@@ -672,7 +864,7 @@ struct UploadSheet: View {
                             ProgressView()
                                 .controlSize(.small)
                         }
-                        Text(isUploading ? "Uploading" : importedImage == nil ? "Choose Image" : "Upload")
+                        Text(isUploading ? "Analyzing" : importedImage == nil ? "Choose Image" : "Upload")
                             .font(.headline)
                     }
                     .frame(maxWidth: .infinity)
@@ -682,6 +874,7 @@ struct UploadSheet: View {
                 .buttonBorderShape(.capsule)
                 .tint(.black.opacity(0.86))
                 .disabled(isUploading)
+                .accessibilityIdentifier("upload-primary-button")
             }
             .padding(.horizontal, 22)
             .padding(.top, 74)
@@ -740,6 +933,7 @@ struct UploadSheet: View {
                 .opacity(controlsAppeared ? 1 : 0)
                 .offset(y: controlsAppeared ? 0 : 18)
                 .animation(.spring(duration: 0.48, bounce: 0.22).delay(Double(index) * 0.05), value: controlsAppeared)
+                .accessibilityIdentifier("upload-source-\(source.apiValue)")
             }
         }
     }
@@ -787,7 +981,7 @@ struct UploadSheet: View {
                         ProgressView(value: uploadProgress)
                             .progressViewStyle(.linear)
                             .tint(.primary)
-                        Text("Preparing timeline entry")
+                        Text("Analyzing inputs and metadata")
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
@@ -802,6 +996,34 @@ struct UploadSheet: View {
             .glassEffect(.regular, in: .rect(cornerRadius: 28))
             .onTapGesture {
                 choose(selectedSource)
+            }
+
+            if let extraction {
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack {
+                        Text(extraction.title)
+                            .font(.headline)
+                        Spacer()
+                        Text("\(Int((extraction.confidence * 100).rounded()))%")
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(.white.opacity(0.58), in: Capsule())
+                    }
+
+                    Text(extraction.metadataLine)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+
+                    Text("Outputs: \(extraction.outputImpacts.joined(separator: ", "))")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .padding(14)
+                .background(.white.opacity(0.46), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
         .padding(18)
@@ -820,6 +1042,7 @@ struct UploadSheet: View {
         withAnimation(.spring(duration: 0.4, bounce: 0.2)) {
             selectedSource = source
             cameraMessage = nil
+            extraction = nil
         }
 
         switch source {
@@ -837,10 +1060,14 @@ struct UploadSheet: View {
         do {
             if let data = try await selectedPhoto.loadTransferable(type: Data.self),
                let image = UIImage(data: data) {
+                let mimeType = selectedPhoto.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg"
                 await MainActor.run {
                     withAnimation(.spring(duration: 0.45, bounce: 0.18)) {
                         importedImage = image
+                        importedImageData = data
                         importedName = "Photo library image"
+                        importedMimeType = mimeType
+                        extraction = nil
                     }
                 }
             }
@@ -867,9 +1094,13 @@ struct UploadSheet: View {
         do {
             let data = try Data(contentsOf: url)
             if let image = UIImage(data: data) {
+                let mimeType = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "image/jpeg"
                 withAnimation(.spring(duration: 0.45, bounce: 0.18)) {
                     importedImage = image
+                    importedImageData = data
                     importedName = url.lastPathComponent
+                    importedMimeType = mimeType
+                    extraction = nil
                 }
             } else {
                 importedName = "Selected file is not an image"
@@ -880,37 +1111,48 @@ struct UploadSheet: View {
     }
 
     private func startUpload() {
-        guard let importedImage else { return }
+        guard let importedImage, let importedImageData else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let assetName = importedName
+        let imageData = importedImageData
+        let mimeType = importedMimeType
+        let source = selectedSource
+
         isUploading = true
         uploadProgress = 0.12
 
         Task {
-            for progress in [0.32, 0.58, 0.82, 1.0] {
-                try? await Task.sleep(for: .milliseconds(210))
-                await MainActor.run {
-                    withAnimation(.smooth(duration: 0.22)) {
-                        uploadProgress = progress
-                    }
+            await advanceUploadProgress(to: 0.36)
+            let extraction = await ImageExtractionClient.analyze(
+                data: imageData,
+                assetName: assetName,
+                source: source,
+                mimeType: mimeType
+            )
+            await MainActor.run {
+                withAnimation(.smooth(duration: 0.24)) {
+                    self.extraction = extraction
+                    uploadProgress = 0.78
                 }
             }
+            await advanceUploadProgress(to: 1.0)
 
             await MainActor.run {
-                let newItem = TimelineItem(
-                    time: "Now",
-                    title: "New upload",
-                    subtitle: selectedSource.rawValue,
-                    detail: "Saved to today's private timeline",
-                    symbol: selectedSource.symbol,
-                    tint: .green,
-                    image: importedImage,
-                    minutesAgo: 0,
-                    badge: "New"
-                )
+                let newItem = extraction.timelineItem(source: source, image: importedImage)
                 onUpload(newItem)
             }
         }
     }
+
+    private func advanceUploadProgress(to value: Double) async {
+        try? await Task.sleep(for: .milliseconds(260))
+        await MainActor.run {
+            withAnimation(.smooth(duration: 0.24)) {
+                uploadProgress = value
+            }
+        }
+    }
+
 }
 
 struct PlaceholderTab: View {
@@ -939,6 +1181,198 @@ struct PlaceholderTab: View {
     }
 }
 
+private extension UploadSource {
+    init?(apiValue: String) {
+        switch apiValue.lowercased() {
+        case "camera":
+            self = .camera
+        case "library", "photos":
+            self = .photos
+        case "file", "files":
+            self = .files
+        default:
+            return nil
+        }
+    }
+
+    var apiValue: String {
+        switch self {
+        case .camera: "camera"
+        case .photos: "library"
+        case .files: "file"
+        }
+    }
+}
+
+private extension TimelineItem {
+    var caloriesKcal: Int {
+        value(before: "kcal")
+    }
+
+    var proteinG: Int {
+        value(before: "g protein")
+    }
+
+    var durationMin: Int {
+        value(before: " min") + value(before: "m /")
+    }
+
+    func value(before marker: String) -> Int {
+        guard let range = detail.range(of: marker) else {
+            return 0
+        }
+
+        let prefix = detail[..<range.lowerBound]
+        let digits = prefix
+            .reversed()
+            .drop { !$0.isNumber }
+            .prefix { $0.isNumber }
+            .reversed()
+        return Int(String(digits)) ?? 0
+    }
+}
+
+private enum ImageExtractionClient {
+    static func analyze(
+        data: Data,
+        assetName: String,
+        source: UploadSource,
+        mimeType: String
+    ) async -> ImageExtraction {
+        guard let url = URL(string: "http://127.0.0.1:8088/ai/extract-image") else {
+            return .fallback(assetName: assetName, source: source, mimeType: mimeType)
+        }
+
+        do {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(
+                ImageExtractionRequest(
+                    assetName: assetName,
+                    source: source.apiValue,
+                    mimeType: mimeType,
+                    imageBase64: data.base64EncodedString()
+                )
+            )
+
+            let (responseData, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200..<300).contains(httpResponse.statusCode) else {
+                return .fallback(assetName: assetName, source: source, mimeType: mimeType)
+            }
+
+            return try JSONDecoder().decode(ImageExtraction.self, from: responseData)
+        } catch {
+            return .fallback(assetName: assetName, source: source, mimeType: mimeType)
+        }
+    }
+}
+
+private extension ImageExtraction {
+    var metadataLine: String {
+        let values = [
+            metadata.caloriesKcal.map { "\($0) kcal" },
+            metadata.proteinG.map { "\($0)g protein" },
+            metadata.carbsG.map { "\($0)g carbs" },
+            metadata.fatG.map { "\($0)g fat" },
+            metadata.fiberG.map { "\($0)g fiber" },
+            metadata.waterMl.map { "\($0)ml water" },
+            metadata.nicotineMg.map { "\($0)mg nicotine" },
+            metadata.durationMin.map { "\($0) min" }
+        ].compactMap(\.self)
+
+        if !values.isEmpty {
+            return values.joined(separator: " / ")
+        }
+
+        return summary
+    }
+
+    static func fallback(assetName: String, source: UploadSource, mimeType: String) -> ImageExtraction {
+        ImageExtraction(
+            schemaVersion: "2026-05-07.inputs-outputs.v1",
+            direction: "input",
+            inputCategory: assetName.localizedCaseInsensitiveContains("receipt") ? "information" : "food",
+            outputImpacts: assetName.localizedCaseInsensitiveContains("receipt") ? ["focus", "mood"] : ["energy", "health"],
+            title: assetName.localizedCaseInsensitiveContains("receipt") ? "Information input" : "Food input",
+            summary: "Estimated upload record. Review details before using it for trends.",
+            confidence: 0.62,
+            metadata: ExtractionMetadata(
+                foodCategory: assetName.localizedCaseInsensitiveContains("receipt") ? nil : "mixed meal",
+                portionEstimate: assetName.localizedCaseInsensitiveContains("receipt") ? nil : "review needed",
+                weightG: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 420,
+                caloriesKcal: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 540,
+                proteinG: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 28,
+                fatG: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 18,
+                carbsG: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 62,
+                fiberG: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 7,
+                waterMl: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 180,
+                caffeineMg: nil,
+                alcoholG: nil,
+                nicotineMg: nil,
+                durationMin: nil,
+                micronutrients: nil,
+                minerals: nil,
+                vitamins: nil,
+                estimatedFrom: ["asset_name", "source"],
+                reviewNeeded: ["context", "portion or duration"],
+                originalMimeType: mimeType
+            )
+        )
+    }
+
+    func timelineItem(source: UploadSource, image: UIImage) -> TimelineItem {
+        TimelineItem(
+            time: "Now",
+            title: title,
+            subtitle: "\(inputCategory.capitalized) / \(direction.capitalized)",
+            detail: metadataLine,
+            symbol: symbolName,
+            tint: tint,
+            image: image,
+            minutesAgo: 0,
+            badge: badgeText
+        )
+    }
+
+    var symbolName: String {
+        switch inputCategory {
+        case "beverage": "drop"
+        case "caffeine": "cup.and.saucer"
+        case "alcohol": "wineglass"
+        case "nicotine": "smoke"
+        case "exercise": "figure.run"
+        case "sunlight": "sun.max"
+        case "social": "person.2"
+        case "information": "doc.text"
+        default: "fork.knife"
+        }
+    }
+
+    var tint: Color {
+        switch inputCategory {
+        case "caffeine": Color(red: 0.50, green: 0.42, blue: 0.35)
+        case "beverage", "sunlight": Color(red: 0.40, green: 0.52, blue: 0.56)
+        case "exercise": Color(red: 0.40, green: 0.45, blue: 0.55)
+        case "information": Color(red: 0.50, green: 0.48, blue: 0.42)
+        case "nicotine": Color(red: 0.48, green: 0.46, blue: 0.50)
+        case "social": Color(red: 0.55, green: 0.42, blue: 0.46)
+        default: Color(red: 0.42, green: 0.52, blue: 0.39)
+        }
+    }
+
+    var badgeText: String? {
+        if let calories = metadata.caloriesKcal {
+            return "\(calories)"
+        }
+        if let duration = metadata.durationMin {
+            return "\(duration)m"
+        }
+        return "\(Int((confidence * 100).rounded()))%"
+    }
+}
+
 struct NomiBackground: View {
     var body: some View {
         LinearGradient(
@@ -952,66 +1386,6 @@ struct NomiBackground: View {
         )
         .ignoresSafeArea()
     }
-}
-
-extension TimelineItem {
-    static let samples: [TimelineItem] = [
-        TimelineItem(
-            time: "07:45",
-            title: "Greek yogurt bowl",
-            subtitle: "Nutrition",
-            detail: "520 kcal / 34g protein",
-            symbol: "fork.knife",
-            tint: Color(red: 0.42, green: 0.52, blue: 0.39),
-            image: nil,
-            minutesAgo: 18,
-            badge: "520"
-        ),
-        TimelineItem(
-            time: "09:30",
-            title: "Desk block",
-            subtitle: "Sitting",
-            detail: "2h 05m / break logged",
-            symbol: "chair",
-            tint: Color(red: 0.50, green: 0.48, blue: 0.42),
-            image: nil,
-            minutesAgo: 74,
-            badge: "2h"
-        ),
-        TimelineItem(
-            time: "12:20",
-            title: "Strength training",
-            subtitle: "Workout",
-            detail: "48 min / 348 kcal",
-            symbol: "dumbbell",
-            tint: Color(red: 0.40, green: 0.45, blue: 0.55),
-            image: nil,
-            minutesAgo: 126,
-            badge: "48m"
-        ),
-        TimelineItem(
-            time: "17:40",
-            title: "Evening walk",
-            subtitle: "Movement",
-            detail: "32 min / 112 kcal",
-            symbol: "figure.walk",
-            tint: Color(red: 0.39, green: 0.54, blue: 0.47),
-            image: nil,
-            minutesAgo: 188,
-            badge: "32m"
-        ),
-        TimelineItem(
-            time: "23:10",
-            title: "Sleep window",
-            subtitle: "Recovery",
-            detail: "7h 42m / good rhythm",
-            symbol: "moon",
-            tint: Color(red: 0.38, green: 0.43, blue: 0.53),
-            image: nil,
-            minutesAgo: 236,
-            badge: "7h"
-        )
-    ]
 }
 
 #Preview {

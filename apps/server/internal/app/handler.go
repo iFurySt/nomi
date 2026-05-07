@@ -36,6 +36,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("GET /records", h.listRecords)
 	mux.HandleFunc("POST /records", h.createRecord)
+	mux.HandleFunc("POST /ai/extract-image", h.extractImage)
 	mux.HandleFunc("POST /ask", h.ask)
 	mux.HandleFunc("GET /daemon/connect", h.seedXWebSocket)
 	mux.HandleFunc("GET /seedx/ws", h.seedXWebSocket)
@@ -88,6 +89,29 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, record)
+}
+
+func (h *Handler) extractImage(w http.ResponseWriter, r *http.Request) {
+	var input ImageExtractionRequest
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	if input.AssetName == "" {
+		writeError(w, http.StatusBadRequest, "asset_name_required")
+		return
+	}
+
+	extraction := BuildImageExtraction(input)
+	h.logger.Info(
+		"image extraction completed",
+		zap.String("asset_name", input.AssetName),
+		zap.String("source", input.Source),
+		zap.String("input_category", extraction.InputCategory),
+		zap.Float64("confidence", extraction.Confidence),
+	)
+	writeJSON(w, http.StatusOK, extraction)
 }
 
 func (h *Handler) ask(w http.ResponseWriter, r *http.Request) {
