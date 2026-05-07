@@ -24,6 +24,7 @@
 - **Bottom nav gesture**: 将底栏从多个孤立按钮改为整条 bar 的 `DragGesture(minimumDistance: 0)`，按住左右滑动时根据手指 x 位置预览高亮；松开落在 tab 上即选中，松开落在 Add 上即打开上传。
 - **Upload nav item**: 将中间上传入口从独立圆形 `+` 改为普通 Add 导航项，和其他 tab 保持 48x50 尺寸、文字标签、轻量按压反馈与底栏调性一致。
 - **Home data pass**: 将首页总览从 uploads / themes mock 改为 Daily Balance 数据网格，覆盖能量、蛋白质、力量训练、步行、久坐和睡眠；timeline 改为低饱和、低装饰的紧凑日志列表，减少彩色块、大图标和 badge 的视觉噪音。
+- **Timeline spacing pass**: 给 timeline 卡片增加行间距，并将时间轴圆点对齐到卡片垂直中心，避免卡片上下紧贴和 rail marker 偏上的观感。
 - **Motion / style**: 使用 SwiftUI spring / smooth 动画、symbolEffect、contentTransition、glass button style 和 glassEffect，贴近 Apple-like / Liquid Glass 方向。
 - **Verification**: 在 iPhone 17 Pro simulator build / install / launch，并保存首页和上传 sheet 截图。
 

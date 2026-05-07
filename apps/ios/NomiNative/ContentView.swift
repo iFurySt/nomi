@@ -529,6 +529,9 @@ struct TimelineRow: View {
     let isFirst: Bool
     let isLast: Bool
     @State private var appeared = false
+    private let cardHeight: CGFloat = 74
+    private let rowGap: CGFloat = 12
+    private let markerSize: CGFloat = 9
 
     var body: some View {
         HStack(alignment: .top, spacing: 11) {
@@ -536,17 +539,17 @@ struct TimelineRow: View {
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 48, alignment: .trailing)
-                .padding(.top, 18)
+                .padding(.top, 28)
 
             VStack(spacing: 0) {
                 Rectangle()
                     .fill(isFirst ? .clear : Color.secondary.opacity(0.14))
-                    .frame(width: 1, height: 16)
+                    .frame(width: 1, height: (cardHeight - markerSize) / 2)
 
                 Circle()
                     .strokeBorder(Color.white.opacity(0.86), lineWidth: 2)
                     .background(Circle().fill(item.tint.opacity(0.68)))
-                    .frame(width: 9, height: 9)
+                    .frame(width: markerSize, height: markerSize)
                     .scaleEffect(appeared ? 1 : 0.4)
 
                 Rectangle()
@@ -554,7 +557,7 @@ struct TimelineRow: View {
                     .frame(width: 1)
                     .frame(maxHeight: .infinity)
             }
-            .frame(width: 10, height: 74)
+            .frame(width: 10, height: cardHeight + rowGap)
 
             HStack(spacing: 11) {
                 ZStack {
@@ -602,6 +605,7 @@ struct TimelineRow: View {
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 12)
+            .frame(height: cardHeight)
             .background {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.white.opacity(0.56))
@@ -611,7 +615,7 @@ struct TimelineRow: View {
                     }
             }
         }
-        .frame(height: 74)
+        .frame(height: cardHeight + rowGap, alignment: .top)
         .offset(y: appeared ? 0 : 12)
         .opacity(appeared ? 1 : 0)
         .onAppear {
