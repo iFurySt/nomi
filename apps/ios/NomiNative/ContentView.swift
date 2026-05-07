@@ -5,6 +5,7 @@ import UIKit
 
 struct TimelineItem: Identifiable, Equatable {
     let id = UUID()
+    let time: String
     let title: String
     let subtitle: String
     let detail: String
@@ -12,6 +13,41 @@ struct TimelineItem: Identifiable, Equatable {
     let tint: Color
     let image: UIImage?
     let minutesAgo: Int
+    let badge: String?
+}
+
+enum NomiTab: Int, CaseIterable {
+    case today = 0
+    case trends = 1
+    case log = 2
+    case profile = 3
+
+    var title: String {
+        switch self {
+        case .today: "Today"
+        case .trends: "Trends"
+        case .log: "Log"
+        case .profile: "Me"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .today: "house"
+        case .trends: "chart.line.uptrend.xyaxis"
+        case .log: "fork.knife"
+        case .profile: "person"
+        }
+    }
+
+    var selectedSymbol: String {
+        switch self {
+        case .today: "house.fill"
+        case .trends: "chart.line.uptrend.xyaxis"
+        case .log: "fork.knife"
+        case .profile: "person.fill"
+        }
+    }
 }
 
 enum UploadSource: String, CaseIterable, Identifiable {
@@ -39,49 +75,18 @@ enum UploadSource: String, CaseIterable, Identifiable {
 }
 
 struct ContentView: View {
-    @State private var selectedTab = 0
+    @State private var selectedTab: NomiTab = .today
     @State private var showUploadSheet = false
     @State private var showHero = false
     @State private var timelineItems: [TimelineItem] = TimelineItem.samples
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack {
-                HomeView(
-                    items: timelineItems,
-                    showHero: showHero
-                )
-                .navigationTitle("Nomi")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            openUploadSheet()
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.headline.weight(.semibold))
-                        }
-                        .buttonStyle(.glass)
-                        .accessibilityLabel("Upload")
-                    }
-                }
-            }
-            .tabItem {
-                Label("Today", systemImage: "house.fill")
-            }
-            .tag(0)
+        ZStack(alignment: .bottom) {
+            currentTabView
 
-            PlaceholderTab(title: "Ask", symbol: "sparkles", detail: "Grounded answers will live here.")
-                .tabItem {
-                    Label("Ask", systemImage: "sparkles")
-                }
-                .tag(1)
-
-            PlaceholderTab(title: "Trends", symbol: "chart.line.uptrend.xyaxis", detail: "Gentle reflection views are next.")
-                .tabItem {
-                    Label("Trends", systemImage: "chart.line.uptrend.xyaxis")
-                }
-                .tag(2)
+            NomiBottomBar(selectedTab: $selectedTab, onAdd: openUploadSheet)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 10)
         }
         .tint(.primary)
         .sheet(isPresented: $showUploadSheet) {
@@ -108,11 +113,104 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var currentTabView: some View {
+        switch selectedTab {
+        case .today:
+            NavigationStack {
+                HomeView(
+                    items: timelineItems,
+                    showHero: showHero
+                )
+                .navigationTitle("Nomi")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+        case .trends:
+            PlaceholderTab(title: "Trends", symbol: "chart.line.uptrend.xyaxis", detail: "Gentle reflection views are next.")
+        case .log:
+            PlaceholderTab(title: "Log", symbol: "fork.knife", detail: "Detailed records will live here.")
+        case .profile:
+            PlaceholderTab(title: "Me", symbol: "person", detail: "Privacy and export controls are next.")
+        }
+    }
+
     private func openUploadSheet() {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         withAnimation(.bouncy(duration: 0.45)) {
             showUploadSheet = true
         }
+    }
+}
+
+struct NomiBottomBar: View {
+    @Binding var selectedTab: NomiTab
+    let onAdd: () -> Void
+    @State private var appeared = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            tabButton(.today)
+            tabButton(.trends)
+
+            Button(action: onAdd) {
+                Image(systemName: "plus")
+                    .font(.system(size: 27, weight: .medium))
+                    .frame(width: 66, height: 66)
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.circle)
+            .tint(Color(red: 0.98, green: 0.77, blue: 0.38))
+            .foregroundStyle(.black.opacity(0.86))
+            .shadow(color: Color(red: 0.82, green: 0.52, blue: 0.12).opacity(0.24), radius: 18, y: 8)
+            .accessibilityLabel("Upload")
+
+            tabButton(.log)
+            tabButton(.profile)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background {
+            Capsule(style: .continuous)
+                .fill(.black.opacity(0.76))
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .shadow(color: .black.opacity(0.24), radius: 22, y: 12)
+        }
+        .scaleEffect(appeared ? 1 : 0.96)
+        .opacity(appeared ? 1 : 0)
+        .onAppear {
+            withAnimation(.spring(duration: 0.55, bounce: 0.2)) {
+                appeared = true
+            }
+        }
+    }
+
+    private func tabButton(_ tab: NomiTab) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.spring(duration: 0.35, bounce: 0.18)) {
+                selectedTab = tab
+            }
+        } label: {
+            VStack(spacing: 5) {
+                Image(systemName: selectedTab == tab ? tab.selectedSymbol : tab.symbol)
+                    .font(.system(size: 21, weight: .medium))
+                    .symbolEffect(.bounce, value: selectedTab)
+                Text(tab.title)
+                    .font(.caption2.weight(.semibold))
+            }
+            .frame(width: 56, height: 56)
+            .foregroundStyle(selectedTab == tab ? .white : .white.opacity(0.42))
+            .background {
+                if selectedTab == tab {
+                    Circle()
+                        .fill(.white.opacity(0.16))
+                        .glassEffect(.regular, in: .circle)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tab.title)
     }
 }
 
@@ -143,16 +241,21 @@ struct HomeView: View {
                         }
                         .padding(.horizontal, 4)
 
-                        LazyVStack(spacing: 12) {
+                        LazyVStack(spacing: 0) {
                             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                TimelineRow(item: item, index: index)
+                                TimelineRow(
+                                    item: item,
+                                    index: index,
+                                    isFirst: index == 0,
+                                    isLast: index == items.count - 1
+                                )
                             }
                         }
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
-                .padding(.bottom, 112)
+                .padding(.bottom, 122)
             }
             .scrollIndicators(.hidden)
         }
@@ -247,55 +350,89 @@ struct MetricPill: View {
 struct TimelineRow: View {
     let item: TimelineItem
     let index: Int
+    let isFirst: Bool
+    let isLast: Bool
     @State private var appeared = false
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(item.tint.opacity(0.15))
-                if let image = item.image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .transition(.opacity.combined(with: .scale(scale: 0.94)))
-                } else {
-                    Image(systemName: item.symbol)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(item.tint)
-                        .symbolEffect(.bounce, value: appeared)
-                }
-            }
-            .frame(width: 58, height: 58)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(item.title)
-                    .font(.headline)
-                Text(item.subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(item.detail)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-
-            Spacer()
-
-            Text("\(item.minutesAgo)m")
+        HStack(alignment: .top, spacing: 12) {
+            Text(item.time)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
-                .padding(.vertical, 6)
-                .padding(.horizontal, 9)
-                .background(.thinMaterial, in: Capsule())
+                .frame(width: 48, alignment: .trailing)
+                .padding(.top, 22)
+
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(isFirst ? .clear : Color.secondary.opacity(0.2))
+                    .frame(width: 1, height: 18)
+
+                Circle()
+                    .strokeBorder(item.tint.opacity(0.36), lineWidth: 2)
+                    .background(Circle().fill(item.tint.opacity(0.82)))
+                    .frame(width: 10, height: 10)
+                    .scaleEffect(appeared ? 1 : 0.4)
+
+                Rectangle()
+                    .fill(isLast ? .clear : Color.secondary.opacity(0.2))
+                    .frame(width: 1)
+                    .frame(maxHeight: .infinity)
+            }
+            .frame(width: 12, height: 88)
+
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(item.tint.opacity(0.14))
+                    if let image = item.image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                    } else {
+                        Image(systemName: item.symbol)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(item.tint)
+                            .symbolEffect(.bounce, value: appeared)
+                    }
+                }
+                .frame(width: 52, height: 52)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Text(item.title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Text(item.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                if let badge = item.badge {
+                    Text(badge)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(item.tint)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 9)
+                        .background(item.tint.opacity(0.1), in: Capsule())
+                }
+            }
+            .padding(.vertical, 11)
+            .padding(.horizontal, 12)
+            .background {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(index == 3 ? item.tint.opacity(0.16) : Color.white.opacity(0.68))
+                    .glassEffect(.regular, in: .rect(cornerRadius: 22))
+            }
         }
-        .padding(14)
-        .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.white.opacity(0.68))
-                .glassEffect(.regular, in: .rect(cornerRadius: 24))
-        }
+        .frame(height: 88)
         .offset(y: appeared ? 0 : 20)
         .opacity(appeared ? 1 : 0)
         .onAppear {
@@ -325,7 +462,7 @@ struct UploadSheet: View {
         ZStack(alignment: .topTrailing) {
             NomiBackground()
 
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Upload")
                         .font(.system(size: 34, weight: .semibold, design: .rounded))
@@ -364,8 +501,8 @@ struct UploadSheet: View {
                 .disabled(isUploading)
             }
             .padding(.horizontal, 22)
-            .padding(.top, 42)
-            .padding(.bottom, 18)
+            .padding(.top, 74)
+            .padding(.bottom, 24)
 
             Button {
                 dismiss()
@@ -375,7 +512,7 @@ struct UploadSheet: View {
             }
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
-            .padding(.top, 34)
+            .padding(.top, 62)
             .padding(.trailing, 26)
             .accessibilityLabel("Close")
         }
@@ -411,7 +548,7 @@ struct UploadSheet: View {
                             .font(.caption.weight(.semibold))
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 86)
+                    .frame(height: 80)
                 }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.roundedRectangle(radius: 20))
@@ -477,7 +614,7 @@ struct UploadSheet: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.94)))
                 }
             }
-            .frame(height: 184)
+            .frame(height: 164)
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .glassEffect(.regular, in: .rect(cornerRadius: 28))
             .onTapGesture {
@@ -577,13 +714,15 @@ struct UploadSheet: View {
 
             await MainActor.run {
                 let newItem = TimelineItem(
+                    time: "Now",
                     title: "New upload",
                     subtitle: selectedSource.rawValue,
                     detail: "Saved to today's private timeline",
                     symbol: selectedSource.symbol,
                     tint: .green,
                     image: importedImage,
-                    minutesAgo: 0
+                    minutesAgo: 0,
+                    badge: "New"
                 )
                 onUpload(newItem)
             }
@@ -635,31 +774,37 @@ struct NomiBackground: View {
 extension TimelineItem {
     static let samples: [TimelineItem] = [
         TimelineItem(
+            time: "07:45",
             title: "Breakfast photo",
             subtitle: "Image upload",
             detail: "AI tags ready for review",
             symbol: "fork.knife.circle.fill",
             tint: .orange,
             image: nil,
-            minutesAgo: 18
+            minutesAgo: 18,
+            badge: "34P"
         ),
         TimelineItem(
+            time: "09:30",
             title: "Walk note",
             subtitle: "Light movement",
             detail: "Recorded after lunch",
             symbol: "figure.walk.circle.fill",
             tint: .mint,
             image: nil,
-            minutesAgo: 74
+            minutesAgo: 74,
+            badge: "48m"
         ),
         TimelineItem(
+            time: "12:20",
             title: "Evening snack",
             subtitle: "Quick capture",
             detail: "Private memory saved",
             symbol: "camera.macro.circle.fill",
             tint: .purple,
             image: nil,
-            minutesAgo: 126
+            minutesAgo: 126,
+            badge: nil
         )
     ]
 }

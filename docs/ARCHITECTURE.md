@@ -4,7 +4,7 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 
 ## 当前仓库结构
 
-- `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 mobile skeleton：首页包含顶部全局总览和今日上传 timeline，导航栏 `+` 打开上拉上传 sheet；Ask / Trends 先作为占位 tab。视觉方向使用系统字体、SwiftUI sheet、Liquid Glass 风格按钮 / 玻璃卡片和轻量动画。
+- `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 mobile skeleton：首页包含顶部全局总览、紧凑今日 timeline 和底部导航栏中央 `+`，中央入口打开上拉上传 sheet；Trends / Log / Me 先作为占位 tab。视觉方向使用系统字体、SwiftUI sheet、Liquid Glass 风格按钮 / 玻璃卡片和轻量动画。
 - `apps/mobile/`：Expo mobile app。保留为迁移前的 React Native 原型和 domain smoke 载体。当前收敛为 iPhone 优先的单一上传工作台：底部使用悬浮玻璃导航，中央圆形入口展开拍摄 / 相册 / 文件三种来源，选择后进入原图 AI 分类、上传处理动画和原图 / 抠图区分展示；保存仍写入本地内存 records，Ask boundary smoke 保留在 domain 层。
 - `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、Postgres schema 初始化和 SeedX daemon websocket 控制面。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。

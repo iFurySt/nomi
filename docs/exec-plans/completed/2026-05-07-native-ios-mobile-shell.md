@@ -6,7 +6,7 @@
 
 ## 范围
 
-- 包含：SwiftUI app scaffold、首页全局总览、今日上传 timeline、导航栏 `+` 触发的上传 sheet、Photos / Files 选择边界、占位 tab、Liquid Glass 风格视觉与动画、截图验证和文档同步。
+- 包含：SwiftUI app scaffold、首页全局总览、紧凑今日 timeline、底部导航栏中央 `+` 触发的上传 sheet、Photos / Files 选择边界、占位 tab、Liquid Glass 风格视觉与动画、截图验证和文档同步。
 - 不包含：server persistence、真实 AI 分类、真机 camera capture、完整 UI test target。
 
 ## 背景
@@ -34,7 +34,7 @@
 
 - 命令：`xcodebuild -project apps/ios/NomiNative.xcodeproj -scheme NomiNative -configuration Debug -destination 'platform=iOS Simulator,id=8239FF81-AFE7-4453-9263-F4D9A5BC63E9' build`
 - 手工检查：安装并运行 `dev.nomi.native`，用 `xcrun simctl io ... screenshot` 生成首页与上传 sheet 截图。
-- 观测检查：截图保存在 `docs/generated/verification/nomi-native-home-2026-05-07-clean.png` 和 `docs/generated/verification/nomi-native-upload-sheet-2026-05-07-final-action.png`。
+- 观测检查：最新截图保存在 `docs/generated/verification/nomi-native-home-bottom-plus-timeline-2026-05-07.png` 和 `docs/generated/verification/nomi-native-upload-sheet-spaced-2026-05-07.png`。
 
 ## 进度记录
 
@@ -47,4 +47,5 @@
 ## 决策记录
 
 - 2026-05-07：新建 `apps/ios/`，不复用 `apps/mobile/ios/`。原因是后者是 Expo prebuild generated / ignored output，不适合作为原生 SwiftUI app 的长期版本化边界。
-- 2026-05-07：优先使用系统 `NavigationStack`、`TabView`、SwiftUI sheet、`PhotosPicker`、`fileImporter` 和 iOS 26 glass modifiers。原因是目标风格要求 Apple-like / Liquid Glass，系统控件能减少自定义复杂度。
+- 2026-05-07：优先使用系统 `NavigationStack`、SwiftUI sheet、`PhotosPicker`、`fileImporter` 和 iOS 26 glass modifiers；底部主导航用自定义 glass bar 承载中央上传入口。原因是目标风格要求 Apple-like / Liquid Glass，同时上传主动作需要稳定停留在拇指区中央。
+- 2026-05-07：将上传主入口从顶部导航栏迁到自定义底部栏中央，并将首页 timeline 改为时间 rail + 紧凑卡片。原因是移动端核心动作更适合拇指区，视觉密度也更接近目标参考图。
