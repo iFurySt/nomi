@@ -279,10 +279,8 @@ struct NomiBottomBar: View {
             }
             .onEnded { value in
                 let finalSlot = navSlot(at: value.location.x, width: width)
-                let startedOnUpload = dragStartSlot == .upload
-                let wasTap = hypot(value.translation.width, value.translation.height) < 10
 
-                if finalSlot == .upload, startedOnUpload, wasTap {
+                if finalSlot == .upload {
                     onAdd()
                 }
 

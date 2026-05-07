@@ -50,5 +50,5 @@
 - 2026-05-07：优先使用系统 `NavigationStack`、SwiftUI sheet、`PhotosPicker`、`fileImporter` 和 iOS 26 glass modifiers；底部主导航用自定义暖色小 glass bar 承载中间 Add 上传项。原因是目标风格要求 Apple-like / Liquid Glass，同时上传动作需要稳定停留在拇指区，chrome 不能压过内容。
 - 2026-05-07：将上传主入口从顶部导航栏迁到自定义底部栏中央，并将首页 timeline 改为时间 rail + 紧凑卡片。原因是移动端核心动作更适合拇指区，视觉密度也更接近目标参考图。
 - 2026-05-07：底部栏只参考位置关系，不复刻参考图黑色大胶囊；回到 Nomi 既有暖色玻璃、轻阴影和 matched-geometry 选中态流动。原因是 Nomi 的设计方向是 quiet / content over chrome。
-- 2026-05-07：底栏交互改为整条 bar 的连续拖拽命中，不再由孤立 Button 分别处理 tab；拖过 tab 时实时切换并给 selection haptic，中间 Add 只有从 Add 起手轻点释放才打开上传。原因是恢复原型里按住左右滑动的流动交互，同时避免滑过上传项误触上传。
+- 2026-05-07：底栏交互改为整条 bar 的连续拖拽命中，不再由孤立 Button 分别处理 tab；拖过 tab 时实时切换并给 selection haptic，最终松开落在 Add 上即打开上传。原因是恢复原型里按住左右滑动的流动交互，并让 Add 和其他导航项拥有一致的“松开即确认”语义。
 - 2026-05-07：将中间上传入口从凸起圆形 `+` 收回为普通 Add 导航项，使用同尺寸、同标签和同按压反馈。原因是上传入口需要在底栏体系内一致存在，而不是作为视觉特例抢占注意力。
