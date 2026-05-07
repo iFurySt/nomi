@@ -200,28 +200,29 @@ struct NomiBottomBar: View {
     private var uploadButton: some View {
         let isActive = activeSlot == .upload
 
-        return Image(systemName: "plus")
-            .font(.system(size: 25, weight: .medium))
-            .frame(width: 56, height: 56)
-            .background {
-                Circle()
-                    .fill(Color(red: 0.79, green: 0.44, blue: 0.34))
-                    .glassEffect(.regular.interactive(), in: .circle)
+        return VStack(spacing: 5) {
+            Image(systemName: "plus")
+                .font(.system(size: 19, weight: .semibold))
+                .symbolEffect(.bounce, value: activeSlot)
+            Text("Add")
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .frame(width: 48, height: 50)
+        .foregroundStyle(Color(red: 0.66, green: 0.36, blue: 0.29).opacity(isActive ? 1 : 0.76))
+        .background {
+            if isActive {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(Color(red: 0.80, green: 0.43, blue: 0.34).opacity(0.12))
+                    .glassEffect(.regular, in: .rect(cornerRadius: 22))
+                    .transition(.scale.combined(with: .opacity))
             }
-            .overlay(alignment: .top) {
-                Capsule()
-                    .fill(.white.opacity(0.36))
-                    .frame(width: 24, height: 1.4)
-                    .padding(.top, 9)
-            }
-            .foregroundStyle(.white)
-            .scaleEffect(isActive ? 1.06 : 1)
-            .shadow(color: Color(red: 0.39, green: 0.17, blue: 0.12).opacity(isActive ? 0.24 : 0.18), radius: isActive ? 18 : 14, y: 8)
-            .accessibilityLabel("Upload")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction {
-                onAdd()
-            }
+        }
+        .scaleEffect(isActive ? 1.07 : 1)
+        .accessibilityLabel("Upload")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            onAdd()
+        }
     }
 
     private func tabButton(_ tab: NomiTab) -> some View {
