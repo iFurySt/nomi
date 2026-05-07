@@ -7,10 +7,12 @@ Nomi server 部署在 `amoylab:/opt/nomi`，通过 Docker Compose 启动，镜�
 - 目录：`/opt/nomi`
 - Compose 文件：`/opt/nomi/docker-compose.yml`
 - 环境文件：`/opt/nomi/.env`
+- SSH wrapper：`/usr/local/bin/nomi-deploy-ssh`，仓库模板见 `infra/amoylab/nomi-deploy-ssh.sh`
+- Root deploy script：`/usr/local/sbin/nomi-deploy-root`，仓库模板见 `infra/amoylab/nomi-deploy-root.sh`
 - 服务容器：`nomi-server`
 - 镜像：`ghcr.io/ifuryst/nomi-server:latest`
 - 端口：默认只绑定 `127.0.0.1:8088`
-- 数据库：复用 amoylab 现有 Postgres 容器，单独创建 `nomi` database 和 `nomi` role
+- 数据库：复用 amoylab 现有 Postgres 容器，`nomi-server` 加入 `postgres_default` Docker network，并单独创建 `nomi` database 和 `nomi` role
 
 当前 records / Ask API 还没有用户认证，所以 amoylab 上的 HTTP 端口默认只对本机开放。需要外部访问时，先补认证和反向代理策略，再调整 Compose 端口绑定。
 
@@ -53,4 +55,3 @@ sudo /usr/local/sbin/nomi-deploy-root health
 ```
 
 如果需要回滚，先把 `/opt/nomi/.env` 里的 `NOMI_IMAGE` 改成上一版 `server-v*` 镜像标签，再执行同样的 `deploy` 和 `health`。
-

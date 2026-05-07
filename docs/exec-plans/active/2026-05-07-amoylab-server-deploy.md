@@ -47,3 +47,4 @@
 ## 决策记录
 
 - 2026-05-07：在认证补齐前，amoylab server HTTP 只绑定本机回环地址，避免把未认证 records / Ask API 直接暴露到公网。
+- 2026-05-07：首轮 tag 发布已成功推送 GHCR 镜像，但 server 通过 host gateway 连接 Postgres 时启动前连接不稳定；改为加入现有 `postgres_default` Docker network，并用 `postgres:5432` 连接数据库。

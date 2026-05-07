@@ -7,8 +7,13 @@ services:
       NOMI_SERVER_ADDR: ":8088"
       NOMI_DATABASE_URL: ${NOMI_DATABASE_URL:?set NOMI_DATABASE_URL}
       NOMI_SEEDX_API_KEY: ${NOMI_SEEDX_API_KEY:?set NOMI_SEEDX_API_KEY}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - postgres
     ports:
       - "127.0.0.1:${NOMI_SERVER_PORT:-8088}:8088"
 
+networks:
+  postgres:
+    external: true
+    name: postgres_default
