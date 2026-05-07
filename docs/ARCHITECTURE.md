@@ -6,6 +6,7 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 
 - `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 mobile skeleton：首页默认不填假 timeline，摄入能量、蛋白质、训练、步行、久坐、睡眠等今日总览从真实上传记录派生；timeline 为空时显示真实空态。底部是暖色小玻璃导航栏，中间 Add 上传项以普通导航项样式打开上拉上传 sheet，并在真实 PhotosPicker / fileImporter 选择图片后调用 server image extraction contract 生成 timeline 项。Trends / Log / Me 先作为占位 tab。视觉方向使用系统字体、SwiftUI sheet、Liquid Glass 风格按钮 / 玻璃卡片、轻量动画和可按住左右滑动的连续选中态流动。
 - `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、图片 AI 提取边界、Postgres schema 初始化和 SeedX daemon websocket 控制面。
+- `infra/amoylab/`：amoylab server 部署模板，包含 Docker Compose 和环境变量示例；真实部署目录是 `amoylab:/opt/nomi`。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。
 - `docs/exec-plans/completed/`：已完成的跨 milestone 执行计划。
 - `docs/generated/verification/`：本地验证生成物，例如 UI 截图。
@@ -45,5 +46,6 @@ MVP 目标拓扑：
 - Server local run：`cd apps/server && NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088`
 - SeedX daemon websocket smoke：先启动 server，再运行 `seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once`
 - 文档检查：`make check-docs`
+- Server tag release：递增 `server-v*` tag 并 push，触发 GHCR 镜像构建和 amoylab 部署；详见 `docs/DEPLOYMENT.md`。
 
 随着 server、SeedX command 调度和 Postgres 集成测试落地，本节需要继续补齐对应启动、测试和观测命令。

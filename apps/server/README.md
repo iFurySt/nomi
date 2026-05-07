@@ -25,6 +25,18 @@ go test ./...
 NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088
 ```
 
+## Docker
+
+```sh
+docker build -t ghcr.io/ifuryst/nomi-server:local .
+docker run --rm -p 127.0.0.1:8088:8088 \
+  -e NOMI_DATABASE_URL='postgres://bytedance:bytedance@host.docker.internal:5432/nomi?sslmode=disable' \
+  -e NOMI_SEEDX_API_KEY=dev_seedx_key \
+  ghcr.io/ifuryst/nomi-server:local
+```
+
+amoylab deployment uses the Compose template in `infra/amoylab/` and the release flow documented in `docs/DEPLOYMENT.md`.
+
 ## SeedX Websocket
 
 SeedX connects to the standard daemon endpoint:

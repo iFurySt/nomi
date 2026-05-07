@@ -1,0 +1,14 @@
+services:
+  server:
+    image: ${NOMI_IMAGE:-ghcr.io/ifuryst/nomi-server:latest}
+    container_name: nomi-server
+    restart: unless-stopped
+    environment:
+      NOMI_SERVER_ADDR: ":8088"
+      NOMI_DATABASE_URL: ${NOMI_DATABASE_URL:?set NOMI_DATABASE_URL}
+      NOMI_SEEDX_API_KEY: ${NOMI_SEEDX_API_KEY:?set NOMI_SEEDX_API_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:${NOMI_SERVER_PORT:-8088}:8088"
+

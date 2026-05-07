@@ -10,6 +10,7 @@ Nomi 不是医疗产品，不提供诊断、治疗、药物或急症判断。
 - 设计方向：`docs/DESIGN.md`
 - 执行计划：`docs/exec-plans/completed/2026-05-06-nomi-mvp-skeleton.md`
 - iOS app：`apps/ios/`
+- Server 部署：`docs/DEPLOYMENT.md`
 
 ## iOS 本地启动
 
@@ -35,6 +36,10 @@ cd apps/server
 go test ./...
 NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088
 ```
+
+## Server 发版
+
+Server 通过 `server-v*` tag 触发 GitHub Actions，构建 `ghcr.io/ifuryst/nomi-server` 并部署到 `amoylab:/opt/nomi`。详细流程见 `docs/DEPLOYMENT.md`。
 
 ## SeedX 本地验证
 

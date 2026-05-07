@@ -12,6 +12,7 @@
 
 - `postgres://bytedance:bytedance@localhost:5432/nomi?sslmode=disable` 只用于本地开发。
 - 共享、staging、production 环境必须通过环境变量或密钥管理系统提供 `NOMI_DATABASE_URL`。
+- amoylab 的真实 `NOMI_DATABASE_URL`、数据库密码和 SeedX key 只允许存在于 `/opt/nomi/.env` 或密钥系统，不写入仓库。
 - SeedX daemon API key 通过 `NOMI_SEEDX_API_KEY` 或 `--seedx-api-key` 配置，真实 key 不得写入 README、history、日志或 URL。
 - 不要把真实数据库 URL、SeedX token、云端 websocket endpoint secret 写入仓库。
 
@@ -24,6 +25,13 @@
 ## API
 
 - 当前 records / Ask API 尚未实现用户认证，只能用于本地开发。
+- amoylab Docker Compose 默认只把 server 绑定到 `127.0.0.1:8088`。公开访问前必须先补 API 认证、授权和反向代理策略。
 - SeedX websocket 在配置 `NOMI_SEEDX_API_KEY` 后要求 WebSocket 握手带 `Authorization: Bearer ...`，兼容 `seedx daemon connect --api-key`；API key 不放在 URL query。
 - 接入真实 mobile client 或云端前必须增加认证、授权、请求大小限制、CORS 策略和审计日志。
 - Websocket origin check 允许非浏览器 daemon client；浏览器来源必须同 host 或本地开发 host。云端模式还需要补租户绑定、短期凭据轮换和审计。
+
+## 部署 SSH
+
+- GitHub Actions 到 amoylab 使用专用 `nomi-deploy` key，不复用个人 root key。
+- amoylab `authorized_keys` 使用 forced command 进入 `/usr/local/bin/nomi-deploy-ssh`，只允许固定的部署和健康检查命令。
+- `nomi-deploy` 用户不加入 docker group；需要 root 的 Docker 操作通过 sudo 限定到固定 `/usr/local/sbin/nomi-deploy-root` 脚本。
