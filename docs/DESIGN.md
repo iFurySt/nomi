@@ -1,6 +1,6 @@
 # 设计原则
 
-这份文档沉淀 Nomi / 知己 相对稳定的产品设计原则。具体功能规格见 `docs/product-specs/`，前端工程约定见 `docs/FRONTEND.md`。
+这份文档沉淀 Nomi / 知己 相对稳定的产品设计原则。具体功能规格见 `docs/product-specs/`，前端工程约定见 `docs/FRONTEND.md`，可执行 UIUX 标准和参考入口见 `docs/UIUX_REFERENCE.md`。
 
 ## Design Direction
 

@@ -57,7 +57,7 @@ npx expo start --web --port 8081 --clear
 
 ## 设计约束
 
-- 设计方向以 `docs/DESIGN.md` 为准：quiet、personal、less is more、Apple-like。
+- 设计方向以 `docs/DESIGN.md` 为准：quiet、personal、less is more、Apple-like；具体 UIUX、动效、底栏、timeline 和参考链接见 `docs/UIUX_REFERENCE.md`。
 - 当前视觉保留暖纸背景、大留白和轻卡片，但产品功能已收口到 upload-only。
 - 优先使用系统感强的排版、清晰留白、克制色彩、图标按钮和选项控件；上传流里尽量让用户选择而不是输入，解释性文案默认删减。
 - 不使用医疗 dashboard、告警、风险评分、红黄警示或诊断 / 治疗文案。
