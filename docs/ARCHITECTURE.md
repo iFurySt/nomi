@@ -4,7 +4,7 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 
 ## 当前仓库结构
 
-- `apps/mobile/`：Expo mobile app。当前收敛为 iPhone 优先的单一上传工作台：底部中央圆形入口展开拍摄 / 相册 / 文件三种来源，选择后进入原图 AI 分类、上传处理动画和原图 / 抠图区分展示；保存仍写入本地内存 records，Ask boundary smoke 保留在 domain 层。
+- `apps/mobile/`：Expo mobile app。当前收敛为 iPhone 优先的单一上传工作台：底部使用悬浮玻璃导航，中央圆形入口展开拍摄 / 相册 / 文件三种来源，选择后进入原图 AI 分类、上传处理动画和原图 / 抠图区分展示；保存仍写入本地内存 records，Ask boundary smoke 保留在 domain 层。
 - `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、Postgres schema 初始化和 SeedX daemon websocket 控制面。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。
 - `docs/exec-plans/completed/`：已完成的跨 milestone 执行计划。

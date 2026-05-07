@@ -469,20 +469,27 @@ function UploadNav({
     <View pointerEvents="box-none" style={styles.navLayer}>
       <ActionFan menuOpen={menuOpen} onSelect={onSelect} />
       <View style={styles.bottomNav}>
+        <View pointerEvents="none" style={styles.navGlassTint} />
+        <View pointerEvents="none" style={styles.navGlassHighlight} />
         <View style={styles.navSideItem}>
-          <Ionicons name="image-outline" size={22} color={colors.textMuted} />
+          <View style={styles.navSideIconShell}>
+            <Ionicons name="image-outline" size={21} color={colors.textMuted} />
+          </View>
           <Text style={styles.navSideText}>Original</Text>
         </View>
         <Pressable
           accessibilityLabel={menuOpen ? 'Close upload menu' : 'Open upload menu'}
           accessibilityRole="button"
           onPress={menuOpen ? onClose : onOpen}
-          style={[styles.fab, menuOpen && styles.fabOpen]}
+          style={({ pressed }) => [styles.fab, menuOpen && styles.fabOpen, pressed && styles.fabPressed]}
         >
+          <View pointerEvents="none" style={styles.fabHighlight} />
           <Ionicons name={menuOpen ? 'close-outline' : 'add-outline'} size={34} color={colors.white} />
         </Pressable>
         <View style={styles.navSideItem}>
-          <Ionicons name="scan-outline" size={22} color={colors.textMuted} />
+          <View style={styles.navSideIconShell}>
+            <Ionicons name="scan-outline" size={21} color={colors.textMuted} />
+          </View>
           <Text style={styles.navSideText}>Cutout</Text>
         </View>
       </View>
@@ -530,7 +537,7 @@ function ActionFan({ menuOpen, onSelect }: { menuOpen: boolean; onSelect: (sourc
               accessibilityLabel={`${item.label} ${item.detail}`}
               accessibilityRole="button"
               onPress={() => onSelect(item.key)}
-              style={styles.fanItem}
+              style={({ pressed }) => [styles.fanItem, pressed && styles.fanItemPressed]}
             >
               <View style={styles.fanIconButton}>
                 <Ionicons name={item.icon} size={24} color={colors.accent} />
@@ -1035,6 +1042,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     elevation: 30,
     height: 330,
+    paddingBottom: 22,
+    paddingHorizontal: 18,
     justifyContent: 'flex-end',
     left: 0,
     overflow: 'visible',
@@ -1044,7 +1053,7 @@ const styles = StyleSheet.create({
   },
   fanLayer: {
     alignItems: 'center',
-    bottom: 42,
+    bottom: 18,
     elevation: 31,
     height: 220,
     justifyContent: 'flex-end',
@@ -1055,64 +1064,131 @@ const styles = StyleSheet.create({
     zIndex: 31,
   },
   fanItemWrap: {
-    bottom: 34,
+    bottom: 58,
     elevation: 32,
     position: 'absolute',
     zIndex: 32,
   },
   fanItem: {
     alignItems: 'center',
-    height: 58,
+    borderRadius: 30,
+    height: 60,
     justifyContent: 'center',
-    width: 58,
+    width: 60,
+  },
+  fanItemPressed: {
+    transform: [{ scale: 0.96 }],
   },
   fanIconButton: {
     alignItems: 'center',
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.surface,
-    borderRadius: 28,
+    backgroundColor: 'rgba(255, 252, 247, 0.74)',
+    borderColor: 'rgba(255, 255, 255, 0.82)',
     borderWidth: 1,
+    borderRadius: 28,
     height: 56,
     justifyContent: 'center',
+    shadowColor: '#29231F',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.11,
+    shadowRadius: 22,
     width: 56,
-    ...shadows.soft,
+    elevation: 6,
   },
   bottomNav: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderTopWidth: 1,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255, 252, 247, 0.62)',
+    borderColor: 'rgba(255, 255, 255, 0.76)',
+    borderRadius: 34,
+    borderWidth: 1,
     flexDirection: 'row',
-    gap: 34,
-    height: 96,
+    gap: 20,
+    height: 82,
     justifyContent: 'center',
-    paddingBottom: 16,
-    paddingHorizontal: 18,
+    maxWidth: 338,
+    overflow: 'visible',
+    paddingHorizontal: 14,
+    position: 'relative',
+    shadowColor: '#29231F',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.14,
+    shadowRadius: 30,
+    width: '100%',
+    elevation: 12,
+  },
+  navGlassTint: {
+    backgroundColor: 'rgba(246, 233, 224, 0.28)',
+    borderRadius: 33,
+    bottom: 2,
+    left: 2,
+    position: 'absolute',
+    right: 2,
+    top: 2,
+  },
+  navGlassHighlight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.52)',
+    borderRadius: 999,
+    height: 1,
+    left: 22,
+    position: 'absolute',
+    right: 22,
+    top: 9,
   },
   navSideItem: {
     alignItems: 'center',
-    gap: spacing.xs,
-    width: 74,
+    gap: 3,
+    height: 58,
+    justifyContent: 'center',
+    width: 76,
+    zIndex: 2,
+  },
+  navSideIconShell: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 44,
   },
   navSideText: {
     color: colors.textMuted,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
   },
   fab: {
     alignItems: 'center',
-    backgroundColor: colors.accent,
-    borderColor: colors.surface,
-    borderRadius: 37,
-    borderWidth: 5,
-    height: 74,
+    backgroundColor: 'rgba(200, 111, 86, 0.94)',
+    borderColor: 'rgba(255, 255, 255, 0.82)',
+    borderRadius: 33,
+    borderWidth: 1,
+    height: 66,
     justifyContent: 'center',
-    marginTop: -42,
-    width: 74,
-    ...shadows.soft,
+    marginTop: -22,
+    overflow: 'hidden',
+    shadowColor: '#642B1F',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.22,
+    shadowRadius: 22,
+    width: 66,
+    zIndex: 3,
+    elevation: 16,
   },
   fabOpen: {
-    backgroundColor: colors.inkSoft,
+    backgroundColor: 'rgba(52, 48, 42, 0.94)',
+  },
+  fabPressed: {
+    transform: [{ scale: 0.96 }],
+  },
+  fabHighlight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.32)',
+    borderRadius: 999,
+    height: 1,
+    left: 17,
+    position: 'absolute',
+    right: 17,
+    top: 9,
   },
   demoPhoto: {
     alignItems: 'center',
