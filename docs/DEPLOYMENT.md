@@ -11,10 +11,36 @@ Nomi server 部署在 `amoylab:/opt/nomi`，通过 Docker Compose 启动，镜�
 - Root deploy script：`/usr/local/sbin/nomi-deploy-root`，仓库模板见 `infra/amoylab/nomi-deploy-root.sh`
 - 服务容器：`nomi-server`
 - 镜像：`ghcr.io/ifuryst/nomi-server:latest`
-- 端口：默认只绑定 `127.0.0.1:8088`
+- 容器端口：只绑定 `127.0.0.1:8088`
+- 公网入口：`https://nomi.ifuryst.com`，nginx 配置为 `/etc/nginx/conf.d/nomi.ifuryst.com.conf`，仓库模板见 `infra/amoylab/nginx-nomi.ifuryst.com.conf`
+- TLS：使用 snap certbot 的 nginx plugin 管理，证书路径是 `/etc/letsencrypt/live/nomi.ifuryst.com/`
 - 数据库：复用 amoylab 现有 Postgres 容器，`nomi-server` 加入 `postgres_default` Docker network，并单独创建 `nomi` database 和 `nomi` role
 
-当前 records / Ask API 还没有用户认证，所以 amoylab 上的 HTTP 端口默认只对本机开放。需要外部访问时，先补认证和反向代理策略，再调整 Compose 端口绑定。
+当前 records / Ask API 还没有用户认证。`nomi.ifuryst.com` 已为 iOS 上架前的生产 API 打通 HTTPS，但在接入真实用户前必须补 API 认证、授权和审计；Compose 仍只把容器端口绑定到本机，由 nginx 统一对外暴露。
+
+## nginx / TLS
+
+amoylab 上的 nginx 配置路径：
+
+```sh
+/etc/nginx/conf.d/nomi.ifuryst.com.conf
+```
+
+证书由 certbot 管理：
+
+```sh
+certbot certificates -d nomi.ifuryst.com
+systemctl list-timers --all | grep -i cert
+```
+
+健康检查：
+
+```sh
+curl -fsS https://nomi.ifuryst.com/health
+curl -I http://nomi.ifuryst.com/health
+```
+
+预期 HTTPS 返回 `{"database":"ok","status":"ok"}`，HTTP 返回 301 到 HTTPS。
 
 ## GitHub Secrets
 

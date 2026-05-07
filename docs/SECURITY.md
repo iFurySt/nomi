@@ -24,8 +24,8 @@
 
 ## API
 
-- 当前 records / Ask API 尚未实现用户认证，只能用于本地开发。
-- amoylab Docker Compose 默认只把 server 绑定到 `127.0.0.1:8088`。公开访问前必须先补 API 认证、授权和反向代理策略。
+- 当前 records / Ask API 尚未实现用户认证；`nomi.ifuryst.com` 已通过 nginx / TLS 暴露到公网，接入真实用户前必须补 API 认证、授权和审计。
+- amoylab Docker Compose 只把 server 绑定到 `127.0.0.1:8088`，公网流量统一经 nginx 转发。
 - SeedX websocket 在配置 `NOMI_SEEDX_API_KEY` 后要求 WebSocket 握手带 `Authorization: Bearer ...`，兼容 `seedx daemon connect --api-key`；API key 不放在 URL query。
 - 接入真实 mobile client 或云端前必须增加认证、授权、请求大小限制、CORS 策略和审计日志。
 - Websocket origin check 允许非浏览器 daemon client；浏览器来源必须同 host 或本地开发 host。云端模式还需要补租户绑定、短期凭据轮换和审计。
