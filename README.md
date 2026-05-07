@@ -38,12 +38,10 @@ NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088
 
 ## SeedX 本地验证
 
-SeedX 在相邻仓库 `../seedx`。先启动 Nomi server，再运行 SeedX 自带 daemon：
+SeedX 通过已安装的 `seedx` CLI 运行。先启动 Nomi server，再运行：
 
 ```sh
-cd ../seedx
-go test ./internal/transport/daemonclient ./internal/cli
-go run ./cmd/seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once
+seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once
 ```
 
 ## 许可证

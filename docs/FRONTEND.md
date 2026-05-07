@@ -27,8 +27,8 @@ SIMCTL_CHILD_NOMI_OPEN_UPLOAD=1 \
 
 ## 当前界面
 
-- Native iOS Home：顶部是 Daily Balance 总览，覆盖摄入能量、剩余卡路里、蛋白质、力量训练、步行、久坐和睡眠等今日数据，并从真实 timeline items 派生；初始状态不填假数据，显示 `No real uploads yet` 空态。下面是低装饰的时间轴 rail + 紧凑日志卡片，弱化彩色块和大图标；底部是较小的暖色悬浮玻璃导航栏，中间 Add 上传项和其他项同尺寸同视觉语言，轻点打开上拉上传 sheet；选中 tab 使用滑动玻璃底托过渡；底栏整条支持按住后左右滑动，拖动时只预览高亮，松开落在 tab 上即选中，松开落在 Add 上即打开上传。Trends / Log / Me 暂时是占位 tab。
-- Native iOS Upload Sheet：提供 Camera / Photos / Files 三个来源，并为 sheet 顶部标题和关闭按钮保留额外上边距。Photos 使用 `PhotosPicker`，Files 使用 SwiftUI `fileImporter`，选择图片后通过 `POST /ai/extract-image` 取得 AI metadata，再用 title、input category、confidence、nutrition / activity metadata 写入本地 timeline；Simulator 上 Camera 暂为 unavailable placeholder。
+- Native iOS Home：顶部是 Today 总览，覆盖摄入能量、剩余卡路里、蛋白质、力量训练、步行、久坐和睡眠等今日数据，并从真实 timeline items 派生；初始状态不填假数据，空态只保留可点击 Add 动作。下面是低装饰的时间轴 rail + 紧凑日志卡片，弱化彩色块和大图标；底部是较小的暖色悬浮玻璃导航栏，中间 Add 上传项和其他项同尺寸同视觉语言，轻点打开上拉上传 sheet；选中 tab 使用滑动玻璃底托过渡；底栏整条支持按住后左右滑动，拖动时只预览高亮，松开落在 tab 上即选中，松开落在 Add 上即打开上传。Trends / Log / Me 暂时是占位 tab。
+- Native iOS Upload Sheet：提供 Camera / Photos / Files 三个来源，并使用系统 sheet 背景、detents、drag indicator 和统一圆角半径。Photos 使用 `PhotosPicker`，Files 使用 SwiftUI `fileImporter`，选择图片后通过 `POST /ai/extract-image` 取得 AI metadata，再用 title、input category、confidence、nutrition / activity metadata 写入本地 timeline 和 server `/records`；app 下次启动通过 `GET /records` 恢复 timeline。Simulator 上 Camera 暂为 unavailable placeholder。
 
 ## 设计约束
 
@@ -48,4 +48,4 @@ SIMCTL_CHILD_NOMI_OPEN_UPLOAD=1 \
 
 ## 测试策略
 
-当前原生 SwiftUI app 有独立 UI test target 覆盖 Photos / Files 真实 picker 上传到 Today timeline。后续应把持久化 record store、真实模型 adapter、camera capture 真机链路和 timeline filtering 升级为更完整的自动化测试。
+当前原生 SwiftUI app 有独立 UI test target 覆盖 Photos / Files 真实 picker 上传到 Today timeline，并有 `NOMI_DISABLE_RECORD_SYNC=1` 用于让 picker 测试不受本地 server 历史记录影响。后续应把 record reload、真实模型 adapter、camera capture 真机链路和 timeline filtering 升级为更完整的自动化测试。

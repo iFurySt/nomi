@@ -2,7 +2,7 @@
 
 ## 后续校正
 
-2026-05-06 后续 dogfood 确认 `../seedx` 已提供 `seedx daemon connect --server-url --api-key`、`/daemon/connect` 和 Bearer API key header。Nomi 已移除自有 `apps/seedx-daemon` skeleton，当前运行入口以 `docs/ARCHITECTURE.md` 和 `README.md` 为准。本计划下方的 `apps/seedx-daemon` 内容只记录当时已完成的 milestone，不再代表当前架构。
+2026-05-06 后续 dogfood 确认 SeedX 已提供 `seedx daemon connect --server-url --api-key`、`/daemon/connect` 和 Bearer API key header。2026-05-07 起，Nomi 文档中的 SeedX 本地入口统一使用已安装的 `seedx` CLI，不再通过相邻 `../seedx` 源码目录运行。Nomi 已移除自有 `apps/seedx-daemon` skeleton，当前运行入口以 `docs/ARCHITECTURE.md` 和 `README.md` 为准。本计划下方的 `apps/seedx-daemon` 内容只记录当时已完成的 milestone，不再代表当前架构。
 
 ## 目标
 

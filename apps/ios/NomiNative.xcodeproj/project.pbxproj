@@ -11,6 +11,7 @@
 		56ED7FE6AAB84C18BD003380 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54D788B5107B4A5F945FE616 /* ContentView.swift */; };
 		9B27A6B9F2C84B05B957D601 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9B27A6B8F2C84B05B957D601 /* Assets.xcassets */; };
 		A10000000000000000000002 /* NomiNativeUploadFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* NomiNativeUploadFlowUITests.swift */; };
+		B20000000000000000000002 /* RecordsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* RecordsClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,6 +32,7 @@
 		9B27A6B8F2C84B05B957D601 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A10000000000000000000001 /* NomiNativeUploadFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NomiNativeUploadFlowUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000003 /* NomiNativeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NomiNativeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000000000000000000001 /* RecordsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,6 +84,7 @@
 			children = (
 				73DF2339F16B45F48198206C /* NomiNativeApp.swift */,
 				54D788B5107B4A5F945FE616 /* ContentView.swift */,
+				B20000000000000000000001 /* RecordsClient.swift */,
 				9B27A6B8F2C84B05B957D601 /* Assets.xcassets */,
 				01CDDD9FAF2844CBA29B4959 /* Info.plist */,
 			);
@@ -202,6 +205,7 @@
 			files = (
 				3ADF7B74CF064BCFB6B249D7 /* NomiNativeApp.swift in Sources */,
 				56ED7FE6AAB84C18BD003380 /* ContentView.swift in Sources */,
+				B20000000000000000000002 /* RecordsClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

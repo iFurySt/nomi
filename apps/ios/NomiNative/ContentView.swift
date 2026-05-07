@@ -175,6 +175,20 @@ struct E2EUploadItem: Decodable {
     let mimeType: String
 }
 
+private enum NomiRadii {
+    static let sheet: CGFloat = 32
+    static let panel: CGFloat = 28
+    static let card: CGFloat = 18
+    static let tile: CGFloat = 16
+}
+
+struct UploadResult {
+    let item: TimelineItem
+    let extraction: ImageExtraction
+    let source: UploadSource
+    let assetName: String
+}
+
 struct ContentView: View {
     @State private var selectedTab: NomiTab = .today
     @State private var showUploadSheet = false
@@ -191,14 +205,24 @@ struct ContentView: View {
         }
         .tint(.primary)
         .sheet(isPresented: $showUploadSheet) {
-            UploadSheet { newItem in
+            UploadSheet { result in
                 withAnimation(.spring(duration: 0.55, bounce: 0.22)) {
-                    timelineItems.insert(newItem, at: 0)
+                    timelineItems.insert(result.item, at: 0)
                 }
                 showUploadSheet = false
+                Task {
+                    await RecordsClient.save(
+                        extraction: result.extraction,
+                        source: result.source,
+                        assetName: result.assetName
+                    )
+                }
             }
             .presentationDetents([.fraction(0.74), .large])
-            .presentationCornerRadius(34)
+            .presentationCornerRadius(NomiRadii.sheet)
+            .presentationBackground {
+                NomiBackground()
+            }
             .presentationDragIndicator(.visible)
         }
         .task {
@@ -210,6 +234,9 @@ struct ContentView: View {
             if ProcessInfo.processInfo.environment["NOMI_OPEN_UPLOAD"] == "1" {
                 try? await Task.sleep(for: .milliseconds(450))
                 openUploadSheet()
+            }
+            if ProcessInfo.processInfo.environment["NOMI_DISABLE_RECORD_SYNC"] != "1" {
+                await loadSavedRecords()
             }
             if ProcessInfo.processInfo.environment["NOMI_E2E_AUTO_UPLOADS"] == "1" {
                 await runE2EUploads()
@@ -224,7 +251,8 @@ struct ContentView: View {
             NavigationStack {
                 HomeView(
                     items: timelineItems,
-                    showHero: showHero
+                    showHero: showHero,
+                    onAdd: openUploadSheet
                 )
                 .navigationTitle("Nomi")
                 .navigationBarTitleDisplayMode(.inline)
@@ -242,6 +270,16 @@ struct ContentView: View {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         withAnimation(.bouncy(duration: 0.45)) {
             showUploadSheet = true
+        }
+    }
+
+    private func loadSavedRecords() async {
+        let savedItems = await RecordsClient.loadTimelineItems()
+        guard !savedItems.isEmpty else { return }
+        await MainActor.run {
+            withAnimation(.spring(duration: 0.48, bounce: 0.18)) {
+                timelineItems = savedItems
+            }
         }
     }
 
@@ -282,6 +320,11 @@ struct ContentView: View {
                         to: resultsURL
                     )
                 }
+                await RecordsClient.save(
+                    extraction: extraction,
+                    source: source,
+                    assetName: item.fileName
+                )
             }
         } catch {
             writeE2EResult("NOMI_E2E_UPLOAD_RESULT failed \(error.localizedDescription)", to: resultsURL)
@@ -475,6 +518,7 @@ struct NomiBottomBar: View {
 struct HomeView: View {
     let items: [TimelineItem]
     let showHero: Bool
+    let onAdd: () -> Void
 
     var body: some View {
         ZStack {
@@ -487,12 +531,12 @@ struct HomeView: View {
                         .opacity(showHero ? 1 : 0)
                         .blur(radius: showHero ? 0 : 12)
 
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack(alignment: .firstTextBaseline) {
-                            Text("Today's Log")
+                            Text("Log")
                                 .font(.title2.weight(.semibold))
                             Spacer()
-                            Text("\(items.count) entries")
+                            Text("\(items.count)")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .contentTransition(.numericText())
@@ -500,7 +544,7 @@ struct HomeView: View {
                         .padding(.horizontal, 4)
 
                         if items.isEmpty {
-                            EmptyTimelineState()
+                            EmptyTimelineState(onAdd: onAdd)
                         } else {
                             LazyVStack(spacing: 0) {
                                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -540,7 +584,7 @@ struct OverviewCard: View {
             DailyMetric(
                 title: "Calories",
                 value: "\(calories)",
-                detail: items.isEmpty ? "No entries yet" : "\(max(0, 2200 - calories)) left",
+                detail: "\(max(0, 2200 - calories)) left",
                 symbol: "flame.fill",
                 tint: Color(red: 0.77, green: 0.47, blue: 0.21),
                 progress: items.isEmpty ? 0 : min(Double(calories) / 2200, 1)
@@ -556,7 +600,7 @@ struct OverviewCard: View {
             DailyMetric(
                 title: "Strength",
                 value: "\(strength)m",
-                detail: items.isEmpty ? "No entries yet" : "Logged today",
+                detail: "today",
                 symbol: "dumbbell.fill",
                 tint: Color(red: 0.40, green: 0.45, blue: 0.55),
                 progress: nil
@@ -564,7 +608,7 @@ struct OverviewCard: View {
             DailyMetric(
                 title: "Walk",
                 value: "\(walk)m",
-                detail: items.isEmpty ? "No entries yet" : "Logged today",
+                detail: "today",
                 symbol: "figure.walk",
                 tint: Color(red: 0.39, green: 0.54, blue: 0.47),
                 progress: nil
@@ -572,7 +616,7 @@ struct OverviewCard: View {
             DailyMetric(
                 title: "Sitting",
                 value: "\(sitting)m",
-                detail: items.isEmpty ? "No entries yet" : "Logged today",
+                detail: "today",
                 symbol: "chair.fill",
                 tint: Color(red: 0.51, green: 0.48, blue: 0.42),
                 progress: nil
@@ -580,7 +624,7 @@ struct OverviewCard: View {
             DailyMetric(
                 title: "Sleep",
                 value: "\(sleep)m",
-                detail: items.isEmpty ? "No entries yet" : "Logged today",
+                detail: "today",
                 symbol: "moon.fill",
                 tint: Color(red: 0.38, green: 0.43, blue: 0.53),
                 progress: nil
@@ -592,10 +636,10 @@ struct OverviewCard: View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text("Daily Balance")
+                    Text("Today")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
-                    Text(items.isEmpty ? "Start with one upload." : "Logged \(items.count) real \(items.count == 1 ? "item" : "items").")
+                    Text("\(items.count) \(items.count == 1 ? "item" : "items")")
                         .font(.system(size: 24, weight: .semibold, design: .rounded))
                         .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -628,9 +672,9 @@ struct OverviewCard: View {
         }
         .padding(18)
         .background {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: NomiRadii.panel, style: .continuous)
                 .fill(.white.opacity(0.72))
-                .glassEffect(.regular, in: .rect(cornerRadius: 30))
+                .glassEffect(.regular, in: .rect(cornerRadius: NomiRadii.panel))
                 .shadow(color: .black.opacity(0.08), radius: 28, y: 18)
         }
         .onAppear {
@@ -687,26 +731,34 @@ struct MetricTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 78, alignment: .topLeading)
         .padding(10)
-        .background(.white.opacity(0.48), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.white.opacity(0.48), in: RoundedRectangle(cornerRadius: NomiRadii.tile, style: .continuous))
     }
 }
 
 struct EmptyTimelineState: View {
+    let onAdd: () -> Void
+
     var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "tray")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Text("No real uploads yet")
-                .font(.headline)
-            Text("Use Add to import a photo or file.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        Button {
+            onAdd()
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 30, weight: .semibold))
+                    .frame(width: 58, height: 58)
+                    .foregroundStyle(Color(red: 0.62, green: 0.35, blue: 0.29))
+                    .background(.white.opacity(0.64), in: Circle())
+                    .glassEffect(.regular.interactive(), in: .circle)
+                Text("Add")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 34)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 34)
-        .background(.white.opacity(0.5), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .glassEffect(.regular, in: .rect(cornerRadius: 26))
+        .buttonStyle(.plain)
+        .background(.white.opacity(0.5), in: RoundedRectangle(cornerRadius: NomiRadii.panel, style: .continuous))
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: NomiRadii.panel))
         .accessibilityIdentifier("empty-timeline")
     }
 }
@@ -795,10 +847,10 @@ struct TimelineRow: View {
             .padding(.horizontal, 12)
             .frame(height: cardHeight)
             .background {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: NomiRadii.card, style: .continuous)
                     .fill(Color.white.opacity(0.56))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        RoundedRectangle(cornerRadius: NomiRadii.card, style: .continuous)
                             .stroke(.white.opacity(0.55), lineWidth: 1)
                     }
             }
@@ -816,7 +868,7 @@ struct TimelineRow: View {
 }
 
 struct UploadSheet: View {
-    let onUpload: (TimelineItem) -> Void
+    let onUpload: (UploadResult) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedSource: UploadSource = .photos
@@ -1139,7 +1191,14 @@ struct UploadSheet: View {
 
             await MainActor.run {
                 let newItem = extraction.timelineItem(source: source, image: importedImage)
-                onUpload(newItem)
+                onUpload(
+                    UploadResult(
+                        item: newItem,
+                        extraction: extraction,
+                        source: source,
+                        assetName: assetName
+                    )
+                )
             }
         }
     }
@@ -1181,7 +1240,7 @@ struct PlaceholderTab: View {
     }
 }
 
-private extension UploadSource {
+extension UploadSource {
     init?(apiValue: String) {
         switch apiValue.lowercased() {
         case "camera":
@@ -1269,7 +1328,7 @@ private enum ImageExtractionClient {
     }
 }
 
-private extension ImageExtraction {
+extension ImageExtraction {
     var metadataLine: String {
         let values = [
             metadata.caloriesKcal.map { "\($0) kcal" },

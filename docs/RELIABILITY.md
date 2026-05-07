@@ -13,9 +13,9 @@
 
 ## SeedX
 
-- Nomi 不维护独立 daemon，使用相邻 `../seedx` 的 `seedx daemon connect`。
-- 本地启动命令：先启动 Nomi server，再运行 `cd ../seedx && go run ./cmd/seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once`。
-- 本地测试命令：`cd ../seedx && go test ./internal/transport/daemonclient ./internal/cli`。
+- Nomi 不维护独立 daemon，使用本机 `seedx` CLI 的 `seedx daemon connect`。
+- 本地启动命令：先启动 Nomi server，再运行 `seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once`。
+- 如果 Nomi smoke 发现 `seedx` CLI 能力缺口或行为问题，记录在当轮 history / issue 里，用于驱动 SeedX 上游修改。
 - SeedX 长运行模式负责断线 backoff 重连；`--once` 用于 hello smoke 和 CI 风格验证。
 
 ## 日志

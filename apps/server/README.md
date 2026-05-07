@@ -1,6 +1,6 @@
 # Nomi Server
 
-Go API skeleton for Nomi / 知己. It owns record persistence, mock Ask responses, and websocket coordination with the SeedX daemon from `../seedx`.
+Go API skeleton for Nomi / 知己. It owns record persistence, mock Ask responses, and websocket coordination with the SeedX daemon exposed by the local `seedx` CLI.
 
 ## Local Setup
 
@@ -33,11 +33,10 @@ SeedX connects to the standard daemon endpoint:
 ws://localhost:8088/daemon/connect
 ```
 
-Run it from the adjacent SeedX repository:
+Run it with the installed SeedX CLI:
 
 ```sh
-cd ../../seedx
-go run ./cmd/seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once
+seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once
 ```
 
 Current SeedX flow:

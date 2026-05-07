@@ -10,9 +10,10 @@ final class NomiNativeUploadFlowUITests: XCTestCase {
 
     func testPhotosUploadCreatesRealTimelineEntry() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["NOMI_DISABLE_RECORD_SYNC"] = "1"
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["No real uploads yet"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "empty-timeline").firstMatch.waitForExistence(timeout: 5))
 
         app.buttons.matching(identifier: "bottom-add").firstMatch.tap()
         let primaryButton = app.buttons.matching(identifier: "upload-primary-button").firstMatch
@@ -25,15 +26,16 @@ final class NomiNativeUploadFlowUITests: XCTestCase {
         primaryButton.tap()
 
         XCTAssertTrue(app.staticTexts["Food input"].waitForExistence(timeout: uploadTimeout))
-        XCTAssertTrue(app.staticTexts["1 entries"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["1 item"].waitForExistence(timeout: 2))
         saveScreenshot(named: "nomi-native-real-upload-photos-2026-05-07.png")
     }
 
     func testFilesUploadCreatesRealTimelineEntry() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["NOMI_DISABLE_RECORD_SYNC"] = "1"
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["No real uploads yet"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "empty-timeline").firstMatch.waitForExistence(timeout: 5))
 
         app.buttons.matching(identifier: "bottom-add").firstMatch.tap()
         let fileButton = app.buttons.matching(identifier: "upload-source-file").firstMatch
@@ -47,7 +49,7 @@ final class NomiNativeUploadFlowUITests: XCTestCase {
         primaryButton.tap()
 
         XCTAssertTrue(app.staticTexts["Food input"].waitForExistence(timeout: uploadTimeout))
-        XCTAssertTrue(app.staticTexts["1 entries"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["1 item"].waitForExistence(timeout: 2))
         saveScreenshot(named: "nomi-native-real-upload-files-2026-05-07.png")
     }
 

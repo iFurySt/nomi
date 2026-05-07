@@ -1,6 +1,6 @@
 # 架构总览
 
-Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是先交付可运行的 MVP skeleton：移动端现在收敛到原生 SwiftUI iOS app，后端用 Go，数据库使用 Postgres，并复用相邻 `../seedx` 仓库自带的 daemon 主动建连能力。云端部署、家庭协作和 Apple Watch 接入在后续阶段处理。
+Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是先交付可运行的 MVP skeleton：移动端现在收敛到原生 SwiftUI iOS app，后端用 Go，数据库使用 Postgres，并复用本机 `seedx` CLI 暴露的 daemon 主动建连能力。云端部署、家庭协作和 Apple Watch 接入在后续阶段处理。
 
 ## 当前仓库结构
 
@@ -24,10 +24,10 @@ MVP 目标拓扑：
 
 1. Mobile app 通过 API 读取和写入个人记录。
 2. Go server 持久化记录到 Postgres，并提供 Ask / extraction 的接口边界。
-3. `../seedx` 的 `seedx daemon connect` 在用户设备启动后主动连接 Go server 的 websocket 地址。
+3. `seedx daemon connect` 在用户设备启动后主动连接 Go server 的 websocket 地址。
 4. Go server 通过 SeedX daemon 协议发送 `daemon:ping` / 后续 `daemon:command`，SeedX 返回 `daemon:pong` / `daemon:result`。
 
-当前原生 iOS app 首页 timeline 使用本地 SwiftUI state 保存本次运行内的真实上传记录，初始状态不注入假数据；上传 sheet 通过 PhotosPicker / fileImporter 选择图片，上传时把 image data base64、来源和 MIME type 发送到 `POST /ai/extract-image`，再用返回的 extraction title、input category、confidence 和 metadata 插入本地 timeline。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`、`POST /ai/extract-image`，并在启动时初始化 Postgres records schema。图片提取 schema 覆盖 input category（food、beverage、caffeine、alcohol、nicotine、information、exercise、sunlight、social）、output impacts（energy、mood、sleep、recovery、focus、health）和 kcal、protein、fat、carbs、fiber、water、caffeine、nicotine、duration 等 metadata；当前实现是服务端 deterministic 边界，后续接真实模型时保持该 contract。SeedX 连接使用 `GET /daemon/connect`，同时保留旧的 `GET /seedx/ws` 兼容本地 smoke；daemon API key 通过 `Authorization: Bearer ...` WebSocket 握手 header 传递。
+当前原生 iOS app 首页 timeline 启动时通过 `GET /records` 加载服务端已保存记录，初始状态不注入假数据；上传 sheet 通过 PhotosPicker / fileImporter 选择图片，上传时把 image data base64、来源和 MIME type 发送到 `POST /ai/extract-image`，再把 extraction title、input category、confidence 和 metadata 通过 `POST /records` 持久化，同时插入本地 timeline。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`、`POST /ai/extract-image`，并在启动时初始化 Postgres records schema。图片提取 schema 覆盖 input category（food、beverage、caffeine、alcohol、nicotine、information、exercise、sunlight、social）、output impacts（energy、mood、sleep、recovery、focus、health）和 kcal、protein、fat、carbs、fiber、water、caffeine、nicotine、duration 等 metadata；当前实现是服务端 deterministic 边界，后续接真实模型时保持该 contract。SeedX 连接使用 `GET /daemon/connect`，同时保留旧的 `GET /seedx/ws` 兼容本地 smoke；daemon API key 通过 `Authorization: Bearer ...` WebSocket 握手 header 传递。
 
 ## 边界
 
@@ -43,8 +43,7 @@ MVP 目标拓扑：
 - Native iOS upload UI test：`xcodebuild test -project apps/ios/NomiNative.xcodeproj -scheme Nomi -configuration Debug -destination 'platform=iOS Simulator,id=<simulator-udid>' -only-testing:NomiNativeUITests/NomiNativeUploadFlowUITests`
 - Server tests：`cd apps/server && go test ./...`
 - Server local run：`cd apps/server && NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088`
-- SeedX daemon tests：`cd ../seedx && go test ./internal/transport/daemonclient ./internal/cli`
-- SeedX daemon websocket smoke：先启动 server，再运行 `cd ../seedx && go run ./cmd/seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once`
+- SeedX daemon websocket smoke：先启动 server，再运行 `seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once`
 - 文档检查：`make check-docs`
 
 随着 server、SeedX command 调度和 Postgres 集成测试落地，本节需要继续补齐对应启动、测试和观测命令。
