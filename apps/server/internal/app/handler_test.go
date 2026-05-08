@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -185,10 +186,38 @@ func TestParseImageExtractionJSONAllowsMarkdownFence(t *testing.T) {
 	}
 }
 
-func TestBuildImageAnalysisPromptHasStrictJSONAndImagePath(t *testing.T) {
+func TestParseImageExtractionJSONAllowsNormalizableFields(t *testing.T) {
 	t.Parallel()
 
-	prompt := BuildImageAnalysisPrompt(StoredImage{
+	extraction, err := ParseImageExtractionJSON(`{
+		"title": "Visible receipt"
+	}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if extraction.Title != "Visible receipt" || extraction.Summary != "Visible receipt" {
+		t.Fatalf("extraction = %#v", extraction)
+	}
+	if extraction.InputCategory != "information" {
+		t.Fatalf("input category = %q", extraction.InputCategory)
+	}
+	if got := extraction.Metadata.EstimatedFrom; len(got) != 1 || got[0] != "image_content" {
+		t.Fatalf("estimated_from = %#v", got)
+	}
+}
+
+func TestParseImageExtractionJSONRequiresTitle(t *testing.T) {
+	t.Parallel()
+
+	if _, err := ParseImageExtractionJSON(`{"summary":"missing title"}`); !errors.Is(err, ErrSeedXInvalidResponse) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestBuildImageAnalysisInputUsesSeedXLocalImageItem(t *testing.T) {
+	t.Parallel()
+
+	input := BuildImageAnalysisInput(StoredImage{
 		AssetName: "receipt.jpg",
 		Source:    "file",
 		MimeType:  "image/jpeg",
@@ -196,14 +225,27 @@ func TestBuildImageAnalysisPromptHasStrictJSONAndImagePath(t *testing.T) {
 		SizeBytes: 42,
 	})
 
-	if !strings.Contains(prompt, "/tmp/nomi/receipt.jpg") {
-		t.Fatal("expected prompt to include local image path")
+	if len(input) != 2 {
+		t.Fatalf("input = %#v", input)
+	}
+	prompt := input[0].Text
+	if input[0].Type != "text" || input[1].Type != "localImage" {
+		t.Fatalf("input = %#v", input)
+	}
+	if input[1].Path != "/tmp/nomi/receipt.jpg" || input[1].Name != "receipt.jpg" {
+		t.Fatalf("local image item = %#v", input[1])
+	}
+	if strings.Contains(prompt, "/tmp/nomi/receipt.jpg") {
+		t.Fatal("expected prompt to omit local image path")
 	}
 	if !strings.Contains(prompt, "Return exactly one JSON object and no markdown") {
 		t.Fatal("expected strict JSON output instruction")
 	}
 	if !strings.Contains(prompt, "Never diagnose") {
 		t.Fatal("expected non-medical boundary")
+	}
+	if !json.Valid(ImageExtractionOutputSchema()) {
+		t.Fatal("expected valid output schema")
 	}
 }
 

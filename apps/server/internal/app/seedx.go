@@ -23,15 +23,25 @@ type SeedXEvent struct {
 	Payload   map[string]any `json:"payload"`
 }
 
-type SeedXSmokeParams struct {
-	Runtime         string `json:"runtime,omitempty"`
-	CWD             string `json:"cwd,omitempty"`
-	Prompt          string `json:"prompt,omitempty"`
-	Model           string `json:"model,omitempty"`
-	ReasoningEffort string `json:"reasoningEffort,omitempty"`
+type SeedXInputItem struct {
+	Type string `json:"type"`
+	Text string `json:"text,omitempty"`
+	URL  string `json:"url,omitempty"`
+	Path string `json:"path,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
-type SeedXSmokeResult struct {
+type SeedXRunParams struct {
+	Runtime         string           `json:"runtime,omitempty"`
+	CWD             string           `json:"cwd,omitempty"`
+	Prompt          string           `json:"prompt,omitempty"`
+	Input           []SeedXInputItem `json:"input,omitempty"`
+	Model           string           `json:"model,omitempty"`
+	ReasoningEffort string           `json:"reasoningEffort,omitempty"`
+	OutputSchema    json.RawMessage  `json:"outputSchema,omitempty"`
+}
+
+type SeedXRunResult struct {
 	Runtime  string         `json:"runtime"`
 	ThreadID string         `json:"threadId"`
 	TurnID   string         `json:"turnId"`
@@ -42,12 +52,12 @@ type SeedXSmokeResult struct {
 }
 
 type seedXCommand struct {
-	ID        string           `json:"id"`
-	Type      string           `json:"type"`
-	CreatedAt time.Time        `json:"created_at"`
-	Method    string           `json:"method"`
-	Runtime   string           `json:"runtime,omitempty"`
-	Params    SeedXSmokeParams `json:"params"`
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	CreatedAt time.Time      `json:"created_at"`
+	Method    string         `json:"method"`
+	Runtime   string         `json:"runtime,omitempty"`
+	Params    SeedXRunParams `json:"params"`
 }
 
 type seedXResult struct {
@@ -61,7 +71,7 @@ type seedXResult struct {
 }
 
 type seedXResultMessage struct {
-	result SeedXSmokeResult
+	result SeedXRunResult
 	err    error
 }
 
@@ -106,12 +116,12 @@ func (c *SeedXController) unregister(session *seedXSession) {
 	}
 }
 
-func (c *SeedXController) RunCodexSmoke(ctx context.Context, params SeedXSmokeParams) (SeedXSmokeResult, error) {
+func (c *SeedXController) RunCodex(ctx context.Context, params SeedXRunParams) (SeedXRunResult, error) {
 	c.mu.Lock()
 	session := c.session
 	if session == nil {
 		c.mu.Unlock()
-		return SeedXSmokeResult{}, ErrSeedXUnavailable
+		return SeedXRunResult{}, ErrSeedXUnavailable
 	}
 	id := fmt.Sprintf("nomi-codex-%d", time.Now().UnixNano())
 	ch := make(chan seedXResultMessage, 1)
@@ -122,19 +132,19 @@ func (c *SeedXController) RunCodexSmoke(ctx context.Context, params SeedXSmokePa
 		ID:        id,
 		Type:      "daemon:command",
 		CreatedAt: time.Now(),
-		Method:    "smoke",
+		Method:    "run",
 		Runtime:   "codex",
 		Params:    params,
 	}
 	if err := session.Send(command); err != nil {
 		c.removePending(id)
-		return SeedXSmokeResult{}, err
+		return SeedXRunResult{}, err
 	}
 
 	select {
 	case <-ctx.Done():
 		c.removePending(id)
-		return SeedXSmokeResult{}, ctx.Err()
+		return SeedXRunResult{}, ctx.Err()
 	case message := <-ch:
 		return message.result, message.err
 	}
@@ -165,16 +175,16 @@ func (c *SeedXController) handleResult(raw json.RawMessage) {
 		return
 	}
 
-	var smoke SeedXSmokeResult
-	if err := json.Unmarshal(result.Result, &smoke); err != nil {
+	var run SeedXRunResult
+	if err := json.Unmarshal(result.Result, &run); err != nil {
 		ch <- seedXResultMessage{err: err}
 		return
 	}
-	if smoke.Error != "" {
-		ch <- seedXResultMessage{err: errors.New(smoke.Error)}
+	if run.Error != "" {
+		ch <- seedXResultMessage{err: errors.New(run.Error)}
 		return
 	}
-	ch <- seedXResultMessage{result: smoke}
+	ch <- seedXResultMessage{result: run}
 }
 
 func (c *SeedXController) removePending(id string) {
@@ -274,8 +284,33 @@ func (h *Handler) handleSeedXDaemonSession(session *seedXSession) error {
 		}
 		if event.Type == "daemon:result" {
 			h.seedX.handleResult(raw)
+			continue
+		}
+		if event.Type == "daemon:server_request" {
+			if err := h.replyUnsupportedSeedXServerRequest(session, raw); err != nil {
+				return err
+			}
 		}
 	}
+}
+
+func (h *Handler) replyUnsupportedSeedXServerRequest(session *seedXSession, raw json.RawMessage) error {
+	var request struct {
+		ID        string `json:"id"`
+		CommandID string `json:"commandId"`
+	}
+	if err := json.Unmarshal(raw, &request); err != nil {
+		return err
+	}
+	return session.Send(map[string]any{
+		"type":      "daemon:server_response",
+		"id":        request.ID,
+		"commandId": request.CommandID,
+		"error": map[string]any{
+			"code":    int64(-32000),
+			"message": "nomi image extraction does not support interactive Codex server requests",
+		},
+	})
 }
 
 func (h *Handler) logSeedXDisconnect(err error, reason string) {

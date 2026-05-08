@@ -56,10 +56,10 @@ func (a *SeedXImageAnalyzer) AnalyzeImage(ctx context.Context, image StoredImage
 	runCtx, cancel := context.WithTimeout(ctx, a.options.Timeout)
 	defer cancel()
 
-	result, err := a.controller.RunCodexSmoke(runCtx, SeedXSmokeParams{
+	result, err := a.controller.RunCodex(runCtx, SeedXRunParams{
 		Runtime:         "codex",
 		CWD:             a.options.CWD,
-		Prompt:          BuildImageAnalysisPrompt(image),
+		Input:           BuildImageAnalysisInput(image),
 		Model:           a.options.Model,
 		ReasoningEffort: a.options.ReasoningEffort,
 	})
@@ -77,8 +77,7 @@ func (a *SeedXImageAnalyzer) AnalyzeImage(ctx context.Context, image StoredImage
 func BuildImageAnalysisPrompt(image StoredImage) string {
 	return fmt.Sprintf(`You are analyzing one user-uploaded image for Nomi, a personal body and life record app.
 
-Image file path on this same local machine:
-%s
+The image is provided to you as a localImage input item. Use that image content as the primary source.
 
 Upload context:
 - asset_name: %s
@@ -86,7 +85,7 @@ Upload context:
 - mime_type: %s
 - size_bytes: %d
 
-Use the actual image content as the primary source. Do not infer from filename alone. Do not modify files or write anything to disk.
+Do not infer from filename alone. Do not modify files or write anything to disk.
 
 Return exactly one JSON object and no markdown. The JSON object must match this schema:
 {
@@ -127,20 +126,85 @@ Rules:
 - Never diagnose, treat, estimate disease risk, interpret abnormal results, recommend medication, or make urgent medical claims. If the image is medical, classify it as "information" and summarize it as a saved document that needs user review.
 - Do not transcribe private identifiers, account numbers, exact addresses, or other sensitive text. Summarize their presence instead.
 - Use confidence between 0.30 and 0.90. Lower confidence when the image is ambiguous, cropped, blurry, or not accessible.
-- Include only valid JSON. Omit unknown optional fields instead of setting them to null.`, image.Path, image.AssetName, image.Source, image.MimeType, image.SizeBytes, seedXImageExtractionSchemaVersion, image.MimeType)
+- Include only valid JSON. Omit unknown optional fields instead of setting them to null.`, image.AssetName, image.Source, image.MimeType, image.SizeBytes, seedXImageExtractionSchemaVersion, image.MimeType)
+}
+
+func BuildImageAnalysisInput(image StoredImage) []SeedXInputItem {
+	return []SeedXInputItem{
+		{Type: "text", Text: BuildImageAnalysisPrompt(image)},
+		{Type: "localImage", Path: image.Path, Name: image.AssetName},
+	}
+}
+
+func ImageExtractionOutputSchema() json.RawMessage {
+	return json.RawMessage(`{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "direction", "input_category", "output_impacts", "title", "summary", "confidence", "metadata"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "direction": { "type": "string", "enum": ["input"] },
+    "input_category": {
+      "type": "string",
+      "enum": ["food", "beverage", "caffeine", "alcohol", "nicotine", "information", "exercise", "sunlight", "social"]
+    },
+    "output_impacts": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["energy", "mood", "sleep", "recovery", "focus", "health"] }
+    },
+    "title": { "type": "string" },
+    "summary": { "type": "string" },
+    "confidence": { "type": "number", "minimum": 0.3, "maximum": 0.9 },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estimated_from"],
+      "properties": {
+        "food_category": { "type": "string" },
+        "portion_estimate": { "type": "string" },
+        "weight_g": { "type": "integer" },
+        "calories_kcal": { "type": "integer" },
+        "protein_g": { "type": "integer" },
+        "fat_g": { "type": "integer" },
+        "carbs_g": { "type": "integer" },
+        "fiber_g": { "type": "integer" },
+        "water_ml": { "type": "integer" },
+        "caffeine_mg": { "type": "integer" },
+        "alcohol_g": { "type": "integer" },
+        "nicotine_mg": { "type": "integer" },
+        "duration_min": { "type": "integer" },
+        "micronutrients": { "type": "array", "items": { "type": "string" } },
+        "minerals": { "type": "array", "items": { "type": "string" } },
+        "vitamins": { "type": "array", "items": { "type": "string" } },
+        "estimated_from": { "type": "array", "items": { "type": "string" } },
+        "review_needed": { "type": "array", "items": { "type": "string" } },
+        "original_mime_type": { "type": "string" }
+      }
+    }
+  }
+}`)
 }
 
 func ParseImageExtractionJSON(text string) (ImageExtraction, error) {
 	jsonText := extractJSONObject(text)
 	if jsonText == "" {
-		return ImageExtraction{}, ErrSeedXInvalidResponse
+		return ImageExtraction{}, fmt.Errorf("%w: missing json object", ErrSeedXInvalidResponse)
 	}
 	var extraction ImageExtraction
 	if err := json.Unmarshal([]byte(jsonText), &extraction); err != nil {
 		return ImageExtraction{}, fmt.Errorf("%w: %v", ErrSeedXInvalidResponse, err)
 	}
-	if extraction.Title == "" || extraction.InputCategory == "" || extraction.Metadata.EstimatedFrom == nil {
-		return ImageExtraction{}, ErrSeedXInvalidResponse
+	if strings.TrimSpace(extraction.Title) == "" {
+		return ImageExtraction{}, fmt.Errorf("%w: missing title", ErrSeedXInvalidResponse)
+	}
+	if strings.TrimSpace(extraction.Summary) == "" {
+		extraction.Summary = extraction.Title
+	}
+	if strings.TrimSpace(extraction.InputCategory) == "" {
+		extraction.InputCategory = "information"
+	}
+	if extraction.Metadata.EstimatedFrom == nil {
+		extraction.Metadata.EstimatedFrom = []string{"image_content"}
 	}
 	return extraction, nil
 }
@@ -290,7 +354,7 @@ func extractionRecordMetadata(extraction ImageExtraction, image StoredImage) map
 		"estimated_from":     strings.Join(extraction.Metadata.EstimatedFrom, ","),
 		"review_needed":      strings.Join(extraction.Metadata.ReviewNeeded, ","),
 		"analysis_provider":  "seedx.codex",
-		"analysis_transport": "seedx.daemon.command.smoke",
+		"analysis_transport": "seedx.daemon.command.run",
 	}
 	addString := func(key string, value string) {
 		if value != "" {

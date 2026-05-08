@@ -22,7 +22,7 @@
 
 - Ask 和 extraction 只能做记录整理、趋势回顾和有来源的回答。
 - 医疗诊断、治疗、药物、剂量、急症、疾病风险和异常判断必须阻断。
-- 当前图片 extraction 会通过 SeedX 调用用户本机 Codex runtime；prompt 必须要求不诊断、不治疗、不输出敏感标识符，并只返回结构化 JSON。若未来改为第三方云端 AI 服务，必须先补用户可见隐私说明和同意流程。
+- 当前图片 extraction 会通过 SeedX 调用用户本机 Codex runtime；server 只向 SeedX 发送本机图片路径和结构化 prompt，不把图片 base64 放进日志或 prompt。prompt 必须要求不诊断、不治疗、不输出敏感标识符，并只返回结构化 JSON。若未来改为第三方云端 AI 服务，必须先补用户可见隐私说明和同意流程。
 
 ## API
 

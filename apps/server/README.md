@@ -58,7 +58,7 @@ Current SeedX flow:
 1. SeedX sends `daemon:hello`.
 2. Server accepts `Authorization: Bearer ...` when `NOMI_SEEDX_API_KEY` is configured.
 3. Server sends `daemon:ping`; long-running SeedX daemon responds with `daemon:pong`.
-4. Image extraction sends `daemon:command` with `method:"smoke"` and `runtime:"codex"`; the prompt includes the local stored image path and requires a single JSON extraction object.
+4. Image extraction sends `daemon:command` with `method:"run"` and `runtime:"codex"`; `params.input` contains a strict JSON text prompt plus a Codex v2 `{ "type": "localImage", "path": "..." }` item for the stored upload.
 5. SeedX returns `daemon:result`; server parses the Codex text, stores the record in Postgres, and returns the extraction with `record_id`.
 
 `GET /seedx/ws` remains as a temporary compatibility path for older local smoke clients.
