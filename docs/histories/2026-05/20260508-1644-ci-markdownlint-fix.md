@@ -1,4 +1,4 @@
-## [2026-05-08 16:44] | Task: CI markdownlint fix
+## [2026-05-08 16:44] | Task: CI markdownlint removal
 
 ### Execution Context
 
@@ -10,29 +10,34 @@
 
 > gh 看看为什么 CI 出错，修复一下
 
+> md lint直接干掉吧，不要了！
+
 ### Changes Overview
 
-**Scope:** `docs`, repository lint config
+**Scope:** GitHub Actions CI, repository hygiene, docs
 
 **Key Actions:**
 
 - **CI diagnosis**: 用 `gh run view` 定位最新 `main` CI 失败在 `Markdown lint` step，基础仓库检查已通过。
-- **Markdown lint config**: 将 `MD024` 配置为只检查同级重复标题，适配 history 文件按多条任务记录复用小节名的写法。
-- **TestFlight docs**: 将跨代码块拆分的发布步骤编号改为 markdownlint 认可的 `1.` 形式。
-- **UIUX docs**: 将官方参考和外部参考的裸 URL 改为 Markdown 链接，保留原参考入口。
+- **CI workflow**: 从 `.github/workflows/ci.yml` 移除 `DavidAnson/markdownlint-cli2-action` step。
+- **Repo hygiene**: 从 `scripts/check-repo-hygiene.sh` 的必备文件列表移除 `.markdownlint.json`，并删除该配置文件。
+- **Docs sync**: 更新 `docs/CICD.md`，不再声明 CI 覆盖 Markdown lint。
+- **Docs cleanup**: 保留 TestFlight 步骤编号和 UIUX 参考链接的 Markdown 兼容整理；这些格式调整不再由 CI 强制检查。
 
 ### Design Intent
 
-这次失败不是代码构建问题，而是文档 lint 规则和已有文档写法不匹配。重复小节标题只在不同 task section 下出现，按同级标题检查即可保留 history 可读性；裸 URL 和被代码块拆开的列表则直接改成 markdownlint 兼容写法。
+这次失败不是代码构建问题，而是 Markdown lint 对现有 history 和文档写法产生了噪音。按用户最新决策，仓库级 CI 不再运行 Markdown lint，只保留 `scripts/ci.sh` 里的基础 docs / repo hygiene / action pinning 检查。
 
 ### Files Modified
 
-- `.markdownlint.json`
+- `.github/workflows/ci.yml`
 - `docs/IOS_TESTFLIGHT_RELEASE.md`
 - `docs/UIUX_REFERENCE.md`
+- `docs/CICD.md`
+- `scripts/check-repo-hygiene.sh`
+- `.markdownlint.json`
 - `docs/histories/2026-05/20260508-1644-ci-markdownlint-fix.md`
 
 ### Verification
 
 - `./scripts/ci.sh`
-- `npx markdownlint-cli2 '**/*.md'`
