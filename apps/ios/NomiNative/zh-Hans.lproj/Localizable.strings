@@ -1,9 +1,11 @@
 "accessibility.close" = "关闭";
-"accessibility.sidebar" = "菜单";
 "accessibility.upload" = "上传";
 "home.timeline" = "时间线";
-"language.chinese.simplified" = "中文";
+"language.chinese.simplified" = "简体中文";
+"language.chinese.traditional" = "繁體中文";
+"language.current" = "当前语言";
 "language.english" = "English";
+"me.section.mine" = "我的";
 "metric.calories" = "热量";
 "metric.calories.left %lld" = "剩余 %lld";
 "metric.protein" = "蛋白质";
@@ -15,7 +17,7 @@
 "metric.walk" = "步行";
 "nav.add" = "添加";
 "settings.language" = "语言";
-"sidebar.username" = "Leo";
+"tab.me" = "我的";
 "tab.today" = "今天";
 "today.item.count.many %lld" = "%lld 条记录";
 "today.item.count.one" = "1 条记录";

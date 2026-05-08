@@ -5,7 +5,7 @@
 ## 数据分级
 
 - Nomi records、图片、提取文本、Ask 问题和回答都按敏感个人数据处理。
-- 当前本地开发数据只允许保存在本机 Postgres 或 mobile 本地状态里。
+- 当前本地开发数据只允许保存在本机 Postgres、`NOMI_IMAGE_STORAGE_DIR` 图片目录或 mobile 本地状态里。
 - 提交 history、截图和日志时不得包含真实用户身体数据、体检单、图片原件或身份信息。
 
 ## 本地凭据
@@ -14,6 +14,7 @@
 - 共享、staging、production 环境必须通过环境变量或密钥管理系统提供 `NOMI_DATABASE_URL`。
 - amoylab 的真实 `NOMI_DATABASE_URL`、数据库密码和 SeedX key 只允许存在于 `/opt/nomi/.env` 或密钥系统，不写入仓库。
 - SeedX daemon API key 通过 `NOMI_SEEDX_API_KEY` 或 `--seedx-api-key` 配置，真实 key 不得写入 README、history、日志或 URL。
+- 上传图片默认落在 `.nomi/uploads` 或 `NOMI_IMAGE_STORAGE_DIR`，不得把真实用户图片、完整本地图片路径或图片中的敏感文本写入 history、截图和普通日志。
 - Apple Developer / App Store Connect 的真实 `.p8`、`.p12`、provisioning profile 和 app-specific password 不得写入仓库；如必须本机留存，只能放到已被 `.gitignore` 忽略的 `.harness/secret/apple/`。
 - 不要把真实数据库 URL、SeedX token、云端 websocket endpoint secret、Apple signing secret 写入仓库。
 
@@ -21,7 +22,7 @@
 
 - Ask 和 extraction 只能做记录整理、趋势回顾和有来源的回答。
 - 医疗诊断、治疗、药物、剂量、急症、疾病风险和异常判断必须阻断。
-- 如果未来用户数据会发送到第三方 AI 服务，必须先补用户可见隐私说明和同意流程。
+- 当前图片 extraction 会通过 SeedX 调用用户本机 Codex runtime；prompt 必须要求不诊断、不治疗、不输出敏感标识符，并只返回结构化 JSON。若未来改为第三方云端 AI 服务，必须先补用户可见隐私说明和同意流程。
 
 ## API
 

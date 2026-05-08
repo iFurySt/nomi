@@ -5,9 +5,11 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -19,6 +21,172 @@ type SeedXEvent struct {
 	Type      string         `json:"type"`
 	CreatedAt time.Time      `json:"created_at"`
 	Payload   map[string]any `json:"payload"`
+}
+
+type SeedXSmokeParams struct {
+	Runtime         string `json:"runtime,omitempty"`
+	CWD             string `json:"cwd,omitempty"`
+	Prompt          string `json:"prompt,omitempty"`
+	Model           string `json:"model,omitempty"`
+	ReasoningEffort string `json:"reasoningEffort,omitempty"`
+}
+
+type SeedXSmokeResult struct {
+	Runtime  string         `json:"runtime"`
+	ThreadID string         `json:"threadId"`
+	TurnID   string         `json:"turnId"`
+	Events   []string       `json:"events"`
+	Text     string         `json:"text,omitempty"`
+	Error    string         `json:"error,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+type seedXCommand struct {
+	ID        string           `json:"id"`
+	Type      string           `json:"type"`
+	CreatedAt time.Time        `json:"created_at"`
+	Method    string           `json:"method"`
+	Runtime   string           `json:"runtime,omitempty"`
+	Params    SeedXSmokeParams `json:"params"`
+}
+
+type seedXResult struct {
+	ID     string          `json:"id"`
+	Type   string          `json:"type"`
+	OK     bool            `json:"ok"`
+	Result json.RawMessage `json:"result,omitempty"`
+	Error  *struct {
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
+}
+
+type seedXResultMessage struct {
+	result SeedXSmokeResult
+	err    error
+}
+
+type SeedXController struct {
+	logger  *zap.Logger
+	mu      sync.Mutex
+	session *seedXSession
+	pending map[string]chan seedXResultMessage
+}
+
+type seedXSession struct {
+	conn    *websocket.Conn
+	writeMu sync.Mutex
+}
+
+func NewSeedXController(logger *zap.Logger) *SeedXController {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	return &SeedXController{
+		logger:  logger,
+		pending: map[string]chan seedXResultMessage{},
+	}
+}
+
+func (c *SeedXController) register(session *seedXSession) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.session = session
+}
+
+func (c *SeedXController) unregister(session *seedXSession) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.session == session {
+		c.session = nil
+	}
+	for id, ch := range c.pending {
+		delete(c.pending, id)
+		ch <- seedXResultMessage{err: ErrSeedXUnavailable}
+		close(ch)
+	}
+}
+
+func (c *SeedXController) RunCodexSmoke(ctx context.Context, params SeedXSmokeParams) (SeedXSmokeResult, error) {
+	c.mu.Lock()
+	session := c.session
+	if session == nil {
+		c.mu.Unlock()
+		return SeedXSmokeResult{}, ErrSeedXUnavailable
+	}
+	id := fmt.Sprintf("nomi-codex-%d", time.Now().UnixNano())
+	ch := make(chan seedXResultMessage, 1)
+	c.pending[id] = ch
+	c.mu.Unlock()
+
+	command := seedXCommand{
+		ID:        id,
+		Type:      "daemon:command",
+		CreatedAt: time.Now(),
+		Method:    "smoke",
+		Runtime:   "codex",
+		Params:    params,
+	}
+	if err := session.Send(command); err != nil {
+		c.removePending(id)
+		return SeedXSmokeResult{}, err
+	}
+
+	select {
+	case <-ctx.Done():
+		c.removePending(id)
+		return SeedXSmokeResult{}, ctx.Err()
+	case message := <-ch:
+		return message.result, message.err
+	}
+}
+
+func (c *SeedXController) handleResult(raw json.RawMessage) {
+	var result seedXResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		c.logger.Warn("seedx result decode failed", zap.Error(err))
+		return
+	}
+
+	c.mu.Lock()
+	ch := c.pending[result.ID]
+	delete(c.pending, result.ID)
+	c.mu.Unlock()
+	if ch == nil {
+		return
+	}
+	defer close(ch)
+
+	if !result.OK {
+		message := "seedx command failed"
+		if result.Error != nil && result.Error.Message != "" {
+			message = result.Error.Message
+		}
+		ch <- seedXResultMessage{err: errors.New(message)}
+		return
+	}
+
+	var smoke SeedXSmokeResult
+	if err := json.Unmarshal(result.Result, &smoke); err != nil {
+		ch <- seedXResultMessage{err: err}
+		return
+	}
+	if smoke.Error != "" {
+		ch <- seedXResultMessage{err: errors.New(smoke.Error)}
+		return
+	}
+	ch <- seedXResultMessage{result: smoke}
+}
+
+func (c *SeedXController) removePending(id string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.pending, id)
+}
+
+func (s *seedXSession) Send(value any) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	return s.conn.WriteJSON(value)
 }
 
 var seedXUpgrader = websocket.Upgrader{
@@ -50,14 +218,23 @@ func (h *Handler) seedXWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("seedx daemon connected", zap.String("remote_addr", r.RemoteAddr), zap.String("path", r.URL.Path))
 
-	var first SeedXEvent
-	if err := conn.ReadJSON(&first); err != nil {
+	_, firstRaw, err := conn.ReadMessage()
+	if err != nil {
 		h.logSeedXDisconnect(err, "before_hello")
 		return
 	}
 
+	var first SeedXEvent
+	if err := json.Unmarshal(firstRaw, &first); err != nil {
+		h.logSeedXDisconnect(err, "invalid_hello")
+		return
+	}
+
 	if first.Type == "daemon:hello" {
-		if err := h.handleSeedXDaemonSession(conn); err != nil {
+		session := &seedXSession{conn: conn}
+		h.seedX.register(session)
+		defer h.seedX.unregister(session)
+		if err := h.handleSeedXDaemonSession(session); err != nil {
 			h.logSeedXDisconnect(err, "session_end")
 		}
 		return
@@ -70,25 +247,33 @@ func (h *Handler) seedXWebSocket(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("seedx daemon disconnected", zap.String("reason", "legacy_smoke_complete"))
 }
 
-func (h *Handler) handleSeedXDaemonSession(conn *websocket.Conn) error {
+func (h *Handler) handleSeedXDaemonSession(session *seedXSession) error {
 	ping := SeedXEvent{
 		ID:        "server-ping-1",
 		Type:      "daemon:ping",
 		CreatedAt: time.Now(),
 	}
-	if err := conn.WriteJSON(ping); err != nil {
+	if err := session.Send(ping); err != nil {
 		return err
 	}
 
 	for {
+		_, raw, err := session.conn.ReadMessage()
+		if err != nil {
+			return err
+		}
 		var event SeedXEvent
-		if err := conn.ReadJSON(&event); err != nil {
+		if err := json.Unmarshal(raw, &event); err != nil {
 			return err
 		}
 		if event.Type == "daemon:ping" {
-			if err := conn.WriteJSON(SeedXEvent{ID: event.ID, Type: "daemon:pong", CreatedAt: time.Now()}); err != nil {
+			if err := session.Send(SeedXEvent{ID: event.ID, Type: "daemon:pong", CreatedAt: time.Now()}); err != nil {
 				return err
 			}
+			continue
+		}
+		if event.Type == "daemon:result" {
+			h.seedX.handleResult(raw)
 		}
 	}
 }

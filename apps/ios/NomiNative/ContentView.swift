@@ -7,6 +7,7 @@ import UIKit
 enum AppLanguage: String, CaseIterable, Identifiable {
     case english
     case simplifiedChinese
+    case traditionalChinese
 
     static let storageKey = "nomi.languagePreference"
 
@@ -14,7 +15,11 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
     static var detected: AppLanguage {
         let preferred = Locale.preferredLanguages.first ?? Locale.autoupdatingCurrent.identifier
-        return preferred.lowercased().hasPrefix("zh") ? .simplifiedChinese : .english
+        let normalized = preferred.lowercased()
+        if normalized.contains("hant") || normalized.contains("tw") || normalized.contains("hk") || normalized.contains("mo") {
+            return .traditionalChinese
+        }
+        return normalized.hasPrefix("zh") ? .simplifiedChinese : .english
     }
 
     static func value(for rawValue: String) -> AppLanguage {
@@ -23,6 +28,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             .english
         case Self.simplifiedChinese.rawValue:
             .simplifiedChinese
+        case Self.traditionalChinese.rawValue:
+            .traditionalChinese
         default:
             Self.detected
         }
@@ -34,6 +41,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             Locale(identifier: "en")
         case .simplifiedChinese:
             Locale(identifier: "zh-Hans")
+        case .traditionalChinese:
+            Locale(identifier: "zh-Hant")
         }
     }
 
@@ -41,6 +50,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self {
         case .english: "language.english"
         case .simplifiedChinese: "language.chinese.simplified"
+        case .traditionalChinese: "language.chinese.traditional"
         }
     }
 }
@@ -115,6 +125,8 @@ struct ImageExtractionRequest: Encodable {
 }
 
 struct ImageExtraction: Decodable, Equatable {
+    let recordID: String?
+    let imageURI: String?
     let schemaVersion: String
     let direction: String
     let inputCategory: String
@@ -125,6 +137,8 @@ struct ImageExtraction: Decodable, Equatable {
     let metadata: ExtractionMetadata
 
     enum CodingKeys: String, CodingKey {
+        case recordID = "record_id"
+        case imageURI = "image_uri"
         case schemaVersion = "schema_version"
         case direction
         case inputCategory = "input_category"
@@ -200,10 +214,113 @@ private enum NomiRadii {
 private enum NomiPalette {
     static let paper = Color(red: 0.98, green: 0.96, blue: 0.91)
     static let surface = Color(red: 1.0, green: 0.98, blue: 0.94)
+    static let surfaceLift = Color(red: 1.0, green: 0.99, blue: 0.96)
     static let ink = Color(red: 0.22, green: 0.18, blue: 0.15)
     static let muted = Color(red: 0.45, green: 0.40, blue: 0.35)
     static let clay = Color(red: 0.70, green: 0.39, blue: 0.31)
     static let cocoa = Color(red: 0.42, green: 0.28, blue: 0.22)
+    static let sage = Color(red: 0.42, green: 0.52, blue: 0.39)
+    static let olive = Color(red: 0.38, green: 0.50, blue: 0.38)
+    static let blueGray = Color(red: 0.40, green: 0.45, blue: 0.55)
+    static let gold = Color(red: 0.77, green: 0.47, blue: 0.21)
+    static let hairline = Color.white.opacity(0.58)
+}
+
+private struct NomiContentSurfaceModifier<SurfaceShape: Shape>: ViewModifier {
+    let shape: SurfaceShape
+    let fillOpacity: Double
+    let strokeOpacity: Double
+    let shadowOpacity: Double
+    let shadowRadius: CGFloat
+    let shadowY: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                shape
+                    .fill(NomiPalette.surfaceLift.opacity(fillOpacity))
+                    .overlay {
+                        shape.stroke(NomiPalette.hairline.opacity(strokeOpacity), lineWidth: 1)
+                    }
+                    .shadow(
+                        color: NomiPalette.cocoa.opacity(shadowOpacity),
+                        radius: shadowRadius,
+                        y: shadowY
+                    )
+            }
+    }
+}
+
+private struct NomiGlassSurfaceModifier<SurfaceShape: Shape>: ViewModifier {
+    let shape: SurfaceShape
+    let tint: Color
+    let fillOpacity: Double
+    let shadowOpacity: Double
+    let shadowRadius: CGFloat
+    let shadowX: CGFloat
+    let shadowY: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                shape
+                    .fill(NomiPalette.surface.opacity(fillOpacity))
+                    .glassEffect(
+                        .regular.tint(tint.opacity(0.08)),
+                        in: shape
+                    )
+                    .shadow(
+                        color: NomiPalette.cocoa.opacity(shadowOpacity),
+                        radius: shadowRadius,
+                        x: shadowX,
+                        y: shadowY
+                    )
+            }
+    }
+}
+
+private extension View {
+    func nomiContentSurface<SurfaceShape: Shape>(
+        in shape: SurfaceShape,
+        fillOpacity: Double = 0.68,
+        strokeOpacity: Double = 1,
+        shadowOpacity: Double = 0.07,
+        shadowRadius: CGFloat = 22,
+        shadowY: CGFloat = 14
+    ) -> some View {
+        modifier(
+            NomiContentSurfaceModifier(
+                shape: shape,
+                fillOpacity: fillOpacity,
+                strokeOpacity: strokeOpacity,
+                shadowOpacity: shadowOpacity,
+                shadowRadius: shadowRadius,
+                shadowY: shadowY
+            )
+        )
+    }
+
+    func nomiGlassSurface<SurfaceShape: Shape>(
+        in shape: SurfaceShape,
+        tint: Color = NomiPalette.surface,
+        fillOpacity: Double = 0.52,
+        shadowOpacity: Double = 0.10,
+        shadowRadius: CGFloat = 24,
+        shadowX: CGFloat = 0,
+        shadowY: CGFloat = 14
+    ) -> some View {
+        modifier(
+            NomiGlassSurfaceModifier(
+                shape: shape,
+                tint: tint,
+                fillOpacity: fillOpacity,
+                shadowOpacity: shadowOpacity,
+                shadowRadius: shadowRadius,
+                shadowX: shadowX,
+                shadowY: shadowY
+            )
+        )
+    }
 }
 
 struct UploadResult {
@@ -213,55 +330,78 @@ struct UploadResult {
     let assetName: String
 }
 
+enum AppTab: Hashable {
+    case today
+    case me
+    case add
+}
+
 struct ContentView: View {
     @State private var showUploadSheet = false
+    @State private var showLanguageSheet = false
     @State private var showHero = false
-    @State private var showSidebar = false
-    @State private var sidebarProgress: CGFloat = 0
+    @State private var selectedTab: AppTab = .today
+    @State private var lastContentTab: AppTab = .today
     @State private var timelineItems: [TimelineItem] = []
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             NomiBackground()
 
-            NavigationStack {
-                HomeView(
-                    items: timelineItems,
-                    showHero: showHero,
-                    onAdd: openUploadSheet
-                )
-                .navigationTitle("Nomi")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        SidebarButton(action: openSidebar)
-                            .opacity(showSidebar ? 0 : 1)
-                            .allowsHitTesting(!showSidebar)
-                            .accessibilityHidden(showSidebar)
+            TabView(selection: $selectedTab) {
+                Tab(value: AppTab.today) {
+                    NavigationStack {
+                        HomeView(
+                            items: timelineItems,
+                            showHero: showHero,
+                            onAdd: openUploadSheet
+                        )
+                        .navigationTitle("Nomi")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbarBackground(.hidden, for: .navigationBar)
                     }
-                    .sharedBackgroundVisibility(.hidden)
+                    .background {
+                        NomiBackground()
+                    }
+                } label: {
+                    Label("tab.today", systemImage: "sun.max")
+                        .accessibilityIdentifier("bottom-today")
                 }
-                .toolbarBackground(.hidden, for: .navigationBar)
+
+                Tab(value: AppTab.me) {
+                    NavigationStack {
+                        MyView(onLanguage: {
+                            showLanguageSheet = true
+                        })
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbarBackground(.hidden, for: .navigationBar)
+                    }
+                    .background {
+                        NomiBackground()
+                    }
+                } label: {
+                    Label("tab.me", systemImage: "person")
+                        .accessibilityIdentifier("bottom-me")
+                }
+
+                Tab(value: AppTab.add, role: .search) {
+                    Color.clear
+                        .accessibilityHidden(true)
+                } label: {
+                    Label("nav.add", systemImage: "plus")
+                        .accessibilityIdentifier("bottom-add")
+                }
             }
+            .tabBarMinimizeBehavior(.never)
             .background {
                 NomiBackground()
             }
-            .offset(x: sidebarProgress * 14)
-            .scaleEffect(1 - sidebarProgress * 0.012, anchor: .trailing)
-            .animation(.smooth(duration: 0.34), value: sidebarProgress)
-
-            CenterAddButton(onAdd: openUploadSheet)
-                .padding(.bottom, 12)
-                .offset(x: sidebarProgress * 10)
-                .opacity(Double(1 - sidebarProgress * 0.28))
-                .animation(.smooth(duration: 0.28), value: sidebarProgress)
-
-            if showSidebar {
-                SidebarOverlay(progress: sidebarProgress, onClose: closeSidebar)
-                    .zIndex(2)
-            }
         }
-        .tint(.primary)
+        .tint(NomiPalette.ink)
+        .onChange(of: selectedTab) { oldValue, newValue in
+            handleTabChange(from: oldValue, to: newValue)
+        }
         .sheet(isPresented: $showUploadSheet) {
             UploadSheet { result in
                 withAnimation(.spring(duration: 0.55, bounce: 0.22)) {
@@ -269,19 +409,24 @@ struct ContentView: View {
                 }
                 showUploadSheet = false
                 Task {
-                    await RecordsClient.save(
-                        extraction: result.extraction,
-                        source: result.source,
-                        assetName: result.assetName
-                    )
+                    if result.extraction.recordID == nil {
+                        await RecordsClient.save(
+                            extraction: result.extraction,
+                            source: result.source,
+                            assetName: result.assetName
+                        )
+                    }
                 }
             }
-            .presentationDetents([.fraction(0.74), .large])
+            .presentationDetents([.fraction(0.72)])
             .presentationCornerRadius(NomiRadii.sheet)
-            .presentationBackground {
-                NomiBackground()
-            }
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showLanguageSheet) {
+            LanguageSelectionSheet()
+                .presentationDetents([.fraction(0.46)])
+                .presentationCornerRadius(NomiRadii.sheet)
+                .presentationDragIndicator(.visible)
         }
         .task {
             guard !showHero else { return }
@@ -302,35 +447,21 @@ struct ContentView: View {
         }
     }
 
+    private func handleTabChange(from oldValue: AppTab, to newValue: AppTab) {
+        switch newValue {
+        case .today, .me:
+            UISelectionFeedbackGenerator().selectionChanged()
+            lastContentTab = newValue
+        case .add:
+            openUploadSheet()
+            selectedTab = oldValue == .add ? lastContentTab : oldValue
+        }
+    }
+
     private func openUploadSheet() {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         withAnimation(.bouncy(duration: 0.45)) {
             showUploadSheet = true
-        }
-    }
-
-    private func openSidebar() {
-        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        guard !showSidebar else { return }
-        sidebarProgress = 0
-        showSidebar = true
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(18))
-            withAnimation(.spring(duration: 0.46, bounce: 0.20)) {
-                sidebarProgress = 1
-            }
-        }
-    }
-
-    private func closeSidebar() {
-        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        withAnimation(.smooth(duration: 0.26)) {
-            sidebarProgress = 0
-        }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(260))
-            guard sidebarProgress == 0 else { return }
-            showSidebar = false
         }
     }
 
@@ -381,11 +512,13 @@ struct ContentView: View {
                         to: resultsURL
                     )
                 }
-                await RecordsClient.save(
-                    extraction: extraction,
-                    source: source,
-                    assetName: item.fileName
-                )
+                if extraction.recordID == nil {
+                    await RecordsClient.save(
+                        extraction: extraction,
+                        source: source,
+                        assetName: item.fileName
+                    )
+                }
             }
         } catch {
             writeE2EResult("NOMI_E2E_UPLOAD_RESULT failed \(error.localizedDescription)", to: resultsURL)
@@ -397,74 +530,10 @@ struct ContentView: View {
         let data = Data((line + "\n").utf8)
         if let handle = try? FileHandle(forWritingTo: url) {
             defer { try? handle.close() }
-            try? handle.seekToEnd()
+            _ = try? handle.seekToEnd()
             try? handle.write(contentsOf: data)
         } else {
             try? data.write(to: url)
-        }
-    }
-}
-
-struct SidebarButton: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button {
-            action()
-        } label: {
-            VStack(spacing: 5) {
-                Capsule()
-                    .fill(NomiPalette.ink.opacity(0.76))
-                    .frame(width: 18, height: 2)
-                Capsule()
-                    .fill(NomiPalette.ink.opacity(0.76))
-                    .frame(width: 12, height: 2)
-                    .frame(width: 18, alignment: .leading)
-            }
-        }
-        .buttonStyle(
-            LiquidCircleButtonStyle(
-                visualSize: 44,
-                touchSize: 52,
-                glassTint: NomiPalette.surface,
-                shadowOpacity: 0.08
-            )
-        )
-        .accessibilityLabel("accessibility.sidebar")
-        .accessibilityIdentifier("sidebar-button")
-    }
-}
-
-struct CenterAddButton: View {
-    let onAdd: () -> Void
-    @State private var appeared = false
-
-    var body: some View {
-        Button {
-            onAdd()
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 24, weight: .medium))
-                .symbolEffect(.bounce, value: appeared)
-                .foregroundStyle(NomiPalette.clay)
-        }
-        .buttonStyle(
-            LiquidCircleButtonStyle(
-                visualSize: 44,
-                touchSize: 56,
-                glassTint: NomiPalette.clay,
-                shadowOpacity: 0.10
-            )
-        )
-        .scaleEffect(appeared ? 1 : 0.9)
-        .opacity(appeared ? 1 : 0)
-        .accessibilityLabel("accessibility.upload")
-        .accessibilityIdentifier("bottom-add")
-        .glassEffectTransition(.materialize)
-        .onAppear {
-            withAnimation(.spring(duration: 0.55, bounce: 0.2)) {
-                appeared = true
-            }
         }
     }
 }
@@ -501,9 +570,99 @@ struct LiquidCircleButtonStyle: ButtonStyle {
     }
 }
 
-struct SidebarOverlay: View {
-    let progress: CGFloat
-    let onClose: () -> Void
+struct MyView: View {
+    let onLanguage: () -> Void
+
+    var body: some View {
+        ZStack {
+            NomiBackground()
+
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 22) {
+                    settingsSection(title: "me.section.mine") {
+                        MySettingsRow(
+                            symbol: "globe",
+                            titleKey: "settings.language",
+                            accessibilityIdentifier: "my-language-row",
+                            action: onLanguage
+                        )
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 44)
+                .padding(.bottom, 126)
+            }
+            .accessibilityIdentifier("my-view")
+        }
+    }
+
+    @ViewBuilder
+    private func settingsSection<Content: View>(
+        title: LocalizedStringKey,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.title2.weight(.regular))
+                .foregroundStyle(NomiPalette.muted)
+
+            VStack(spacing: 0) {
+                content()
+            }
+            .background(NomiPalette.surfaceLift.opacity(0.76), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(.white.opacity(0.72), lineWidth: 1)
+            }
+            .shadow(color: NomiPalette.cocoa.opacity(0.06), radius: 18, y: 10)
+        }
+    }
+}
+
+struct MySettingsRow: View {
+    let symbol: String
+    let titleKey: LocalizedStringKey
+    var accessibilityIdentifier: String?
+    var action: (() -> Void)?
+
+    var body: some View {
+        Button {
+            action?()
+        } label: {
+            HStack(spacing: 20) {
+                Image(systemName: symbol)
+                    .font(.system(size: 24, weight: .regular))
+                    .foregroundStyle(NomiPalette.ink.opacity(0.78))
+                    .frame(width: 42, height: 54)
+
+                Text(titleKey)
+                    .font(.title3.weight(.regular))
+                    .foregroundStyle(NomiPalette.muted)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(NomiPalette.muted.opacity(0.86))
+            }
+            .frame(height: 58)
+            .padding(.horizontal, 20)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(action == nil)
+        .accessibilityIdentifier(accessibilityIdentifier ?? "")
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(NomiPalette.cocoa.opacity(0.08))
+                .frame(height: 1)
+                .padding(.leading, 84)
+                .opacity(0.9)
+        }
+    }
+}
+
+struct LanguageSelectionSheet: View {
     @AppStorage(AppLanguage.storageKey) private var languagePreference = AppLanguage.detected.rawValue
 
     private var selectedLanguage: AppLanguage {
@@ -511,132 +670,44 @@ struct SidebarOverlay: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            let drawerWidth = min(proxy.size.width * 0.76, 292)
+        VStack(spacing: 22) {
+            Text("language.current")
+                .font(.title3.weight(.medium))
+                .foregroundStyle(NomiPalette.muted)
+                .padding(.top, 34)
+                .accessibilityIdentifier("language-sheet")
 
-            ZStack(alignment: .leading) {
-                sidebarBackdrop
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        onClose()
+            VStack(spacing: 14) {
+                ForEach(AppLanguage.allCases) { language in
+                    Button {
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        withAnimation(.smooth(duration: 0.22)) {
+                            languagePreference = language.rawValue
+                        }
+                    } label: {
+                        HStack {
+                            Text(language.titleKey)
+                                .font(.title3.weight(.regular))
+                            Spacer(minLength: 0)
+                            if selectedLanguage == language {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 21, weight: .semibold))
+                            }
+                        }
+                        .foregroundStyle(NomiPalette.ink.opacity(0.84))
+                        .padding(.horizontal, 22)
+                        .frame(height: 58)
+                        .background(NomiPalette.cocoa.opacity(0.055), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
-
-                sidebarContent
-                .frame(width: drawerWidth)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .background {
-                    ZStack {
-                        NomiBackground()
-
-                        LinearGradient(
-                            colors: [
-                                NomiPalette.surface.opacity(0.22),
-                                .white.opacity(0.04)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
-                    .clipShape(sidebarShape)
-                    .glassEffect(.regular, in: sidebarShape)
-                    .shadow(color: NomiPalette.cocoa.opacity(0.12), radius: 28, x: 10, y: 18)
-                    .ignoresSafeArea()
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("language-\(language.rawValue)")
                 }
-                .offset(x: -drawerWidth * (1 - progress))
-                .scaleEffect(x: 0.985 + progress * 0.015, y: 1, anchor: .leading)
-                .glassEffectTransition(.materialize)
-                .accessibilityIdentifier("sidebar-drawer")
             }
-        }
-    }
-
-    private var sidebarShape: ConcentricRectangle {
-        ConcentricRectangle(
-            uniformLeadingCorners: .fixed(0),
-            uniformTrailingCorners: .concentric(minimum: .fixed(30))
-        )
-    }
-
-    private var sidebarBackdrop: some View {
-        NomiBackground()
-            .opacity(Double(progress))
-        .ignoresSafeArea()
-    }
-
-    private var sidebarContent: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Text("sidebar.username")
-                .font(.system(size: 30, weight: .semibold, design: .rounded))
-                .foregroundStyle(NomiPalette.ink)
-                .padding(.top, 82)
-                .opacity(Double(progress))
-                .offset(x: -18 * (1 - progress))
-
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    Image(systemName: "character.bubble")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(NomiPalette.clay)
-                        .frame(width: 30, height: 30)
-                        .background(NomiPalette.clay.opacity(0.11), in: Circle())
-
-                    Text("settings.language")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(NomiPalette.ink)
-
-                    Spacer(minLength: 0)
-                }
-
-                languagePicker
-            }
-            .padding(12)
-            .background(NomiPalette.surface.opacity(0.52), in: .rect(corners: .concentric(minimum: .fixed(NomiRadii.card))))
-            .glassEffect(.regular.interactive(), in: .rect(corners: .concentric(minimum: .fixed(NomiRadii.card))))
-            .opacity(Double(progress))
-            .offset(x: -24 * (1 - progress))
-            .scaleEffect(0.985 + progress * 0.015, anchor: .leading)
+            .padding(.horizontal, 24)
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 18)
-        .padding(.bottom, 28)
-    }
-
-    private var languagePicker: some View {
-        HStack(spacing: 6) {
-            ForEach(AppLanguage.allCases) { language in
-                Button {
-                    UISelectionFeedbackGenerator().selectionChanged()
-                    withAnimation(.spring(duration: 0.28, bounce: 0.14)) {
-                        languagePreference = language.rawValue
-                    }
-                } label: {
-                    Text(language.titleKey)
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.74)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 32)
-                        .foregroundStyle(selectedLanguage == language ? NomiPalette.ink : NomiPalette.muted.opacity(0.78))
-                        .contentShape(Rectangle())
-                        .background {
-                            if selectedLanguage == language {
-                                ConcentricRectangle(corners: .concentric(minimum: .fixed(12)), isUniform: true)
-                                    .fill(NomiPalette.surface.opacity(0.82))
-                                    .overlay {
-                                        ConcentricRectangle(corners: .concentric(minimum: .fixed(12)), isUniform: true)
-                                            .stroke(.white.opacity(0.68), lineWidth: 1)
-                                    }
-                                    .transition(.scale.combined(with: .opacity))
-                            }
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("language-\(language.rawValue)")
-            }
-        }
-        .padding(3)
-        .background(NomiPalette.cocoa.opacity(0.06), in: .rect(corners: .concentric(minimum: .fixed(15))))
+        .background(NomiPalette.surfaceLift.opacity(0.92))
     }
 }
 
@@ -695,7 +766,6 @@ struct HomeView: View {
 
 struct OverviewCard: View {
     let items: [TimelineItem]
-    @State private var breathe = false
 
     private var metrics: [DailyMetric] {
         let calories = items.map { $0.caloriesKcal }.reduce(0, +)
@@ -712,7 +782,7 @@ struct OverviewCard: View {
                 value: "\(calories)",
                 detailKey: "metric.calories.left \(max(0, 2200 - calories))",
                 symbol: "flame.fill",
-                tint: Color(red: 0.77, green: 0.47, blue: 0.21),
+                tint: NomiPalette.gold,
                 progress: items.isEmpty ? 0 : min(Double(calories) / 2200, 1)
             ),
             DailyMetric(
@@ -721,7 +791,7 @@ struct OverviewCard: View {
                 value: "\(protein)g",
                 detailKey: "metric.protein.target",
                 symbol: "circle.hexagongrid.fill",
-                tint: Color(red: 0.38, green: 0.50, blue: 0.38),
+                tint: NomiPalette.olive,
                 progress: min(Double(protein) / 120, 1)
             ),
             DailyMetric(
@@ -730,7 +800,7 @@ struct OverviewCard: View {
                 value: "\(strength)m",
                 detailKey: "metric.today",
                 symbol: "dumbbell.fill",
-                tint: Color(red: 0.40, green: 0.45, blue: 0.55),
+                tint: NomiPalette.blueGray,
                 progress: nil
             ),
             DailyMetric(
@@ -739,7 +809,7 @@ struct OverviewCard: View {
                 value: "\(walk)m",
                 detailKey: "metric.today",
                 symbol: "figure.walk",
-                tint: Color(red: 0.39, green: 0.54, blue: 0.47),
+                tint: NomiPalette.sage,
                 progress: nil
             ),
             DailyMetric(
@@ -757,7 +827,7 @@ struct OverviewCard: View {
                 value: "\(sleep)m",
                 detailKey: "metric.today",
                 symbol: "moon.fill",
-                tint: Color(red: 0.38, green: 0.43, blue: 0.53),
+                tint: NomiPalette.blueGray,
                 progress: nil
             )
         ]
@@ -780,15 +850,12 @@ struct OverviewCard: View {
 
                 ZStack {
                     Circle()
-                        .fill(.white.opacity(0.72))
+                        .fill(NomiPalette.surfaceLift.opacity(0.72))
                         .frame(width: 50, height: 50)
-                        .glassEffect(.regular.interactive(), in: .circle)
                     Image(systemName: "heart.text.square.fill")
                         .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(Color(red: 0.33, green: 0.40, blue: 0.32))
-                        .symbolEffect(.pulse, options: .repeating, value: breathe)
+                        .foregroundStyle(NomiPalette.sage)
                 }
-                .scaleEffect(breathe ? 1.035 : 0.985)
             }
 
             LazyVGrid(columns: [
@@ -802,17 +869,13 @@ struct OverviewCard: View {
             }
         }
         .padding(18)
-        .background {
-            RoundedRectangle(cornerRadius: NomiRadii.panel, style: .continuous)
-                .fill(.white.opacity(0.72))
-                .glassEffect(.regular, in: .rect(cornerRadius: NomiRadii.panel))
-                .shadow(color: .black.opacity(0.08), radius: 28, y: 18)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
-                breathe = true
-            }
-        }
+        .nomiContentSurface(
+            in: ConcentricRectangle(corners: .concentric(minimum: .fixed(NomiRadii.panel)), isUniform: true),
+            fillOpacity: 0.70,
+            shadowOpacity: 0.08,
+            shadowRadius: 28,
+            shadowY: 18
+        )
     }
 }
 
@@ -862,7 +925,14 @@ struct MetricTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 78, alignment: .topLeading)
         .padding(10)
-        .background(.white.opacity(0.48), in: RoundedRectangle(cornerRadius: NomiRadii.tile, style: .continuous))
+        .nomiContentSurface(
+            in: ConcentricRectangle(corners: .concentric(minimum: .fixed(NomiRadii.tile)), isUniform: true),
+            fillOpacity: 0.46,
+            strokeOpacity: 0.55,
+            shadowOpacity: 0,
+            shadowRadius: 0,
+            shadowY: 0
+        )
     }
 }
 
@@ -959,14 +1029,14 @@ struct TimelineRow: View {
             .padding(.vertical, 10)
             .padding(.horizontal, 12)
             .frame(height: cardHeight)
-            .background {
-                RoundedRectangle(cornerRadius: NomiRadii.card, style: .continuous)
-                    .fill(Color.white.opacity(0.56))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: NomiRadii.card, style: .continuous)
-                            .stroke(.white.opacity(0.55), lineWidth: 1)
-                    }
-            }
+            .nomiContentSurface(
+                in: ConcentricRectangle(corners: .concentric(minimum: .fixed(NomiRadii.card)), isUniform: true),
+                fillOpacity: 0.56,
+                strokeOpacity: 0.85,
+                shadowOpacity: 0.025,
+                shadowRadius: 12,
+                shadowY: 7
+            )
         }
         .frame(height: cardHeight + rowGap, alignment: .top)
         .offset(y: appeared ? 0 : 12)
@@ -999,9 +1069,9 @@ struct UploadSheet: View {
     @State private var controlsAppeared = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("nav.add")
-                .font(.system(size: 34, weight: .semibold, design: .rounded))
+                .font(.system(size: 30, weight: .semibold, design: .rounded))
 
             sourcePicker
 
@@ -1029,26 +1099,34 @@ struct UploadSheet: View {
             }
             .buttonStyle(.glassProminent)
             .buttonBorderShape(.capsule)
-            .tint(.black.opacity(0.86))
+            .tint(NomiPalette.ink)
             .disabled(isUploading)
             .accessibilityIdentifier("upload-primary-button")
         }
         .padding(.horizontal, 22)
-        .padding(.top, 72)
+        .padding(.top, 64)
         .padding(.bottom, 24)
         .overlay(alignment: .topTrailing) {
             Button {
                 dismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .frame(width: 48, height: 48)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(NomiPalette.ink.opacity(0.72))
             }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
-            .padding(.top, 58)
-            .padding(.trailing, 26)
-            .accessibilityLabel("accessibility.close")
-        }
+            .buttonStyle(
+                LiquidCircleButtonStyle(
+                    visualSize: 46,
+                    touchSize: 54,
+                    glassTint: NomiPalette.surface,
+                    shadowOpacity: 0.06
+                )
+	            )
+	            .padding(.top, 52)
+	            .padding(.trailing, 24)
+	            .accessibilityLabel("accessibility.close")
+	            .accessibilityIdentifier("upload-close-button")
+	        }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhoto, matching: .images)
         .fileImporter(
             isPresented: $showFileImporter,
@@ -1075,18 +1153,17 @@ struct UploadSheet: View {
                 } label: {
                     VStack(spacing: 9) {
                         Image(systemName: source.symbol)
-                            .font(.title3.weight(.semibold))
+                            .font(.system(size: 22, weight: .semibold))
                             .symbolEffect(.bounce, value: selectedSource)
                         Text(source.titleKey)
                             .font(.caption.weight(.semibold))
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 80)
+                    .frame(height: 76)
                 }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.roundedRectangle(radius: 20))
-                .tint(selectedSource == source ? .primary.opacity(0.75) : .secondary.opacity(0.35))
-                .scaleEffect(selectedSource == source ? 1.02 : 1)
+                .tint(selectedSource == source ? NomiPalette.ink.opacity(0.82) : NomiPalette.muted.opacity(0.34))
                 .opacity(controlsAppeared ? 1 : 0)
                 .offset(y: controlsAppeared ? 0 : 18)
                 .animation(.spring(duration: 0.48, bounce: 0.22).delay(Double(index) * 0.05), value: controlsAppeared)
@@ -1109,13 +1186,13 @@ struct UploadSheet: View {
                 Spacer()
                 Image(systemName: importedImage == nil ? "plus.viewfinder" : "checkmark.circle.fill")
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(importedImage == nil ? Color.secondary : Color.green)
+                    .foregroundStyle(importedImage == nil ? Color.secondary : NomiPalette.sage)
                     .contentTransition(.symbolEffect(.replace))
             }
 
             ZStack {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(.white.opacity(0.54))
+                ConcentricRectangle(corners: .concentric(minimum: .fixed(NomiRadii.panel)), isUniform: true)
+                    .fill(NomiPalette.surfaceLift.opacity(0.50))
 
                 if let importedImage {
                     Image(uiImage: importedImage)
@@ -1137,20 +1214,19 @@ struct UploadSheet: View {
                     VStack(spacing: 12) {
                         ProgressView(value: uploadProgress)
                             .progressViewStyle(.linear)
-                            .tint(.primary)
+                            .tint(NomiPalette.ink)
                         Text("upload.analyzing")
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
                     .padding(18)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(.thinMaterial, in: ConcentricRectangle(corners: .concentric(minimum: .fixed(NomiRadii.card)), isUniform: true))
                     .padding(26)
                     .transition(.opacity.combined(with: .scale(scale: 0.94)))
                 }
             }
             .frame(height: 164)
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .glassEffect(.regular, in: .rect(cornerRadius: 28))
+            .clipShape(ConcentricRectangle(corners: .concentric(minimum: .fixed(NomiRadii.panel)), isUniform: true))
             .onTapGesture {
                 choose(selectedSource)
             }
@@ -1179,16 +1255,25 @@ struct UploadSheet: View {
                         .lineLimit(1)
                 }
                 .padding(14)
-                .background(.white.opacity(0.46), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .nomiContentSurface(
+                    in: ConcentricRectangle(corners: .concentric(minimum: .fixed(NomiRadii.card)), isUniform: true),
+                    fillOpacity: 0.48,
+                    strokeOpacity: 0.6,
+                    shadowOpacity: 0,
+                    shadowRadius: 0,
+                    shadowY: 0
+                )
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
         .padding(18)
-        .background {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .fill(.white.opacity(0.62))
-                .glassEffect(.regular, in: .rect(cornerRadius: NomiRadii.panel))
-        }
+        .nomiContentSurface(
+            in: ConcentricRectangle(corners: .concentric(minimum: .fixed(NomiRadii.panel)), isUniform: true),
+            fillOpacity: 0.62,
+            shadowOpacity: 0.03,
+            shadowRadius: 16,
+            shadowY: 8
+        )
         .opacity(controlsAppeared ? 1 : 0)
         .offset(y: controlsAppeared ? 0 : 18)
         .animation(.spring(duration: 0.55, bounce: 0.2).delay(0.12), value: controlsAppeared)
@@ -1425,6 +1510,8 @@ extension ImageExtraction {
 
     static func fallback(assetName: String, source: UploadSource, mimeType: String) -> ImageExtraction {
         ImageExtraction(
+            recordID: nil,
+            imageURI: nil,
             schemaVersion: "2026-05-07.inputs-outputs.v1",
             direction: "input",
             inputCategory: assetName.localizedCaseInsensitiveContains("receipt") ? "information" : "food",

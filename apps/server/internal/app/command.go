@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -17,16 +18,24 @@ import (
 const defaultDatabaseURL = "postgres://bytedance:bytedance@localhost:5432/nomi?sslmode=disable"
 
 type Config struct {
-	Addr        string
-	DatabaseURL string
-	SeedXAPIKey string
+	Addr                      string
+	DatabaseURL               string
+	SeedXAPIKey               string
+	ImageStorageDir           string
+	SeedXCodexModel           string
+	SeedXCodexReasoningEffort string
+	SeedXCommandTimeout       time.Duration
 }
 
 func NewRootCommand() *cobra.Command {
 	cfg := Config{
-		Addr:        envOrDefault("NOMI_SERVER_ADDR", ":8088"),
-		DatabaseURL: envOrDefault("NOMI_DATABASE_URL", defaultDatabaseURL),
-		SeedXAPIKey: envOrDefault("NOMI_SEEDX_API_KEY", ""),
+		Addr:                      envOrDefault("NOMI_SERVER_ADDR", ":8088"),
+		DatabaseURL:               envOrDefault("NOMI_DATABASE_URL", defaultDatabaseURL),
+		SeedXAPIKey:               envOrDefault("NOMI_SEEDX_API_KEY", ""),
+		ImageStorageDir:           envOrDefault("NOMI_IMAGE_STORAGE_DIR", ".nomi/uploads"),
+		SeedXCodexModel:           envOrDefault("NOMI_SEEDX_CODEX_MODEL", ""),
+		SeedXCodexReasoningEffort: envOrDefault("NOMI_SEEDX_CODEX_REASONING_EFFORT", "medium"),
+		SeedXCommandTimeout:       envDurationOrDefault("NOMI_SEEDX_COMMAND_TIMEOUT", 2*time.Minute),
 	}
 
 	cmd := &cobra.Command{
@@ -40,6 +49,10 @@ func NewRootCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cfg.Addr, "addr", cfg.Addr, "HTTP listen address")
 	cmd.Flags().StringVar(&cfg.DatabaseURL, "database-url", cfg.DatabaseURL, "Postgres connection URL")
 	cmd.Flags().StringVar(&cfg.SeedXAPIKey, "seedx-api-key", cfg.SeedXAPIKey, "SeedX daemon API key")
+	cmd.Flags().StringVar(&cfg.ImageStorageDir, "image-storage-dir", cfg.ImageStorageDir, "Directory for uploaded image files")
+	cmd.Flags().StringVar(&cfg.SeedXCodexModel, "seedx-codex-model", cfg.SeedXCodexModel, "Optional Codex model override for SeedX image analysis")
+	cmd.Flags().StringVar(&cfg.SeedXCodexReasoningEffort, "seedx-codex-reasoning-effort", cfg.SeedXCodexReasoningEffort, "Codex reasoning effort for SeedX image analysis")
+	cmd.Flags().DurationVar(&cfg.SeedXCommandTimeout, "seedx-command-timeout", cfg.SeedXCommandTimeout, "Timeout for SeedX image analysis commands")
 
 	return cmd
 }
@@ -71,7 +84,18 @@ func run(ctx context.Context, cfg Config) error {
 		return err
 	}
 
-	handler := NewHandler(store, logger, cfg.SeedXAPIKey)
+	handler := NewHandler(
+		store,
+		logger,
+		cfg.SeedXAPIKey,
+		WithImageStorageDir(cfg.ImageStorageDir),
+		WithSeedXAnalyzerOptions(SeedXImageAnalyzerOptions{
+			CWD:             defaultCodexCWD(),
+			Model:           cfg.SeedXCodexModel,
+			ReasoningEffort: cfg.SeedXCodexReasoningEffort,
+			Timeout:         cfg.SeedXCommandTimeout,
+		}),
+	)
 	server := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           handler.Routes(),
@@ -102,5 +126,19 @@ func envOrDefault(key string, fallback string) string {
 		return value
 	}
 
+	return fallback
+}
+
+func envDurationOrDefault(key string, fallback time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	if duration, err := time.ParseDuration(value); err == nil {
+		return duration
+	}
+	if seconds, err := strconv.Atoi(value); err == nil {
+		return time.Duration(seconds) * time.Second
+	}
 	return fallback
 }

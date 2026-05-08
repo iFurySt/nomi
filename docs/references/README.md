@@ -12,4 +12,4 @@
 
 ## UIUX
 
-移动端 UIUX、动效和 Apple 官方设计参考链接统一维护在 `docs/UIUX_REFERENCE.md`。该文档只保留摘要和链接，避免把外部指南大段复制进仓库。
+移动端 UIUX、动效、Apple 官方设计参考、iOS 26 Liquid Glass tab bar 文章和 LiquidGlassSwiftUI 示例入口统一维护在 `docs/UIUX_REFERENCE.md`。该文档只保留摘要、链接和项目内实现守则，避免把外部指南大段复制进仓库。

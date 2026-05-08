@@ -14,6 +14,8 @@ type ImageExtractionRequest struct {
 }
 
 type ImageExtraction struct {
+	RecordID      string             `json:"record_id,omitempty"`
+	ImageURI      string             `json:"image_uri,omitempty"`
 	SchemaVersion string             `json:"schema_version"`
 	Direction     string             `json:"direction"`
 	InputCategory string             `json:"input_category"`

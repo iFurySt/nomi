@@ -53,25 +53,45 @@ final class NomiNativeUploadFlowUITests: XCTestCase {
         saveScreenshot(named: "nomi-native-real-upload-files-2026-05-07.png")
     }
 
-    func testSidebarLanguageSwitchesBetweenChineseAndEnglish() throws {
+    func testBottomFloatingControlsOpenUploadAndLanguageSettings() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["NOMI_DISABLE_RECORD_SYNC"] = "1"
+        app.launch()
+
+        XCTAssertTrue(app.buttons.matching(identifier: "bottom-today").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons.matching(identifier: "bottom-me").firstMatch.waitForExistence(timeout: 2), app.debugDescription)
+
+        app.buttons.matching(identifier: "bottom-add").firstMatch.tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "upload-primary-button").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+
+        app.buttons.matching(identifier: "upload-close-button").firstMatch.tap()
+        XCTAssertFalse(app.buttons.matching(identifier: "upload-primary-button").firstMatch.waitForExistence(timeout: 2))
+
+        app.buttons.matching(identifier: "bottom-me").firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "my-view").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+
+        app.buttons.matching(identifier: "my-language-row").firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "language-sheet").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons.matching(identifier: "language-english").firstMatch.waitForExistence(timeout: 2), app.debugDescription)
+    }
+
+    func testMyLanguageSheetSwitchesBetweenChineseAndEnglish() throws {
         let app = XCUIApplication()
         app.launchEnvironment["NOMI_DISABLE_RECORD_SYNC"] = "1"
         app.launchEnvironment["NOMI_RESET_LANGUAGE_PREFERENCE"] = "1"
         app.launch()
 
-        let sidebarButton = app.buttons.matching(identifier: "sidebar-button").firstMatch
-        XCTAssertTrue(sidebarButton.waitForExistence(timeout: 5), app.debugDescription)
-        sidebarButton.tap()
-
-        let drawer = app.descendants(matching: .any).matching(identifier: "sidebar-drawer").firstMatch
-        XCTAssertTrue(drawer.waitForExistence(timeout: 5), app.debugDescription)
+        app.buttons.matching(identifier: "bottom-me").firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "my-view").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        app.buttons.matching(identifier: "my-language-row").firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "language-sheet").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(app.staticTexts["Language"].waitForExistence(timeout: 2))
 
-        tapFirstButton(containing: "中文", in: app)
+        app.buttons.matching(identifier: "language-simplifiedChinese").firstMatch.tap()
         XCTAssertTrue(app.staticTexts["语言"].waitForExistence(timeout: 2))
-        saveScreenshot(named: "nomi-native-home-sidebar-zh-2026-05-07.png")
+        saveScreenshot(named: "nomi-native-my-language-zh-2026-05-08.png")
 
-        tapFirstButton(containing: "English", in: app)
+        app.buttons.matching(identifier: "language-english").firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Language"].waitForExistence(timeout: 2))
     }
 

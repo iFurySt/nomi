@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -143,6 +144,82 @@ func TestSeedXWebSocketAcceptsSeedXHello(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "i/o timeout") {
 		t.Fatalf("session was closed after pong: %v", err)
+	}
+}
+
+func TestSeedXControllerRunsCodexSmokeCommandOverDaemon(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(nil, zap.NewNop(), "dev-key")
+	server := httptest.NewServer(handler.Routes())
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/daemon/connect"
+	header := http.Header{}
+	header.Set("Authorization", "Bearer dev-key")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, header)
+	if err != nil {
+		t.Fatalf("dial failed: %v", err)
+	}
+	defer conn.Close()
+
+	if err := conn.WriteJSON(SeedXEvent{Type: "daemon:hello"}); err != nil {
+		t.Fatalf("write hello: %v", err)
+	}
+	var ping SeedXEvent
+	if err := conn.ReadJSON(&ping); err != nil {
+		t.Fatalf("read ping: %v", err)
+	}
+
+	resultCh := make(chan SeedXSmokeResult, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		result, err := handler.seedX.RunCodexSmoke(context.Background(), SeedXSmokeParams{
+			Runtime: "codex",
+			CWD:     "/workspace",
+			Prompt:  "analyze",
+		})
+		if err != nil {
+			errCh <- err
+			return
+		}
+		resultCh <- result
+	}()
+
+	var command struct {
+		ID     string           `json:"id"`
+		Type   string           `json:"type"`
+		Method string           `json:"method"`
+		Params SeedXSmokeParams `json:"params"`
+	}
+	if err := conn.ReadJSON(&command); err != nil {
+		t.Fatalf("read command: %v", err)
+	}
+	if command.Type != "daemon:command" || command.Method != "smoke" || command.Params.Prompt != "analyze" {
+		t.Fatalf("command = %#v", command)
+	}
+
+	if err := conn.WriteJSON(map[string]any{
+		"type": "daemon:result",
+		"id":   command.ID,
+		"ok":   true,
+		"result": map[string]any{
+			"runtime": "codex",
+			"text":    `{"ok":true}`,
+		},
+	}); err != nil {
+		t.Fatalf("write result: %v", err)
+	}
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("run command: %v", err)
+	case result := <-resultCh:
+		if result.Text != `{"ok":true}` {
+			t.Fatalf("result = %#v", result)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for command result")
 	}
 }
 

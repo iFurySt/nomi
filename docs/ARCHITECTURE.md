@@ -4,8 +4,8 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 
 ## 当前仓库结构
 
-- `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 home-only mobile skeleton：首页默认不填假 timeline，摄入能量、蛋白质、训练、步行、久坐、睡眠等今日总览从真实上传记录派生；timeline 为空时显示真实空态。底部只有一个居中的 Add icon，打开上拉上传 sheet，并在真实 PhotosPicker / fileImporter 选择图片后调用 server image extraction contract 生成 timeline 项。左上角 icon 打开左侧 sidebar，当前只保留用户名和语言切换；首次启动自动写入识别出的中 / 英语言，后续只在 English / 中文之间切换。视觉方向使用系统字体、SwiftUI sheet、Liquid Glass 风格按钮 / 玻璃卡片和轻量动画。
-- `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、图片 AI 提取边界、Postgres schema 初始化和 SeedX daemon websocket 控制面。
+- `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 home-only mobile skeleton：首页默认不填假 timeline，摄入能量、蛋白质、训练、步行、久坐、睡眠等今日总览从真实上传记录派生；timeline 为空时显示真实空态。底部使用 iOS 26 原生 `TabView` Liquid Glass tab bar：左侧 Today / 我的为普通 tab 组，右侧 Add 使用 `TabRole.search` 分离成独立圆形 action，中间空档和选中 glass 高亮交给系统处理。Add 只打开上拉上传 sheet 并回到上一个内容 tab；真实 PhotosPicker / fileImporter 选择图片后调用 server image extraction contract 生成 timeline 项。底部“我的”进入 My 页，当前只保留语言切换；首次启动自动写入识别出的中 / 英语言，后续可在 English / 简体中文 / 繁體中文之间切换。视觉方向使用系统字体、SwiftUI sheet、Liquid Glass 风格按钮 / 玻璃卡片和轻量动画。
+- `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、图片上传落盘、SeedX/Codex 图片提取、Postgres schema 初始化和 SeedX daemon websocket 控制面。
 - `infra/amoylab/`：amoylab server 部署模板，包含 Docker Compose 和环境变量示例；真实部署目录是 `amoylab:/opt/nomi`。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。
 - `docs/exec-plans/completed/`：已完成的跨 milestone 执行计划。
@@ -28,12 +28,12 @@ MVP 目标拓扑：
 3. `seedx daemon connect` 在用户设备启动后主动连接 Go server 的 websocket 地址。
 4. Go server 通过 SeedX daemon 协议发送 `daemon:ping` / 后续 `daemon:command`，SeedX 返回 `daemon:pong` / `daemon:result`。
 
-当前原生 iOS app 首页 timeline 启动时通过 `GET /records` 加载服务端已保存记录，初始状态不注入假数据；上传 sheet 通过 PhotosPicker / fileImporter 选择图片，上传时把 image data base64、来源和 MIME type 发送到 `POST /ai/extract-image`，再把 extraction title、input category、confidence 和 metadata 通过 `POST /records` 持久化，同时插入本地 timeline。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`、`POST /ai/extract-image`，并在启动时初始化 Postgres records schema。图片提取 schema 覆盖 input category（food、beverage、caffeine、alcohol、nicotine、information、exercise、sunlight、social）、output impacts（energy、mood、sleep、recovery、focus、health）和 kcal、protein、fat、carbs、fiber、water、caffeine、nicotine、duration 等 metadata；当前实现是服务端 deterministic 边界，后续接真实模型时保持该 contract。SeedX 连接使用 `GET /daemon/connect`，同时保留旧的 `GET /seedx/ws` 兼容本地 smoke；daemon API key 通过 `Authorization: Bearer ...` WebSocket 握手 header 传递。
+当前原生 iOS app 首页 timeline 启动时通过 `GET /records` 加载服务端已保存记录，初始状态不注入假数据；上传 sheet 通过 PhotosPicker / fileImporter 选择图片，上传时把 image data base64、来源和 MIME type 发送到 `POST /ai/extract-image`。Go server 先把图片写入 `NOMI_IMAGE_STORAGE_DIR`，再通过已连接的 SeedX daemon 发送 `daemon:command` / `method:"smoke"`，让本机 Codex 按图片本地路径和严格 JSON prompt 生成 extraction；server 解析结果后把 title、input category、confidence、image URI 和 metadata 写入 `records`，再把带 `record_id` 的 extraction 返回给 iOS，同时插入本地 timeline。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`、`POST /ai/extract-image`，并在启动时初始化 Postgres records schema。图片提取 schema 覆盖 input category（food、beverage、caffeine、alcohol、nicotine、information、exercise、sunlight、social）、output impacts（energy、mood、sleep、recovery、focus、health）和 kcal、protein、fat、carbs、fiber、water、caffeine、nicotine、duration 等 metadata。SeedX 连接使用 `GET /daemon/connect`，同时保留旧的 `GET /seedx/ws` 兼容本地 smoke；daemon API key 通过 `Authorization: Bearer ...` WebSocket 握手 header 传递。
 
 ## 边界
 
 - Mobile app 负责低 effort capture 和记录回看；趋势、Ask、隐私 / 导出等入口等到产品信息架构明确后再放回主界面。
-- Server 负责数据持久化、API boundary、websocket session 管理和审计友好的日志。
+- Server 负责图片落盘、AI extraction 调度、数据持久化、API boundary、websocket session 管理和审计友好的日志。
 - SeedX 负责本机 daemon 连接、事件转发、重连、runtime capability 和本机日志；Nomi 不维护重复 daemon。
 - AI 能力只做记录整理、趋势回顾和有来源的回答，不做诊断、治疗、药物或急症判断。
 
@@ -45,7 +45,7 @@ MVP 目标拓扑：
 - Native iOS TestFlight release：`docs/IOS_TESTFLIGHT_RELEASE.md` 记录 `com.ifuryst.nomi` / team `J9P29FA5BX` / App Store Connect App ID `6767420142` 的手动 archive 和 upload 流程。
 - Server tests：`cd apps/server && go test ./...`
 - Server local run：`cd apps/server && NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088`
-- SeedX daemon websocket smoke：先启动 server，再运行 `seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once`
+- SeedX daemon local run：先启动 server，再运行 `seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key`；`--once` 只验证 hello，不会处理图片分析 command。
 - 文档检查：`make check-docs`
 - Server tag release：递增 `server-v*` tag 并 push，触发 GHCR 镜像构建和 amoylab 部署；详见 `docs/DEPLOYMENT.md`。
 

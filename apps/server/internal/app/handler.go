@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -18,17 +20,55 @@ type Store interface {
 }
 
 type Handler struct {
-	store       Store
-	logger      *zap.Logger
-	seedXAPIKey string
+	store         Store
+	logger        *zap.Logger
+	seedXAPIKey   string
+	seedX         *SeedXController
+	imageStore    *FileImageStore
+	imageAnalyzer ImageAnalyzer
 }
 
-func NewHandler(store Store, logger *zap.Logger, seedXAPIKey string) *Handler {
-	return &Handler{
+type HandlerOption func(*Handler)
+
+func WithImageStorageDir(dir string) HandlerOption {
+	return func(h *Handler) {
+		h.imageStore = NewFileImageStore(dir)
+	}
+}
+
+func WithImageAnalyzer(analyzer ImageAnalyzer) HandlerOption {
+	return func(h *Handler) {
+		h.imageAnalyzer = analyzer
+	}
+}
+
+func WithSeedXAnalyzerOptions(options SeedXImageAnalyzerOptions) HandlerOption {
+	return func(h *Handler) {
+		h.imageAnalyzer = NewSeedXImageAnalyzer(h.seedX, options)
+	}
+}
+
+func NewHandler(store Store, logger *zap.Logger, seedXAPIKey string, options ...HandlerOption) *Handler {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	controller := NewSeedXController(logger)
+	h := &Handler{
 		store:       store,
 		logger:      logger,
 		seedXAPIKey: seedXAPIKey,
+		seedX:       controller,
+		imageStore:  NewFileImageStore(defaultImageStorageDir()),
 	}
+	for _, option := range options {
+		option(h)
+	}
+	if h.imageAnalyzer == nil {
+		h.imageAnalyzer = NewSeedXImageAnalyzer(h.seedX, SeedXImageAnalyzerOptions{
+			CWD: defaultCodexCWD(),
+		})
+	}
+	return h
 }
 
 func (h *Handler) Routes() http.Handler {
@@ -92,6 +132,8 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) extractImage(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxImageRequestBodyBytes)
+
 	var input ImageExtractionRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json")
@@ -103,7 +145,37 @@ func (h *Handler) extractImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	extraction := BuildImageExtraction(input)
+	storedImage, err := h.imageStore.Save(r.Context(), input)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, ErrImageTooLarge) {
+			status = http.StatusRequestEntityTooLarge
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+
+	extraction, err := h.imageAnalyzer.AnalyzeImage(r.Context(), storedImage)
+	if err != nil {
+		h.logger.Warn(
+			"image analysis failed",
+			zap.String("asset_name", input.AssetName),
+			zap.String("source", input.Source),
+			zap.Error(err),
+		)
+		writeError(w, http.StatusServiceUnavailable, "image_analysis_unavailable")
+		return
+	}
+	extraction.ImageURI = storedImage.URI
+
+	record, err := h.persistImageExtraction(r.Context(), extraction, storedImage)
+	if err != nil {
+		h.logger.Error("persist image extraction failed", zap.Error(err))
+		writeError(w, http.StatusInternalServerError, "record_create_failed")
+		return
+	}
+	extraction.RecordID = record.ID
+
 	h.logger.Info(
 		"image extraction completed",
 		zap.String("asset_name", input.AssetName),
@@ -112,6 +184,24 @@ func (h *Handler) extractImage(w http.ResponseWriter, r *http.Request) {
 		zap.Float64("confidence", extraction.Confidence),
 	)
 	writeJSON(w, http.StatusOK, extraction)
+}
+
+func (h *Handler) persistImageExtraction(ctx context.Context, extraction ImageExtraction, image StoredImage) (Record, error) {
+	if h.store == nil {
+		return Record{}, errors.New("record_store_unavailable")
+	}
+
+	confidence := extraction.Confidence
+	return h.store.CreateRecord(ctx, CreateRecordInput{
+		Type:       recordTypeForInputCategory(extraction.InputCategory),
+		Source:     image.Source,
+		Title:      extraction.Title,
+		Summary:    extractionSummary(extraction),
+		RawText:    extraction.Summary,
+		ImageURI:   image.URI,
+		Metadata:   extractionRecordMetadata(extraction, image),
+		Confidence: &confidence,
+	})
 }
 
 func (h *Handler) ask(w http.ResponseWriter, r *http.Request) {
@@ -217,4 +307,19 @@ func HasMedicalIntent(question string) bool {
 	}
 
 	return false
+}
+
+func defaultImageStorageDir() string {
+	if value := os.Getenv("NOMI_IMAGE_STORAGE_DIR"); value != "" {
+		return value
+	}
+	return ".nomi/uploads"
+}
+
+func defaultCodexCWD() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "."
+	}
+	return cwd
 }

@@ -8,7 +8,11 @@ enum NomiAPI {
             return url
         }
 
+#if DEBUG
+        return URL(string: "http://127.0.0.1:8088")!
+#else
         return URL(string: "https://nomi.ifuryst.com")!
+#endif
     }()
 
     static func url(path: String) -> URL {

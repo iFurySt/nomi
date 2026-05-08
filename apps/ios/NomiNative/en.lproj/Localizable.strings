@@ -1,9 +1,11 @@
 "accessibility.close" = "Close";
-"accessibility.sidebar" = "Menu";
 "accessibility.upload" = "Upload";
 "home.timeline" = "Timeline";
 "language.chinese.simplified" = "中文";
+"language.chinese.traditional" = "Traditional Chinese";
+"language.current" = "Current language";
 "language.english" = "English";
+"me.section.mine" = "Mine";
 "metric.calories" = "Calories";
 "metric.calories.left %lld" = "%lld left";
 "metric.protein" = "Protein";
@@ -15,7 +17,7 @@
 "metric.walk" = "Walk";
 "nav.add" = "Add";
 "settings.language" = "Language";
-"sidebar.username" = "Leo";
+"tab.me" = "Me";
 "tab.today" = "Today";
 "today.item.count.many %lld" = "%lld items";
 "today.item.count.one" = "1 item";

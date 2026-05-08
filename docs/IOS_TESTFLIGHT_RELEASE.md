@@ -53,7 +53,7 @@ curl --noproxy '*' -fsS https://nomi.ifuryst.com/records
 
 ```text
 MARKETING_VERSION = 0.1
-CURRENT_PROJECT_VERSION = 1
+CURRENT_PROJECT_VERSION = 2
 ```
 
 3. 先跑本地验证。
