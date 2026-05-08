@@ -69,10 +69,12 @@ final class NomiNativeUploadFlowUITests: XCTestCase {
 
         app.buttons.matching(identifier: "bottom-me").firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "my-view").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        saveScreenshot(named: "nomi-native-gray-my-2026-05-08.png")
 
         app.buttons.matching(identifier: "my-language-row").firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "language-sheet").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(app.buttons.matching(identifier: "language-english").firstMatch.waitForExistence(timeout: 2), app.debugDescription)
+        saveScreenshot(named: "nomi-native-gray-language-sheet-2026-05-08.png")
     }
 
     func testMyLanguageSheetSwitchesBetweenChineseAndEnglish() throws {
@@ -85,14 +87,14 @@ final class NomiNativeUploadFlowUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "my-view").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         app.buttons.matching(identifier: "my-language-row").firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "language-sheet").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["Language"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Current language"].waitForExistence(timeout: 2))
 
         app.buttons.matching(identifier: "language-simplifiedChinese").firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["语言"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["当前语言"].waitForExistence(timeout: 2))
         saveScreenshot(named: "nomi-native-my-language-zh-2026-05-08.png")
 
         app.buttons.matching(identifier: "language-english").firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Language"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Current language"].waitForExistence(timeout: 2))
     }
 
     private func selectFirstPhoto() {

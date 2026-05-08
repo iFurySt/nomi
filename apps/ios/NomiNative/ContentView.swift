@@ -46,11 +46,19 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
-    var titleKey: LocalizedStringKey {
+    var displayName: String {
         switch self {
-        case .english: "language.english"
-        case .simplifiedChinese: "language.chinese.simplified"
-        case .traditionalChinese: "language.chinese.traditional"
+        case .english: "English"
+        case .simplifiedChinese: "简体中文"
+        case .traditionalChinese: "繁體中文"
+        }
+    }
+
+    var currentLanguageTitle: String {
+        switch self {
+        case .english: "Current language"
+        case .simplifiedChinese: "当前语言"
+        case .traditionalChinese: "目前語言"
         }
     }
 }
@@ -205,25 +213,33 @@ struct E2EUploadItem: Decodable {
 }
 
 private enum NomiRadii {
-    static let sheet: CGFloat = 32
     static let panel: CGFloat = 28
     static let card: CGFloat = 18
     static let tile: CGFloat = 16
 }
 
+private enum NomiType {
+    static let pageTitle: Font = .system(.title, design: .default, weight: .semibold)
+    static let sectionTitle: Font = .system(.title3, design: .default, weight: .regular)
+    static let cardTitle: Font = .system(.headline, design: .default, weight: .semibold)
+    static let body: Font = .system(.body, design: .default, weight: .regular)
+    static let bodyEmphasis: Font = .system(.body, design: .default, weight: .semibold)
+    static let value: Font = .system(.title3, design: .default, weight: .semibold)
+    static let caption: Font = .system(.caption, design: .default, weight: .medium)
+    static let captionStrong: Font = .system(.caption, design: .default, weight: .semibold)
+}
+
 private enum NomiPalette {
-    static let paper = Color(red: 0.98, green: 0.96, blue: 0.91)
-    static let surface = Color(red: 1.0, green: 0.98, blue: 0.94)
-    static let surfaceLift = Color(red: 1.0, green: 0.99, blue: 0.96)
-    static let ink = Color(red: 0.22, green: 0.18, blue: 0.15)
-    static let muted = Color(red: 0.45, green: 0.40, blue: 0.35)
-    static let clay = Color(red: 0.70, green: 0.39, blue: 0.31)
-    static let cocoa = Color(red: 0.42, green: 0.28, blue: 0.22)
-    static let sage = Color(red: 0.42, green: 0.52, blue: 0.39)
-    static let olive = Color(red: 0.38, green: 0.50, blue: 0.38)
-    static let blueGray = Color(red: 0.40, green: 0.45, blue: 0.55)
-    static let gold = Color(red: 0.77, green: 0.47, blue: 0.21)
-    static let hairline = Color.white.opacity(0.58)
+    static let paper = Color(uiColor: .systemGroupedBackground)
+    static let surface = Color(uiColor: .secondarySystemGroupedBackground)
+    static let surfaceLift = Color(uiColor: .systemBackground)
+    static let fill = Color(uiColor: .tertiarySystemFill)
+    static let ink = Color(uiColor: .label)
+    static let muted = Color(uiColor: .secondaryLabel)
+    static let quiet = Color(uiColor: .tertiaryLabel)
+    static let hairline = Color(uiColor: .separator).opacity(0.36)
+    static let shadow = Color.black
+    static let metric = Color(uiColor: .label).opacity(0.68)
 }
 
 private struct NomiContentSurfaceModifier<SurfaceShape: Shape>: ViewModifier {
@@ -243,7 +259,7 @@ private struct NomiContentSurfaceModifier<SurfaceShape: Shape>: ViewModifier {
                         shape.stroke(NomiPalette.hairline.opacity(strokeOpacity), lineWidth: 1)
                     }
                     .shadow(
-                        color: NomiPalette.cocoa.opacity(shadowOpacity),
+                        color: NomiPalette.shadow.opacity(shadowOpacity),
                         radius: shadowRadius,
                         y: shadowY
                     )
@@ -270,7 +286,7 @@ private struct NomiGlassSurfaceModifier<SurfaceShape: Shape>: ViewModifier {
                         in: shape
                     )
                     .shadow(
-                        color: NomiPalette.cocoa.opacity(shadowOpacity),
+                        color: NomiPalette.shadow.opacity(shadowOpacity),
                         radius: shadowRadius,
                         x: shadowX,
                         y: shadowY
@@ -419,13 +435,11 @@ struct ContentView: View {
                 }
             }
             .presentationDetents([.fraction(0.72)])
-            .presentationCornerRadius(NomiRadii.sheet)
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showLanguageSheet) {
             LanguageSelectionSheet()
                 .presentationDetents([.fraction(0.46)])
-                .presentationCornerRadius(NomiRadii.sheet)
                 .presentationDragIndicator(.visible)
         }
         .task {
@@ -538,38 +552,6 @@ struct ContentView: View {
     }
 }
 
-struct LiquidCircleButtonStyle: ButtonStyle {
-    let visualSize: CGFloat
-    let touchSize: CGFloat
-    let glassTint: Color
-    let shadowOpacity: Double
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .frame(width: visualSize, height: visualSize)
-            .background {
-                Circle()
-                    .fill(NomiPalette.surface.opacity(configuration.isPressed ? 0.72 : 0.58))
-                    .glassEffect(
-                        .regular
-                            .tint(glassTint.opacity(configuration.isPressed ? 0.18 : 0.08))
-                            .interactive(),
-                        in: .circle
-                    )
-                    .shadow(
-                        color: NomiPalette.cocoa.opacity(configuration.isPressed ? shadowOpacity * 0.5 : shadowOpacity),
-                        radius: configuration.isPressed ? 9 : 16,
-                        y: configuration.isPressed ? 4 : 10
-                    )
-            }
-            .scaleEffect(configuration.isPressed ? 0.93 : 1)
-            .animation(.interactiveSpring(duration: 0.18, extraBounce: 0.12), value: configuration.isPressed)
-            .frame(width: touchSize, height: touchSize)
-            .contentShape(Circle())
-            .glassEffectTransition(.materialize)
-    }
-}
-
 struct MyView: View {
     let onLanguage: () -> Void
 
@@ -603,18 +585,21 @@ struct MyView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.title2.weight(.regular))
+                .font(NomiType.sectionTitle)
                 .foregroundStyle(NomiPalette.muted)
 
             VStack(spacing: 0) {
                 content()
             }
-            .background(NomiPalette.surfaceLift.opacity(0.76), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(
+                NomiPalette.surfaceLift.opacity(0.92),
+                in: ConcentricRectangle(corners: .concentric(minimum: .fixed(NomiRadii.panel)), isUniform: true)
+            )
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(.white.opacity(0.72), lineWidth: 1)
+                ConcentricRectangle(corners: .concentric(minimum: .fixed(NomiRadii.panel)), isUniform: true)
+                    .stroke(NomiPalette.hairline, lineWidth: 1)
             }
-            .shadow(color: NomiPalette.cocoa.opacity(0.06), radius: 18, y: 10)
+            .shadow(color: NomiPalette.shadow.opacity(0.045), radius: 18, y: 10)
         }
     }
 }
@@ -631,18 +616,18 @@ struct MySettingsRow: View {
         } label: {
             HStack(spacing: 20) {
                 Image(systemName: symbol)
-                    .font(.system(size: 24, weight: .regular))
+                    .font(.system(.title2, design: .default, weight: .regular))
                     .foregroundStyle(NomiPalette.ink.opacity(0.78))
                     .frame(width: 42, height: 54)
 
                 Text(titleKey)
-                    .font(.title3.weight(.regular))
+                    .font(NomiType.body)
                     .foregroundStyle(NomiPalette.muted)
 
                 Spacer(minLength: 0)
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(.callout, design: .default, weight: .medium))
                     .foregroundStyle(NomiPalette.muted.opacity(0.86))
             }
             .frame(height: 58)
@@ -652,13 +637,6 @@ struct MySettingsRow: View {
         .buttonStyle(.plain)
         .disabled(action == nil)
         .accessibilityIdentifier(accessibilityIdentifier ?? "")
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(NomiPalette.cocoa.opacity(0.08))
-                .frame(height: 1)
-                .padding(.leading, 84)
-                .opacity(0.9)
-        }
     }
 }
 
@@ -671,8 +649,8 @@ struct LanguageSelectionSheet: View {
 
     var body: some View {
         VStack(spacing: 22) {
-            Text("language.current")
-                .font(.title3.weight(.medium))
+            Text(selectedLanguage.currentLanguageTitle)
+                .font(NomiType.bodyEmphasis)
                 .foregroundStyle(NomiPalette.muted)
                 .padding(.top, 34)
                 .accessibilityIdentifier("language-sheet")
@@ -686,18 +664,21 @@ struct LanguageSelectionSheet: View {
                         }
                     } label: {
                         HStack {
-                            Text(language.titleKey)
-                                .font(.title3.weight(.regular))
+                            Text(language.displayName)
+                                .font(NomiType.body)
                             Spacer(minLength: 0)
                             if selectedLanguage == language {
                                 Image(systemName: "checkmark")
-                                    .font(.system(size: 21, weight: .semibold))
+                                    .font(.system(.title3, design: .default, weight: .semibold))
                             }
                         }
                         .foregroundStyle(NomiPalette.ink.opacity(0.84))
                         .padding(.horizontal, 22)
                         .frame(height: 58)
-                        .background(NomiPalette.cocoa.opacity(0.055), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(
+                            NomiPalette.fill.opacity(selectedLanguage == language ? 0.78 : 0.52),
+                            in: ConcentricRectangle(corners: .concentric(minimum: .fixed(NomiRadii.card)), isUniform: true)
+                        )
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("language-\(language.rawValue)")
@@ -707,7 +688,6 @@ struct LanguageSelectionSheet: View {
 
             Spacer(minLength: 0)
         }
-        .background(NomiPalette.surfaceLift.opacity(0.92))
     }
 }
 
@@ -733,10 +713,10 @@ struct HomeView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(alignment: .firstTextBaseline) {
                                 Text("home.timeline")
-                                    .font(.title2.weight(.semibold))
+                                    .font(NomiType.sectionTitle.weight(.semibold))
                                 Spacer()
                                 Text("\(items.count)")
-                                    .font(.subheadline)
+                                    .font(.subheadline.weight(.medium))
                                     .foregroundStyle(.secondary)
                                     .contentTransition(.numericText())
                             }
@@ -782,7 +762,7 @@ struct OverviewCard: View {
                 value: "\(calories)",
                 detailKey: "metric.calories.left \(max(0, 2200 - calories))",
                 symbol: "flame.fill",
-                tint: NomiPalette.gold,
+                tint: NomiPalette.metric,
                 progress: items.isEmpty ? 0 : min(Double(calories) / 2200, 1)
             ),
             DailyMetric(
@@ -791,7 +771,7 @@ struct OverviewCard: View {
                 value: "\(protein)g",
                 detailKey: "metric.protein.target",
                 symbol: "circle.hexagongrid.fill",
-                tint: NomiPalette.olive,
+                tint: NomiPalette.metric,
                 progress: min(Double(protein) / 120, 1)
             ),
             DailyMetric(
@@ -800,7 +780,7 @@ struct OverviewCard: View {
                 value: "\(strength)m",
                 detailKey: "metric.today",
                 symbol: "dumbbell.fill",
-                tint: NomiPalette.blueGray,
+                tint: NomiPalette.metric,
                 progress: nil
             ),
             DailyMetric(
@@ -809,7 +789,7 @@ struct OverviewCard: View {
                 value: "\(walk)m",
                 detailKey: "metric.today",
                 symbol: "figure.walk",
-                tint: NomiPalette.sage,
+                tint: NomiPalette.metric,
                 progress: nil
             ),
             DailyMetric(
@@ -818,7 +798,7 @@ struct OverviewCard: View {
                 value: "\(sitting)m",
                 detailKey: "metric.today",
                 symbol: "chair.fill",
-                tint: Color(red: 0.51, green: 0.48, blue: 0.42),
+                tint: NomiPalette.metric,
                 progress: nil
             ),
             DailyMetric(
@@ -827,7 +807,7 @@ struct OverviewCard: View {
                 value: "\(sleep)m",
                 detailKey: "metric.today",
                 symbol: "moon.fill",
-                tint: NomiPalette.blueGray,
+                tint: NomiPalette.metric,
                 progress: nil
             )
         ]
@@ -838,10 +818,10 @@ struct OverviewCard: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text("tab.today")
-                        .font(.subheadline.weight(.medium))
+                        .font(NomiType.caption)
                         .foregroundStyle(.secondary)
                     Text(items.count == 1 ? "today.item.count.one" : "today.item.count.many \(items.count)")
-                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                        .font(NomiType.value)
                         .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -853,8 +833,8 @@ struct OverviewCard: View {
                         .fill(NomiPalette.surfaceLift.opacity(0.72))
                         .frame(width: 50, height: 50)
                     Image(systemName: "heart.text.square.fill")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(NomiPalette.sage)
+                        .font(.system(.headline, design: .default, weight: .semibold))
+                        .foregroundStyle(NomiPalette.metric)
                 }
             }
 
@@ -886,13 +866,13 @@ struct MetricTile: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: metric.symbol)
-                    .font(.caption.weight(.bold))
+                    .font(NomiType.captionStrong)
                     .foregroundStyle(metric.tint)
                     .frame(width: 20, height: 20)
-                    .background(metric.tint.opacity(0.11), in: Circle())
+                    .background(NomiPalette.fill.opacity(0.55), in: Circle())
 
                 Text(metric.titleKey)
-                    .font(.caption.weight(.semibold))
+                    .font(NomiType.captionStrong)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -902,11 +882,11 @@ struct MetricTile: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(metric.value)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(NomiType.bodyEmphasis)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Text(metric.detailKey)
-                    .font(.caption2)
+                    .font(.caption2.weight(.regular))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -959,7 +939,7 @@ struct TimelineRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 11) {
             Text(item.time)
-                .font(.caption.weight(.medium))
+                .font(NomiType.caption)
                 .foregroundStyle(.secondary)
                 .frame(width: 48, alignment: .trailing)
                 .padding(.top, 28)
@@ -970,7 +950,7 @@ struct TimelineRow: View {
                     .frame(width: 1, height: (cardHeight - markerSize) / 2)
 
                 Circle()
-                    .strokeBorder(Color.white.opacity(0.86), lineWidth: 2)
+                    .strokeBorder(NomiPalette.surfaceLift.opacity(0.86), lineWidth: 2)
                     .background(Circle().fill(item.tint.opacity(0.68)))
                     .frame(width: markerSize, height: markerSize)
                     .scaleEffect(appeared ? 1 : 0.4)
@@ -994,7 +974,7 @@ struct TimelineRow: View {
                             .clipShape(Circle())
                     } else {
                         Image(systemName: item.symbol)
-                            .font(.caption.weight(.semibold))
+                            .font(NomiType.captionStrong)
                             .foregroundStyle(item.tint)
                             .symbolEffect(.bounce, value: appeared)
                     }
@@ -1003,14 +983,14 @@ struct TimelineRow: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.subtitle)
-                        .font(.caption)
+                        .font(.caption.weight(.regular))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Text(item.title)
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                     Text(item.detail)
-                        .font(.caption.weight(.medium))
+                        .font(NomiType.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -1019,11 +999,11 @@ struct TimelineRow: View {
 
                 if let badge = item.badge {
                     Text(badge)
-                        .font(.caption.weight(.medium))
+                        .font(NomiType.caption)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 5)
                         .padding(.horizontal, 8)
-                        .background(.white.opacity(0.46), in: Capsule())
+                        .background(NomiPalette.fill.opacity(0.58), in: Capsule())
                 }
             }
             .padding(.vertical, 10)
@@ -1071,7 +1051,7 @@ struct UploadSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("nav.add")
-                .font(.system(size: 30, weight: .semibold, design: .rounded))
+                .font(NomiType.pageTitle)
 
             sourcePicker
 
@@ -1092,7 +1072,7 @@ struct UploadSheet: View {
                             .controlSize(.small)
                     }
                     Text(isUploading ? "upload.analyzing" : importedImage == nil ? "upload.choose" : "upload.upload")
-                        .font(.headline)
+                        .font(NomiType.bodyEmphasis)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
@@ -1107,26 +1087,21 @@ struct UploadSheet: View {
         .padding(.top, 64)
         .padding(.bottom, 24)
         .overlay(alignment: .topTrailing) {
-            Button {
+            Button(role: .close) {
                 dismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(NomiPalette.ink.opacity(0.72))
+                    .font(.system(.headline, design: .default, weight: .medium))
             }
-            .buttonStyle(
-                LiquidCircleButtonStyle(
-                    visualSize: 46,
-                    touchSize: 54,
-                    glassTint: NomiPalette.surface,
-                    shadowOpacity: 0.06
-                )
-	            )
-	            .padding(.top, 52)
-	            .padding(.trailing, 24)
-	            .accessibilityLabel("accessibility.close")
-	            .accessibilityIdentifier("upload-close-button")
-	        }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .tint(NomiPalette.ink.opacity(0.72))
+            .frame(width: 52, height: 52)
+            .padding(.top, 52)
+            .padding(.trailing, 24)
+            .accessibilityLabel("accessibility.close")
+            .accessibilityIdentifier("upload-close-button")
+        }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhoto, matching: .images)
         .fileImporter(
             isPresented: $showFileImporter,
@@ -1153,10 +1128,10 @@ struct UploadSheet: View {
                 } label: {
                     VStack(spacing: 9) {
                         Image(systemName: source.symbol)
-                            .font(.system(size: 22, weight: .semibold))
+                            .font(.system(.title3, design: .default, weight: .semibold))
                             .symbolEffect(.bounce, value: selectedSource)
                         Text(source.titleKey)
-                            .font(.caption.weight(.semibold))
+                            .font(NomiType.captionStrong)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 76)
@@ -1177,16 +1152,16 @@ struct UploadSheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(selectedSource.copyKey)
-                        .font(.headline)
+                        .font(NomiType.cardTitle)
                     Text(cameraMessage ?? importedName)
-                        .font(.subheadline)
+                        .font(.subheadline.weight(.regular))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 Spacer()
                 Image(systemName: importedImage == nil ? "plus.viewfinder" : "checkmark.circle.fill")
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(importedImage == nil ? Color.secondary : NomiPalette.sage)
+                    .foregroundStyle(importedImage == nil ? Color.secondary : NomiPalette.metric)
                     .contentTransition(.symbolEffect(.replace))
             }
 
@@ -1202,10 +1177,10 @@ struct UploadSheet: View {
                 } else {
                     VStack(spacing: 10) {
                         Image(systemName: selectedSource.symbol)
-                            .font(.system(size: 36, weight: .semibold))
+                            .font(.system(.largeTitle, design: .default, weight: .semibold))
                             .foregroundStyle(.secondary)
                         Text("upload.tap.to.choose")
-                            .font(.subheadline)
+                            .font(.subheadline.weight(.regular))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -1216,7 +1191,7 @@ struct UploadSheet: View {
                             .progressViewStyle(.linear)
                             .tint(NomiPalette.ink)
                         Text("upload.analyzing")
-                            .font(.caption.weight(.medium))
+                            .font(NomiType.caption)
                             .foregroundStyle(.secondary)
                     }
                     .padding(18)
@@ -1235,22 +1210,22 @@ struct UploadSheet: View {
                 VStack(alignment: .leading, spacing: 9) {
                     HStack {
                         Text(extraction.title)
-                            .font(.headline)
+                            .font(NomiType.cardTitle)
                         Spacer()
                         Text("\(Int((extraction.confidence * 100).rounded()))%")
-                            .font(.caption.weight(.bold))
+                            .font(NomiType.captionStrong)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 5)
-                            .background(.white.opacity(0.58), in: Capsule())
+                            .background(NomiPalette.fill.opacity(0.58), in: Capsule())
                     }
 
                     Text(extraction.metadataLine)
-                        .font(.caption.weight(.medium))
+                        .font(NomiType.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
 
                     Text(extraction.outputImpacts.joined(separator: " / "))
-                        .font(.caption.weight(.medium))
+                        .font(NomiType.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -1573,13 +1548,14 @@ extension ImageExtraction {
 
     var tint: Color {
         switch inputCategory {
-        case "caffeine": Color(red: 0.50, green: 0.42, blue: 0.35)
-        case "beverage", "sunlight": Color(red: 0.40, green: 0.52, blue: 0.56)
-        case "exercise": Color(red: 0.40, green: 0.45, blue: 0.55)
-        case "information": Color(red: 0.50, green: 0.48, blue: 0.42)
-        case "nicotine": Color(red: 0.48, green: 0.46, blue: 0.50)
-        case "social": Color(red: 0.55, green: 0.42, blue: 0.46)
-        default: Color(red: 0.42, green: 0.52, blue: 0.39)
+        case "caffeine", "beverage", "sunlight":
+            Color(uiColor: .label).opacity(0.62)
+        case "exercise", "information", "social":
+            Color(uiColor: .label).opacity(0.70)
+        case "alcohol", "nicotine":
+            Color(uiColor: .secondaryLabel).opacity(0.84)
+        default:
+            Color(uiColor: .label).opacity(0.66)
         }
     }
 
@@ -1598,21 +1574,11 @@ struct NomiBackground: View {
     var ignoresSafeArea = true
 
     var body: some View {
-        let gradient = LinearGradient(
-            colors: [
-                Color(red: 0.98, green: 0.97, blue: 0.94),
-                Color(red: 0.91, green: 0.95, blue: 0.97),
-                Color(red: 0.97, green: 0.94, blue: 0.92)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-
         if ignoresSafeArea {
-            gradient
+            NomiPalette.paper
                 .ignoresSafeArea()
         } else {
-            gradient
+            NomiPalette.paper
         }
     }
 }

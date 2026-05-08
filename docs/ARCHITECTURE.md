@@ -4,7 +4,7 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 
 ## 当前仓库结构
 
-- `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 home-only mobile skeleton：首页默认不填假 timeline，摄入能量、蛋白质、训练、步行、久坐、睡眠等今日总览从真实上传记录派生；timeline 为空时显示真实空态。底部使用 iOS 26 原生 `TabView` Liquid Glass tab bar：左侧 Today / 我的为普通 tab 组，右侧 Add 使用 `TabRole.search` 分离成独立圆形 action，中间空档和选中 glass 高亮交给系统处理。Add 只打开上拉上传 sheet 并回到上一个内容 tab；真实 PhotosPicker / fileImporter 选择图片后调用 server image extraction contract 生成 timeline 项。底部“我的”进入 My 页，当前只保留语言切换；首次启动自动写入识别出的中 / 英语言，后续可在 English / 简体中文 / 繁體中文之间切换。视觉方向使用系统字体、SwiftUI sheet、Liquid Glass 风格按钮 / 玻璃卡片和轻量动画。
+- `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 home-only mobile skeleton：首页默认不填假 timeline，摄入能量、蛋白质、训练、步行、久坐、睡眠等今日总览从真实上传记录派生；timeline 为空时显示真实空态。底部使用 iOS 26 原生 `TabView` Liquid Glass tab bar：左侧 Today / 我的为普通 tab 组，右侧 Add 使用 `TabRole.search` 分离成独立圆形 action，中间空档和选中 glass 高亮交给系统处理。Add 只打开上拉上传 sheet 并回到上一个内容 tab；真实 PhotosPicker / fileImporter 选择图片后调用 server image extraction contract 生成 timeline 项。底部“我的”进入 My 页，当前只保留语言切换；首次启动自动写入识别出的中 / 英语言，后续可在 English / 简体中文 / 繁體中文之间切换。视觉方向使用系统黑白灰语义色、系统字体 / Dynamic Type、SwiftUI 系统 sheet 外层圆角、Liquid Glass 风格按钮 / 玻璃卡片和轻量动画。
 - `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、图片上传落盘、SeedX/Codex 图片提取、Postgres schema 初始化和 SeedX daemon websocket 控制面。
 - `infra/amoylab/`：amoylab server 部署模板，包含 Docker Compose 和环境变量示例；真实部署目录是 `amoylab:/opt/nomi`。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。

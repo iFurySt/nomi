@@ -47,22 +47,22 @@ curl --noproxy '*' -fsS https://nomi.ifuryst.com/health
 curl --noproxy '*' -fsS https://nomi.ifuryst.com/records
 ```
 
-2. 更新 iOS build number。
+1. 更新 iOS build number。
 
 每次上传 App Store Connect 的 `CURRENT_PROJECT_VERSION` 必须递增；`MARKETING_VERSION` 只在对外版本号变化时递增。当前项目使用：
 
 ```text
 MARKETING_VERSION = 0.1
-CURRENT_PROJECT_VERSION = 2
+CURRENT_PROJECT_VERSION = 3
 ```
 
-3. 先跑本地验证。
+1. 先跑本地验证。
 
 ```sh
 xcodebuild -project apps/ios/NomiNative.xcodeproj -scheme Nomi -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 ```
 
-4. Archive。
+1. Archive。
 
 ```sh
 rm -rf build/Nomi-TestFlight.xcarchive build/Nomi-TestFlight-export build/Nomi-TestFlight-upload
@@ -77,7 +77,7 @@ xcodebuild \
   clean archive
 ```
 
-5. 准备 export options。
+1. 准备 export options。
 
 ```sh
 rm -f /tmp/NomiUploadOptions.plist
@@ -90,7 +90,7 @@ rm -f /tmp/NomiUploadOptions.plist
   /tmp/NomiUploadOptions.plist
 ```
 
-6. 上传到 App Store Connect。
+1. 上传到 App Store Connect。
 
 ```sh
 xcodebuild \
@@ -108,7 +108,7 @@ Uploaded package is processing.
 Upload succeeded.
 ```
 
-7. 打开 App Store Connect TestFlight 页面，等待 processing 完成。
+1. 打开 App Store Connect TestFlight 页面，等待 processing 完成。
 
 ```text
 https://appstoreconnect.apple.com/apps/6767420142/testflight

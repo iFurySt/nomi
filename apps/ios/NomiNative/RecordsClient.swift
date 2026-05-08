@@ -213,12 +213,13 @@ private func symbolName(for inputCategory: String) -> String {
 
 private func tint(for inputCategory: String) -> Color {
     switch inputCategory {
-    case "caffeine": Color(red: 0.50, green: 0.42, blue: 0.35)
-    case "beverage", "sunlight": Color(red: 0.40, green: 0.52, blue: 0.56)
-    case "exercise": Color(red: 0.40, green: 0.45, blue: 0.55)
-    case "information", "document": Color(red: 0.50, green: 0.48, blue: 0.42)
-    case "nicotine": Color(red: 0.48, green: 0.46, blue: 0.50)
-    case "social": Color(red: 0.55, green: 0.42, blue: 0.46)
-    default: Color(red: 0.42, green: 0.52, blue: 0.39)
+    case "caffeine", "beverage", "sunlight":
+        Color(uiColor: .label).opacity(0.62)
+    case "exercise", "information", "document", "social":
+        Color(uiColor: .label).opacity(0.70)
+    case "alcohol", "nicotine":
+        Color(uiColor: .secondaryLabel).opacity(0.84)
+    default:
+        Color(uiColor: .label).opacity(0.66)
     }
 }
