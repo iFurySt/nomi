@@ -22,6 +22,7 @@
 - **Signing preflight**: Confirmed local Xcode account is a personal/free provisioning team and that the available `/Users/bytedance/Downloads` certificate files are Developer ID macOS signing assets rather than iOS App Store distribution assets.
 - **App Store signing**: After the paid Yifan PANG account was available in Xcode, configured the iOS app target for team `J9P29FA5BX` and bundle id `com.ifuryst.nomi`.
 - **TestFlight upload**: Created an App Store Connect-signed IPA and uploaded it to App Store Connect for processing.
+- **Release docs**: Added `docs/IOS_TESTFLIGHT_RELEASE.md` and linked it from `AGENTS.md`, `docs/CICD.md`, `docs/ARCHITECTURE.md`, and `docs/SECURITY.md`; local Apple-only material belongs under ignored `.harness/secret/apple/`.
 
 ### Verification
 
@@ -39,3 +40,5 @@
 The first Release archive could be produced locally only with the personal development team, and App Store Connect export was blocked because that team could not create iOS App Store provisioning profiles for `dev.nomi.native`.
 
 After the paid team was available, `com.ifuryst.nomi` archived and exported successfully with `Cloud Managed Apple Distribution`; the upload completed and App Store Connect reported that the package is processing.
+
+Follow-up documentation now records the repeatable manual TestFlight path, including build number handling, archive/upload commands, App Store Connect identifiers, and secret hygiene.

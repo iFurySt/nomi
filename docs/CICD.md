@@ -8,6 +8,7 @@
 - `supply-chain-security.yml`：在 PR 上做依赖变更检查，并在 PR、定时任务和手动触发时运行 OSV 扫描。
 - `release.yml`：手动触发的 release 流水线，用来打包仓库级制品、生成 provenance，并创建 GitHub Release。
 - `server-release.yml`：推送 `server-v*` tag 后构建 `apps/server` Docker 镜像，推送到 GHCR，并通过受限 SSH key 部署到 `amoylab:/opt/nomi`。
+- iOS TestFlight 目前不走 GitHub Actions，默认用本机 Xcode paid account、automatic signing 和 App Store Connect 手动上传；流程见 `docs/IOS_TESTFLIGHT_RELEASE.md`。
 
 ## 设计原则
 
@@ -23,7 +24,8 @@
 2. 在 `scripts/ci.sh` 里继续叠加项目自己的验证命令。
 3. 用真实构建产物替换 `scripts/release-package.sh`。
 4. Server 真实部署已接入 `server-release.yml`，后续 server 发版通过递增 `server-v*` tag 触发。
-5. 即使交付方式变化，SBOM 和 provenance 这类供应链能力也建议保留。
+5. iOS TestFlight 先保持本机手动发布；等需要自动化时，再把 App Store Connect API key、provisioning 和证书迁入专用 secret 管理，而不是复用本机 `.harness/secret`。
+6. 即使交付方式变化，SBOM 和 provenance 这类供应链能力也建议保留。
 
 ## Server 发版
 
@@ -48,3 +50,22 @@ git push origin server-vX.Y.Z
 - 对 release artifact 生成的 GitHub artifact attestation
 
 也就是说，即使项目还没进入真实部署阶段，这个模板也已经把“可追溯的制品封装”这一步准备好了。
+
+## iOS TestFlight
+
+iOS 发布的固定信息：
+
+- App Store Connect App ID：`6767420142`
+- Bundle ID：`com.ifuryst.nomi`
+- Apple Developer team：`J9P29FA5BX`
+- Scheme：`Nomi`
+
+后续用户提到发 TestFlight 时，默认执行：
+
+1. 确认 `https://nomi.ifuryst.com/health` 正常。
+2. 递增 `CURRENT_PROJECT_VERSION`。
+3. 跑 iOS Debug simulator build。
+4. 用 Release archive 上传 App Store Connect。
+5. 在 App Store Connect TestFlight 页面确认 build processing 完成。
+
+详细命令和常见错误见 `docs/IOS_TESTFLIGHT_RELEASE.md`。真实 Apple 密钥、`.p8`、`.p12` 和 provisioning profiles 不写入 git；如必须本机留存，放在 `.harness/secret/apple/`。

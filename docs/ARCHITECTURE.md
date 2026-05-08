@@ -40,8 +40,9 @@ MVP 目标拓扑：
 ## 本地验证入口
 
 - Native iOS build：`xcodebuild -project apps/ios/NomiNative.xcodeproj -scheme Nomi -configuration Debug -destination 'platform=iOS Simulator,id=<simulator-udid>' build`
-- Native iOS simulator run：`xcrun simctl install <simulator-udid> ~/Library/Developer/Xcode/DerivedData/NomiNative-*/Build/Products/Debug-iphonesimulator/Nomi.app && xcrun simctl launch --terminate-running-process <simulator-udid> dev.nomi.native`
+- Native iOS simulator run：`xcrun simctl install <simulator-udid> ~/Library/Developer/Xcode/DerivedData/NomiNative-*/Build/Products/Debug-iphonesimulator/Nomi.app && xcrun simctl launch --terminate-running-process <simulator-udid> com.ifuryst.nomi`
 - Native iOS upload UI test：`xcodebuild test -project apps/ios/NomiNative.xcodeproj -scheme Nomi -configuration Debug -destination 'platform=iOS Simulator,id=<simulator-udid>' -only-testing:NomiNativeUITests/NomiNativeUploadFlowUITests`
+- Native iOS TestFlight release：`docs/IOS_TESTFLIGHT_RELEASE.md` 记录 `com.ifuryst.nomi` / team `J9P29FA5BX` / App Store Connect App ID `6767420142` 的手动 archive 和 upload 流程。
 - Server tests：`cd apps/server && go test ./...`
 - Server local run：`cd apps/server && NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088`
 - SeedX daemon websocket smoke：先启动 server，再运行 `seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key --once`

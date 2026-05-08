@@ -14,7 +14,8 @@
 - 共享、staging、production 环境必须通过环境变量或密钥管理系统提供 `NOMI_DATABASE_URL`。
 - amoylab 的真实 `NOMI_DATABASE_URL`、数据库密码和 SeedX key 只允许存在于 `/opt/nomi/.env` 或密钥系统，不写入仓库。
 - SeedX daemon API key 通过 `NOMI_SEEDX_API_KEY` 或 `--seedx-api-key` 配置，真实 key 不得写入 README、history、日志或 URL。
-- 不要把真实数据库 URL、SeedX token、云端 websocket endpoint secret 写入仓库。
+- Apple Developer / App Store Connect 的真实 `.p8`、`.p12`、provisioning profile 和 app-specific password 不得写入仓库；如必须本机留存，只能放到已被 `.gitignore` 忽略的 `.harness/secret/apple/`。
+- 不要把真实数据库 URL、SeedX token、云端 websocket endpoint secret、Apple signing secret 写入仓库。
 
 ## AI 边界
 
