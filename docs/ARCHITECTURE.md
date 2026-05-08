@@ -4,7 +4,7 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 
 ## 当前仓库结构
 
-- `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 mobile skeleton：首页默认不填假 timeline，摄入能量、蛋白质、训练、步行、久坐、睡眠等今日总览从真实上传记录派生；timeline 为空时显示真实空态。底部是暖色小玻璃导航栏，中间 Add 上传项以普通导航项样式打开上拉上传 sheet，并在真实 PhotosPicker / fileImporter 选择图片后调用 server image extraction contract 生成 timeline 项。Trends / Log / Me 先作为占位 tab。视觉方向使用系统字体、SwiftUI sheet、Liquid Glass 风格按钮 / 玻璃卡片、轻量动画和可按住左右滑动的连续选中态流动。
+- `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 home-only mobile skeleton：首页默认不填假 timeline，摄入能量、蛋白质、训练、步行、久坐、睡眠等今日总览从真实上传记录派生；timeline 为空时显示真实空态。底部只有一个居中的 Add icon，打开上拉上传 sheet，并在真实 PhotosPicker / fileImporter 选择图片后调用 server image extraction contract 生成 timeline 项。左上角 icon 打开左侧 sidebar，当前只保留用户名和语言切换；首次启动自动写入识别出的中 / 英语言，后续只在 English / 中文之间切换。视觉方向使用系统字体、SwiftUI sheet、Liquid Glass 风格按钮 / 玻璃卡片和轻量动画。
 - `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、图片 AI 提取边界、Postgres schema 初始化和 SeedX daemon websocket 控制面。
 - `infra/amoylab/`：amoylab server 部署模板，包含 Docker Compose 和环境变量示例；真实部署目录是 `amoylab:/opt/nomi`。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。
@@ -32,7 +32,7 @@ MVP 目标拓扑：
 
 ## 边界
 
-- Mobile app 负责低 effort capture、记录回看、趋势展示、Ask 入口和隐私 / 导出入口。
+- Mobile app 负责低 effort capture 和记录回看；趋势、Ask、隐私 / 导出等入口等到产品信息架构明确后再放回主界面。
 - Server 负责数据持久化、API boundary、websocket session 管理和审计友好的日志。
 - SeedX 负责本机 daemon 连接、事件转发、重连、runtime capability 和本机日志；Nomi 不维护重复 daemon。
 - AI 能力只做记录整理、趋势回顾和有来源的回答，不做诊断、治疗、药物或急症判断。

@@ -17,6 +17,8 @@
 - Modality：https://developer.apple.com/design/human-interface-guidelines/modality
 - Layout：https://developer.apple.com/design/human-interface-guidelines/layout
 - Materials / Liquid Glass：https://developer.apple.com/design/human-interface-guidelines/materials
+- WWDC25 Meet Liquid Glass：https://developer.apple.com/videos/play/wwdc2025/219/
+- WWDC25 Build a SwiftUI app with the new design：https://developer.apple.com/videos/play/wwdc2025/323/
 - Motion：https://developer.apple.com/design/human-interface-guidelines/motion
 - Color：https://developer.apple.com/design/human-interface-guidelines/color
 - Typography：https://developer.apple.com/design/human-interface-guidelines/typography
@@ -29,8 +31,10 @@
 - `docs/design-docs/mobile-uiux-less-is-more/README.md`：less-is-more 方向总览。
 - `docs/design-docs/mobile-uiux-less-is-more/v3-earth-morandi/`：优先参考的视觉探索，保留暖色、大地色、莫兰迪色、轻 surface 和小众设计 App 气质。
 - `docs/design-docs/mobile-uiux-less-is-more/v2-consistent-system/`：一致性控制参考，尤其是 token、底部导航、卡片和多页统一导出方式。
+- `docs/generated/verification/nomi-native-home-single-add-warm-2026-05-07.png`：当前原生 iOS home-only + 单 Add icon 首页截图基准。
 - `docs/generated/verification/nomi-native-home-health-summary-2026-05-07.png`：当前原生 iOS 首页截图基准。
 - `docs/generated/verification/nomi-native-upload-sheet-spaced-2026-05-07.png`：当前原生 iOS 上传 sheet 截图基准。
+- `docs/generated/verification/nomi-native-home-sidebar-zh-2026-05-07.png`：当前原生 iOS 首页左侧 sidebar 与中文语言切换截图基准。
 
 ## Nomi UIUX 标准
 
@@ -38,8 +42,9 @@
 - 信息层级：首屏先给今天最重要的身体和生活记录，再给可继续记录的入口；不要让 chrome、装饰、解释文案压过数据和记录。
 - 首页：Today 总览覆盖摄入 / 卡路里、蛋白质、训练、步行、久坐、睡眠等数据；timeline 低装饰、可扫描、卡片有明确间距，时间轴圆点和卡片垂直中心对齐。
 - 上传：Capture / Add 是主动作，sheet 顶部保留足够安全区；Camera / Photos / Files 使用系统 picker 边界；选择多于输入。
-- 底部导航：保持较小暖色悬浮 glass bar；Add 是普通导航项，不是突兀特例；按住左右滑动时只预览高亮，松手才确认 tab 或打开 Add。
-- Log / Trends / Ask：Log 偏记录回看，Trends 偏温和复盘，Ask 必须有来源、有边界、不过度诊断。
+- 底部入口：当前只保留居中的 Add icon；在 Log / Trends / Me 没有真实内容前，不把空页面和解释文案放进主导航。
+- Sidebar：左上角圆形 Liquid Glass icon 打开左侧 sidebar；当前只保留用户名和语言切换行，语言只有 English / 中文 两个实际选项。sidebar 使用和首页一致的暖纸背景，不画显式边框线。
+- Log / Trends / Ask：这些入口回归前要有真实内容和明确边界；Ask 必须有来源、有边界、不过度诊断。
 
 ## Visual Tokens
 
@@ -84,9 +89,10 @@
 
 - 图标：原生 iOS 优先使用 SF Symbols；保持线性、轻量、一致 stroke。
 - 按钮：明确命令使用文字或 icon+text；工具按钮优先 icon，并保证可访问 label。
-- Tab / nav：active 状态用轻 glass pill / matched geometry 流动，不使用大黑胶囊、强阴影或突兀圆形 FAB。
+- Tab / nav：当前没有多 tab；若后续恢复，active 状态用轻 glass pill / matched geometry 流动，不使用大黑胶囊、强阴影或突兀圆形 FAB。
 - Sheet：优先系统 sheet，顶部留白充分，关闭按钮清晰，主动作靠底部但不遮挡内容。
-- 圆角：优先用系统 presentation / material 承担外层裁切；sheet 不再叠自绘背景顶到边框。Nomi 当前半径分层为 sheet `32`、大 panel `28`、timeline card `18`、metric tile `16`，新组件先复用语义层级，不单点随意调半径。
+- 圆角：优先用系统 presentation / material 承担外层裁切；iOS 26+ 新增外层浮层和 sidebar 优先用 `ConcentricRectangle` / `.concentric(minimum:)` 保持容器同心圆角，不再为每个新 surface 随手写固定 radius。Nomi 既有半径分层可作为 minimum 语义：sheet `32`、大 panel `28`、timeline card `18`、metric tile `16`。
+- Liquid Glass：自定义 glass 控件必须显式指定 shape；icon-only 主动作优先 `.glassEffect(..., in: .circle)`，避免默认 capsule。Toolbar item 如被系统共享背景包成胶囊，可用 `sharedBackgroundVisibility(.hidden)` 保留自定义圆形 glass。
 - Timeline：时间在左、rail 居中、卡片在右；圆点对齐卡片垂直中心，卡片间距稳定。
 - 指标卡：少量指标、明确单位、短文案；不要做复杂环形图、风险分或医疗解释。
 

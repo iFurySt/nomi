@@ -4,6 +4,47 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case english
+    case simplifiedChinese
+
+    static let storageKey = "nomi.languagePreference"
+
+    var id: String { rawValue }
+
+    static var detected: AppLanguage {
+        let preferred = Locale.preferredLanguages.first ?? Locale.autoupdatingCurrent.identifier
+        return preferred.lowercased().hasPrefix("zh") ? .simplifiedChinese : .english
+    }
+
+    static func value(for rawValue: String) -> AppLanguage {
+        switch rawValue {
+        case Self.english.rawValue:
+            .english
+        case Self.simplifiedChinese.rawValue:
+            .simplifiedChinese
+        default:
+            Self.detected
+        }
+    }
+
+    var resolvedLocale: Locale {
+        switch self {
+        case .english:
+            Locale(identifier: "en")
+        case .simplifiedChinese:
+            Locale(identifier: "zh-Hans")
+        }
+    }
+
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .english: "language.english"
+        case .simplifiedChinese: "language.chinese.simplified"
+        }
+    }
+}
+
 struct TimelineItem: Identifiable, Equatable {
     let id = UUID()
     let time: String
@@ -18,53 +59,19 @@ struct TimelineItem: Identifiable, Equatable {
 }
 
 struct DailyMetric: Identifiable {
-    var id: String { title }
-    let title: String
+    let id: String
+    let titleKey: LocalizedStringKey
     let value: String
-    let detail: String
+    let detailKey: LocalizedStringKey
     let symbol: String
     let tint: Color
     let progress: Double?
 }
 
-enum NomiTab: Int, CaseIterable {
-    case today = 0
-    case trends = 1
-    case log = 2
-    case profile = 3
-
-    var title: String {
-        switch self {
-        case .today: "Today"
-        case .trends: "Trends"
-        case .log: "Log"
-        case .profile: "Me"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .today: "house"
-        case .trends: "chart.line.uptrend.xyaxis"
-        case .log: "fork.knife"
-        case .profile: "person"
-        }
-    }
-
-    var selectedSymbol: String {
-        switch self {
-        case .today: "house.fill"
-        case .trends: "chart.line.uptrend.xyaxis"
-        case .log: "fork.knife"
-        case .profile: "person.fill"
-        }
-    }
-}
-
 enum UploadSource: String, CaseIterable, Identifiable {
-    case camera = "Camera"
-    case photos = "Photos"
-    case files = "Files"
+    case camera
+    case photos
+    case files
 
     var id: String { rawValue }
 
@@ -76,11 +83,19 @@ enum UploadSource: String, CaseIterable, Identifiable {
         }
     }
 
-    var copy: String {
+    var titleKey: LocalizedStringKey {
         switch self {
-        case .camera: "Camera"
-        case .photos: "Library"
-        case .files: "File"
+        case .camera: "upload.source.camera"
+        case .photos: "upload.source.photos"
+        case .files: "upload.source.files"
+        }
+    }
+
+    var copyKey: LocalizedStringKey {
+        switch self {
+        case .camera: "upload.source.camera"
+        case .photos: "upload.source.library"
+        case .files: "upload.source.file"
         }
     }
 }
@@ -182,6 +197,15 @@ private enum NomiRadii {
     static let tile: CGFloat = 16
 }
 
+private enum NomiPalette {
+    static let paper = Color(red: 0.98, green: 0.96, blue: 0.91)
+    static let surface = Color(red: 1.0, green: 0.98, blue: 0.94)
+    static let ink = Color(red: 0.22, green: 0.18, blue: 0.15)
+    static let muted = Color(red: 0.45, green: 0.40, blue: 0.35)
+    static let clay = Color(red: 0.70, green: 0.39, blue: 0.31)
+    static let cocoa = Color(red: 0.42, green: 0.28, blue: 0.22)
+}
+
 struct UploadResult {
     let item: TimelineItem
     let extraction: ImageExtraction
@@ -190,18 +214,52 @@ struct UploadResult {
 }
 
 struct ContentView: View {
-    @State private var selectedTab: NomiTab = .today
     @State private var showUploadSheet = false
     @State private var showHero = false
+    @State private var showSidebar = false
+    @State private var sidebarProgress: CGFloat = 0
     @State private var timelineItems: [TimelineItem] = []
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            currentTabView
+            NomiBackground()
 
-            NomiBottomBar(selectedTab: $selectedTab, onAdd: openUploadSheet)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 10)
+            NavigationStack {
+                HomeView(
+                    items: timelineItems,
+                    showHero: showHero,
+                    onAdd: openUploadSheet
+                )
+                .navigationTitle("Nomi")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        SidebarButton(action: openSidebar)
+                            .opacity(showSidebar ? 0 : 1)
+                            .allowsHitTesting(!showSidebar)
+                            .accessibilityHidden(showSidebar)
+                    }
+                    .sharedBackgroundVisibility(.hidden)
+                }
+                .toolbarBackground(.hidden, for: .navigationBar)
+            }
+            .background {
+                NomiBackground()
+            }
+            .offset(x: sidebarProgress * 14)
+            .scaleEffect(1 - sidebarProgress * 0.012, anchor: .trailing)
+            .animation(.smooth(duration: 0.34), value: sidebarProgress)
+
+            CenterAddButton(onAdd: openUploadSheet)
+                .padding(.bottom, 12)
+                .offset(x: sidebarProgress * 10)
+                .opacity(Double(1 - sidebarProgress * 0.28))
+                .animation(.smooth(duration: 0.28), value: sidebarProgress)
+
+            if showSidebar {
+                SidebarOverlay(progress: sidebarProgress, onClose: closeSidebar)
+                    .zIndex(2)
+            }
         }
         .tint(.primary)
         .sheet(isPresented: $showUploadSheet) {
@@ -244,32 +302,35 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
-    private var currentTabView: some View {
-        switch selectedTab {
-        case .today:
-            NavigationStack {
-                HomeView(
-                    items: timelineItems,
-                    showHero: showHero,
-                    onAdd: openUploadSheet
-                )
-                .navigationTitle("Nomi")
-                .navigationBarTitleDisplayMode(.inline)
-            }
-        case .trends:
-            PlaceholderTab(title: "Trends", symbol: "chart.line.uptrend.xyaxis", detail: "Gentle reflection views are next.")
-        case .log:
-            PlaceholderTab(title: "Log", symbol: "fork.knife", detail: "Detailed records will live here.")
-        case .profile:
-            PlaceholderTab(title: "Me", symbol: "person", detail: "Privacy and export controls are next.")
-        }
-    }
-
     private func openUploadSheet() {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         withAnimation(.bouncy(duration: 0.45)) {
             showUploadSheet = true
+        }
+    }
+
+    private func openSidebar() {
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        guard !showSidebar else { return }
+        sidebarProgress = 0
+        showSidebar = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(18))
+            withAnimation(.spring(duration: 0.46, bounce: 0.20)) {
+                sidebarProgress = 1
+            }
+        }
+    }
+
+    private func closeSidebar() {
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        withAnimation(.smooth(duration: 0.26)) {
+            sidebarProgress = 0
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(260))
+            guard sidebarProgress == 0 else { return }
+            showSidebar = false
         }
     }
 
@@ -344,174 +405,238 @@ struct ContentView: View {
     }
 }
 
-struct NomiBottomBar: View {
-    private enum NavSlot: Equatable {
-        case tab(NomiTab)
-        case upload
-    }
-
-    @Binding var selectedTab: NomiTab
-    let onAdd: () -> Void
-    @State private var appeared = false
-    @State private var activeSlot: NavSlot?
-    @State private var dragStartSlot: NavSlot?
-    @State private var lastFeedbackSlot: NavSlot?
-    @Namespace private var selectionNamespace
-
-    private var highlightedSlot: NavSlot {
-        activeSlot ?? .tab(selectedTab)
-    }
+struct SidebarButton: View {
+    let action: () -> Void
 
     var body: some View {
-        GeometryReader { proxy in
-            HStack(spacing: 9) {
-                tabButton(.today)
-                tabButton(.trends)
-                uploadButton
-                tabButton(.log)
-                tabButton(.profile)
+        Button {
+            action()
+        } label: {
+            VStack(spacing: 5) {
+                Capsule()
+                    .fill(NomiPalette.ink.opacity(0.76))
+                    .frame(width: 18, height: 2)
+                Capsule()
+                    .fill(NomiPalette.ink.opacity(0.76))
+                    .frame(width: 12, height: 2)
+                    .frame(width: 18, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Capsule(style: .continuous))
-            .gesture(navDragGesture(width: proxy.size.width))
         }
-        .frame(maxWidth: 326)
-        .frame(height: 72)
-        .background {
-            Capsule(style: .continuous)
-                .fill(Color(red: 1.0, green: 0.99, blue: 0.96).opacity(0.62))
-                .glassEffect(.regular.interactive(), in: .capsule)
-                .overlay {
-                    Capsule(style: .continuous)
-                        .stroke(.white.opacity(0.72), lineWidth: 1)
-                }
-                .overlay(alignment: .top) {
-                    Capsule()
-                        .fill(.white.opacity(0.5))
-                        .frame(height: 1)
-                        .padding(.horizontal, 24)
-                        .padding(.top, 8)
-                }
-                .shadow(color: Color(red: 0.16, green: 0.13, blue: 0.11).opacity(0.13), radius: 24, y: 16)
+        .buttonStyle(
+            LiquidCircleButtonStyle(
+                visualSize: 44,
+                touchSize: 52,
+                glassTint: NomiPalette.surface,
+                shadowOpacity: 0.08
+            )
+        )
+        .accessibilityLabel("accessibility.sidebar")
+        .accessibilityIdentifier("sidebar-button")
+    }
+}
+
+struct CenterAddButton: View {
+    let onAdd: () -> Void
+    @State private var appeared = false
+
+    var body: some View {
+        Button {
+            onAdd()
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 24, weight: .medium))
+                .symbolEffect(.bounce, value: appeared)
+                .foregroundStyle(NomiPalette.clay)
         }
-        .scaleEffect(appeared ? 1 : 0.96)
+        .buttonStyle(
+            LiquidCircleButtonStyle(
+                visualSize: 44,
+                touchSize: 56,
+                glassTint: NomiPalette.clay,
+                shadowOpacity: 0.10
+            )
+        )
+        .scaleEffect(appeared ? 1 : 0.9)
         .opacity(appeared ? 1 : 0)
+        .accessibilityLabel("accessibility.upload")
+        .accessibilityIdentifier("bottom-add")
+        .glassEffectTransition(.materialize)
         .onAppear {
             withAnimation(.spring(duration: 0.55, bounce: 0.2)) {
                 appeared = true
             }
         }
     }
+}
 
-    private var uploadButton: some View {
-        let isHighlighted = highlightedSlot == .upload
+struct LiquidCircleButtonStyle: ButtonStyle {
+    let visualSize: CGFloat
+    let touchSize: CGFloat
+    let glassTint: Color
+    let shadowOpacity: Double
 
-        return VStack(spacing: 5) {
-            Image(systemName: "plus")
-                .font(.system(size: 19, weight: .semibold))
-                .symbolEffect(.bounce, value: highlightedSlot)
-            Text("Add")
-                .font(.system(size: 10, weight: .semibold))
-        }
-        .frame(width: 48, height: 50)
-        .foregroundStyle(Color(red: 0.66, green: 0.36, blue: 0.29).opacity(isHighlighted ? 1 : 0.76))
-        .background {
-            if isHighlighted {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(Color(red: 0.80, green: 0.43, blue: 0.34).opacity(0.12))
-                    .glassEffect(.regular, in: .rect(cornerRadius: 22))
-                    .matchedGeometryEffect(id: "highlightedSlot", in: selectionNamespace)
-                    .transition(.scale.combined(with: .opacity))
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: visualSize, height: visualSize)
+            .background {
+                Circle()
+                    .fill(NomiPalette.surface.opacity(configuration.isPressed ? 0.72 : 0.58))
+                    .glassEffect(
+                        .regular
+                            .tint(glassTint.opacity(configuration.isPressed ? 0.18 : 0.08))
+                            .interactive(),
+                        in: .circle
+                    )
+                    .shadow(
+                        color: NomiPalette.cocoa.opacity(configuration.isPressed ? shadowOpacity * 0.5 : shadowOpacity),
+                        radius: configuration.isPressed ? 9 : 16,
+                        y: configuration.isPressed ? 4 : 10
+                    )
             }
-        }
-        .scaleEffect(isHighlighted ? 1.07 : 1)
-        .accessibilityLabel("Upload")
-        .accessibilityIdentifier("bottom-add")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction {
-            onAdd()
-        }
+            .scaleEffect(configuration.isPressed ? 0.93 : 1)
+            .animation(.interactiveSpring(duration: 0.18, extraBounce: 0.12), value: configuration.isPressed)
+            .frame(width: touchSize, height: touchSize)
+            .contentShape(Circle())
+            .glassEffectTransition(.materialize)
+    }
+}
+
+struct SidebarOverlay: View {
+    let progress: CGFloat
+    let onClose: () -> Void
+    @AppStorage(AppLanguage.storageKey) private var languagePreference = AppLanguage.detected.rawValue
+
+    private var selectedLanguage: AppLanguage {
+        AppLanguage.value(for: languagePreference)
     }
 
-    private func tabButton(_ tab: NomiTab) -> some View {
-        let isHighlighted = highlightedSlot == .tab(tab)
-        let isActive = activeSlot == .tab(tab)
+    var body: some View {
+        GeometryReader { proxy in
+            let drawerWidth = min(proxy.size.width * 0.76, 292)
 
-        return VStack(spacing: 5) {
-            Image(systemName: isHighlighted ? tab.selectedSymbol : tab.symbol)
-                .font(.system(size: 18, weight: .medium))
-                .symbolEffect(.bounce, value: highlightedSlot)
-            Text(tab.title)
-                .font(.system(size: 10, weight: .semibold))
-        }
-        .frame(width: 48, height: 50)
-        .foregroundStyle(isHighlighted ? Color(red: 0.21, green: 0.19, blue: 0.16) : Color(red: 0.42, green: 0.39, blue: 0.34).opacity(0.58))
-        .background {
-            if isHighlighted {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(.white.opacity(0.56))
-                    .glassEffect(.regular, in: .rect(cornerRadius: 22))
-                    .matchedGeometryEffect(id: "highlightedSlot", in: selectionNamespace)
-                    .transition(.scale.combined(with: .opacity))
-            }
-        }
-        .scaleEffect(isActive ? 1.07 : isHighlighted ? 1.03 : 1)
-        .accessibilityLabel(tab.title)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction {
-            selectTab(tab)
-        }
-    }
-
-    private func navDragGesture(width: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .local)
-            .onChanged { value in
-                let slot = navSlot(at: value.location.x, width: width)
-
-                if dragStartSlot == nil {
-                    dragStartSlot = slot
-                }
-
-                if activeSlot != slot {
-                    withAnimation(.spring(duration: 0.34, bounce: 0.18)) {
-                        activeSlot = slot
+            ZStack(alignment: .leading) {
+                sidebarBackdrop
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onClose()
                     }
-                }
 
-                if lastFeedbackSlot != slot {
-                    UISelectionFeedbackGenerator().selectionChanged()
-                    lastFeedbackSlot = slot
+                sidebarContent
+                .frame(width: drawerWidth)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .background {
+                    ZStack {
+                        NomiBackground()
+
+                        LinearGradient(
+                            colors: [
+                                NomiPalette.surface.opacity(0.22),
+                                .white.opacity(0.04)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                    .clipShape(sidebarShape)
+                    .glassEffect(.regular, in: sidebarShape)
+                    .shadow(color: NomiPalette.cocoa.opacity(0.12), radius: 28, x: 10, y: 18)
+                    .ignoresSafeArea()
                 }
+                .offset(x: -drawerWidth * (1 - progress))
+                .scaleEffect(x: 0.985 + progress * 0.015, y: 1, anchor: .leading)
+                .glassEffectTransition(.materialize)
+                .accessibilityIdentifier("sidebar-drawer")
             }
-            .onEnded { value in
-                let finalSlot = navSlot(at: value.location.x, width: width)
-
-                switch finalSlot {
-                case .tab(let tab):
-                    selectTab(tab)
-                case .upload:
-                    onAdd()
-                }
-
-                withAnimation(.spring(duration: 0.28, bounce: 0.18)) {
-                    activeSlot = nil
-                }
-                dragStartSlot = nil
-                lastFeedbackSlot = nil
-            }
-    }
-
-    private func navSlot(at x: CGFloat, width: CGFloat) -> NavSlot {
-        let slots: [NavSlot] = [.tab(.today), .tab(.trends), .upload, .tab(.log), .tab(.profile)]
-        let slotWidth = max(width / CGFloat(slots.count), 1)
-        let index = min(max(Int(x / slotWidth), 0), slots.count - 1)
-        return slots[index]
-    }
-
-    private func selectTab(_ tab: NomiTab) {
-        withAnimation(.spring(duration: 0.35, bounce: 0.18)) {
-            selectedTab = tab
         }
+    }
+
+    private var sidebarShape: ConcentricRectangle {
+        ConcentricRectangle(
+            uniformLeadingCorners: .fixed(0),
+            uniformTrailingCorners: .concentric(minimum: .fixed(30))
+        )
+    }
+
+    private var sidebarBackdrop: some View {
+        NomiBackground()
+            .opacity(Double(progress))
+        .ignoresSafeArea()
+    }
+
+    private var sidebarContent: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Text("sidebar.username")
+                .font(.system(size: 30, weight: .semibold, design: .rounded))
+                .foregroundStyle(NomiPalette.ink)
+                .padding(.top, 82)
+                .opacity(Double(progress))
+                .offset(x: -18 * (1 - progress))
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: "character.bubble")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(NomiPalette.clay)
+                        .frame(width: 30, height: 30)
+                        .background(NomiPalette.clay.opacity(0.11), in: Circle())
+
+                    Text("settings.language")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(NomiPalette.ink)
+
+                    Spacer(minLength: 0)
+                }
+
+                languagePicker
+            }
+            .padding(12)
+            .background(NomiPalette.surface.opacity(0.52), in: .rect(corners: .concentric(minimum: .fixed(NomiRadii.card))))
+            .glassEffect(.regular.interactive(), in: .rect(corners: .concentric(minimum: .fixed(NomiRadii.card))))
+            .opacity(Double(progress))
+            .offset(x: -24 * (1 - progress))
+            .scaleEffect(0.985 + progress * 0.015, anchor: .leading)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 18)
+        .padding(.bottom, 28)
+    }
+
+    private var languagePicker: some View {
+        HStack(spacing: 6) {
+            ForEach(AppLanguage.allCases) { language in
+                Button {
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    withAnimation(.spring(duration: 0.28, bounce: 0.14)) {
+                        languagePreference = language.rawValue
+                    }
+                } label: {
+                    Text(language.titleKey)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.74)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 32)
+                        .foregroundStyle(selectedLanguage == language ? NomiPalette.ink : NomiPalette.muted.opacity(0.78))
+                        .contentShape(Rectangle())
+                        .background {
+                            if selectedLanguage == language {
+                                ConcentricRectangle(corners: .concentric(minimum: .fixed(12)), isUniform: true)
+                                    .fill(NomiPalette.surface.opacity(0.82))
+                                    .overlay {
+                                        ConcentricRectangle(corners: .concentric(minimum: .fixed(12)), isUniform: true)
+                                            .stroke(.white.opacity(0.68), lineWidth: 1)
+                                    }
+                                    .transition(.scale.combined(with: .opacity))
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("language-\(language.rawValue)")
+            }
+        }
+        .padding(3)
+        .background(NomiPalette.cocoa.opacity(0.06), in: .rect(corners: .concentric(minimum: .fixed(15))))
     }
 }
 
@@ -531,21 +656,21 @@ struct HomeView: View {
                         .opacity(showHero ? 1 : 0)
                         .blur(radius: showHero ? 0 : 12)
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text("Log")
-                                .font(.title2.weight(.semibold))
-                            Spacer()
-                            Text("\(items.count)")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .contentTransition(.numericText())
-                        }
-                        .padding(.horizontal, 4)
+                    if items.isEmpty {
+                        EmptyTimelineState()
+                    } else {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("home.timeline")
+                                    .font(.title2.weight(.semibold))
+                                Spacer()
+                                Text("\(items.count)")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .contentTransition(.numericText())
+                            }
+                            .padding(.horizontal, 4)
 
-                        if items.isEmpty {
-                            EmptyTimelineState(onAdd: onAdd)
-                        } else {
                             LazyVStack(spacing: 0) {
                                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                                     TimelineRow(
@@ -582,49 +707,55 @@ struct OverviewCard: View {
 
         return [
             DailyMetric(
-                title: "Calories",
+                id: "calories",
+                titleKey: "metric.calories",
                 value: "\(calories)",
-                detail: "\(max(0, 2200 - calories)) left",
+                detailKey: "metric.calories.left \(max(0, 2200 - calories))",
                 symbol: "flame.fill",
                 tint: Color(red: 0.77, green: 0.47, blue: 0.21),
                 progress: items.isEmpty ? 0 : min(Double(calories) / 2200, 1)
             ),
             DailyMetric(
-                title: "Protein",
+                id: "protein",
+                titleKey: "metric.protein",
                 value: "\(protein)g",
-                detail: "120g target",
+                detailKey: "metric.protein.target",
                 symbol: "circle.hexagongrid.fill",
                 tint: Color(red: 0.38, green: 0.50, blue: 0.38),
                 progress: min(Double(protein) / 120, 1)
             ),
             DailyMetric(
-                title: "Strength",
+                id: "strength",
+                titleKey: "metric.strength",
                 value: "\(strength)m",
-                detail: "today",
+                detailKey: "metric.today",
                 symbol: "dumbbell.fill",
                 tint: Color(red: 0.40, green: 0.45, blue: 0.55),
                 progress: nil
             ),
             DailyMetric(
-                title: "Walk",
+                id: "walk",
+                titleKey: "metric.walk",
                 value: "\(walk)m",
-                detail: "today",
+                detailKey: "metric.today",
                 symbol: "figure.walk",
                 tint: Color(red: 0.39, green: 0.54, blue: 0.47),
                 progress: nil
             ),
             DailyMetric(
-                title: "Sitting",
+                id: "sitting",
+                titleKey: "metric.sitting",
                 value: "\(sitting)m",
-                detail: "today",
+                detailKey: "metric.today",
                 symbol: "chair.fill",
                 tint: Color(red: 0.51, green: 0.48, blue: 0.42),
                 progress: nil
             ),
             DailyMetric(
-                title: "Sleep",
+                id: "sleep",
+                titleKey: "metric.sleep",
                 value: "\(sleep)m",
-                detail: "today",
+                detailKey: "metric.today",
                 symbol: "moon.fill",
                 tint: Color(red: 0.38, green: 0.43, blue: 0.53),
                 progress: nil
@@ -636,10 +767,10 @@ struct OverviewCard: View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text("Today")
+                    Text("tab.today")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
-                    Text("\(items.count) \(items.count == 1 ? "item" : "items")")
+                    Text(items.count == 1 ? "today.item.count.one" : "today.item.count.many \(items.count)")
                         .font(.system(size: 24, weight: .semibold, design: .rounded))
                         .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -697,7 +828,7 @@ struct MetricTile: View {
                     .frame(width: 20, height: 20)
                     .background(metric.tint.opacity(0.11), in: Circle())
 
-                Text(metric.title)
+                Text(metric.titleKey)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -711,13 +842,13 @@ struct MetricTile: View {
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
-                Text(metric.detail)
+                Text(metric.detailKey)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .id("\(metric.title)-\(metric.value)-\(metric.detail)")
+            .id("\(metric.id)-\(metric.value)")
             .transaction { transaction in
                 transaction.animation = nil
             }
@@ -736,30 +867,12 @@ struct MetricTile: View {
 }
 
 struct EmptyTimelineState: View {
-    let onAdd: () -> Void
-
     var body: some View {
-        Button {
-            onAdd()
-        } label: {
-            VStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.system(size: 30, weight: .semibold))
-                    .frame(width: 58, height: 58)
-                    .foregroundStyle(Color(red: 0.62, green: 0.35, blue: 0.29))
-                    .background(.white.opacity(0.64), in: Circle())
-                    .glassEffect(.regular.interactive(), in: .circle)
-                Text("Add")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.primary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 34)
-        }
-        .buttonStyle(.plain)
-        .background(.white.opacity(0.5), in: RoundedRectangle(cornerRadius: NomiRadii.panel, style: .continuous))
-        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: NomiRadii.panel))
-        .accessibilityIdentifier("empty-timeline")
+        Color.clear
+            .frame(height: 156)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("home.timeline")
+            .accessibilityIdentifier("empty-timeline")
     }
 }
 
@@ -876,7 +989,7 @@ struct UploadSheet: View {
     @State private var showPhotoPicker = false
     @State private var importedImage: UIImage?
     @State private var importedImageData: Data?
-    @State private var importedName = "No file selected"
+    @State private var importedName = String(localized: "upload.no.file.selected")
     @State private var importedMimeType = "image/jpeg"
     @State private var showFileImporter = false
     @State private var isUploading = false
@@ -887,7 +1000,7 @@ struct UploadSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Add")
+            Text("nav.add")
                 .font(.system(size: 34, weight: .semibold, design: .rounded))
 
             sourcePicker
@@ -908,7 +1021,7 @@ struct UploadSheet: View {
                         ProgressView()
                             .controlSize(.small)
                     }
-                    Text(isUploading ? "Analyzing" : importedImage == nil ? "Choose" : "Upload")
+                    Text(isUploading ? "upload.analyzing" : importedImage == nil ? "upload.choose" : "upload.upload")
                         .font(.headline)
                 }
                 .frame(maxWidth: .infinity)
@@ -934,7 +1047,7 @@ struct UploadSheet: View {
             .buttonBorderShape(.circle)
             .padding(.top, 58)
             .padding(.trailing, 26)
-            .accessibilityLabel("Close")
+            .accessibilityLabel("accessibility.close")
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhoto, matching: .images)
         .fileImporter(
@@ -964,7 +1077,7 @@ struct UploadSheet: View {
                         Image(systemName: source.symbol)
                             .font(.title3.weight(.semibold))
                             .symbolEffect(.bounce, value: selectedSource)
-                        Text(source.rawValue)
+                        Text(source.titleKey)
                             .font(.caption.weight(.semibold))
                     }
                     .frame(maxWidth: .infinity)
@@ -986,7 +1099,7 @@ struct UploadSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(selectedSource.copy)
+                    Text(selectedSource.copyKey)
                         .font(.headline)
                     Text(cameraMessage ?? importedName)
                         .font(.subheadline)
@@ -1014,7 +1127,7 @@ struct UploadSheet: View {
                         Image(systemName: selectedSource.symbol)
                             .font(.system(size: 36, weight: .semibold))
                             .foregroundStyle(.secondary)
-                        Text("Tap to choose")
+                        Text("upload.tap.to.choose")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -1025,7 +1138,7 @@ struct UploadSheet: View {
                         ProgressView(value: uploadProgress)
                             .progressViewStyle(.linear)
                             .tint(.primary)
-                        Text("Analyzing")
+                        Text("upload.analyzing")
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
@@ -1091,7 +1204,7 @@ struct UploadSheet: View {
 
         switch source {
         case .camera:
-            cameraMessage = "Camera is a placeholder on simulator"
+            cameraMessage = String(localized: "upload.camera.simulator.placeholder")
         case .photos:
             showPhotoPicker = true
         case .files:
@@ -1109,7 +1222,7 @@ struct UploadSheet: View {
                     withAnimation(.spring(duration: 0.45, bounce: 0.18)) {
                         importedImage = image
                         importedImageData = data
-                        importedName = "Photo library image"
+                        importedName = String(localized: "upload.photo.library.image")
                         importedMimeType = mimeType
                         extraction = nil
                     }
@@ -1117,14 +1230,14 @@ struct UploadSheet: View {
             }
         } catch {
             await MainActor.run {
-                importedName = "Could not load selected photo"
+                importedName = String(localized: "upload.photo.load.error")
             }
         }
     }
 
     private func importFile(_ result: Result<[URL], Error>) {
         guard case .success(let urls) = result, let url = urls.first else {
-            importedName = "No file selected"
+            importedName = String(localized: "upload.no.file.selected")
             return
         }
 
@@ -1147,10 +1260,10 @@ struct UploadSheet: View {
                     extraction = nil
                 }
             } else {
-                importedName = "Selected file is not an image"
+                importedName = String(localized: "upload.file.not.image")
             }
         } catch {
-            importedName = "Could not import file"
+            importedName = String(localized: "upload.file.import.error")
         }
     }
 
@@ -1204,32 +1317,6 @@ struct UploadSheet: View {
         }
     }
 
-}
-
-struct PlaceholderTab: View {
-    let title: String
-    let symbol: String
-    let detail: String
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                NomiBackground()
-                VStack(spacing: 16) {
-                    Image(systemName: symbol)
-                        .font(.system(size: 36, weight: .semibold))
-                        .frame(width: 78, height: 78)
-                        .glassEffect(.regular.interactive(), in: .circle)
-                    Text(title)
-                        .font(.title2.weight(.semibold))
-                    Text(detail)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .navigationTitle(title)
-        }
-    }
 }
 
 extension UploadSource {
@@ -1290,12 +1377,8 @@ private enum ImageExtractionClient {
         source: UploadSource,
         mimeType: String
     ) async -> ImageExtraction {
-        guard let url = URL(string: "http://127.0.0.1:8088/ai/extract-image") else {
-            return .fallback(assetName: assetName, source: source, mimeType: mimeType)
-        }
-
         do {
-            var request = URLRequest(url: url)
+            var request = URLRequest(url: NomiAPI.url(path: "ai/extract-image"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONEncoder().encode(
@@ -1425,8 +1508,10 @@ extension ImageExtraction {
 }
 
 struct NomiBackground: View {
+    var ignoresSafeArea = true
+
     var body: some View {
-        LinearGradient(
+        let gradient = LinearGradient(
             colors: [
                 Color(red: 0.98, green: 0.97, blue: 0.94),
                 Color(red: 0.91, green: 0.95, blue: 0.97),
@@ -1435,7 +1520,13 @@ struct NomiBackground: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
-        .ignoresSafeArea()
+
+        if ignoresSafeArea {
+            gradient
+                .ignoresSafeArea()
+        } else {
+            gradient
+        }
     }
 }
 

@@ -1,12 +1,25 @@
 import Foundation
 import SwiftUI
 
-enum RecordsClient {
-    private static let baseURL = URL(string: "http://127.0.0.1:8088")!
+enum NomiAPI {
+    static let baseURL: URL = {
+        if let value = ProcessInfo.processInfo.environment["NOMI_API_BASE_URL"],
+           let url = URL(string: value) {
+            return url
+        }
 
+        return URL(string: "https://nomi.ifuryst.com")!
+    }()
+
+    static func url(path: String) -> URL {
+        baseURL.appending(path: path)
+    }
+}
+
+enum RecordsClient {
     static func loadTimelineItems() async -> [TimelineItem] {
         do {
-            let (data, response) = try await URLSession.shared.data(from: baseURL.appending(path: "records"))
+            let (data, response) = try await URLSession.shared.data(from: NomiAPI.url(path: "records"))
             guard let httpResponse = response as? HTTPURLResponse,
                   (200..<300).contains(httpResponse.statusCode) else {
                 return []
@@ -21,7 +34,7 @@ enum RecordsClient {
 
     static func save(extraction: ImageExtraction, source: UploadSource, assetName: String) async {
         do {
-            var request = URLRequest(url: baseURL.appending(path: "records"))
+            var request = URLRequest(url: NomiAPI.url(path: "records"))
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONEncoder().encode(

@@ -12,6 +12,8 @@
 		9B27A6B9F2C84B05B957D601 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9B27A6B8F2C84B05B957D601 /* Assets.xcassets */; };
 		A10000000000000000000002 /* NomiNativeUploadFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* NomiNativeUploadFlowUITests.swift */; };
 		B20000000000000000000002 /* RecordsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* RecordsClient.swift */; };
+		C30000000000000000000001 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000002 /* Localizable.strings */; };
+		C30000000000000000000003 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000008 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,6 +35,10 @@
 		A10000000000000000000001 /* NomiNativeUploadFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NomiNativeUploadFlowUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000003 /* NomiNativeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NomiNativeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000000000000000000001 /* RecordsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsClient.swift; sourceTree = "<group>"; };
+		C30000000000000000000004 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		C30000000000000000000005 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		C30000000000000000000006 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		C30000000000000000000007 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,6 +91,8 @@
 				73DF2339F16B45F48198206C /* NomiNativeApp.swift */,
 				54D788B5107B4A5F945FE616 /* ContentView.swift */,
 				B20000000000000000000001 /* RecordsClient.swift */,
+				C30000000000000000000002 /* Localizable.strings */,
+				C30000000000000000000008 /* InfoPlist.strings */,
 				9B27A6B8F2C84B05B957D601 /* Assets.xcassets */,
 				01CDDD9FAF2844CBA29B4959 /* Info.plist */,
 			);
@@ -158,6 +166,7 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
 			);
 			mainGroup = 9562164E8F804706A6C7A263;
 			minimizedProjectReferenceProxies = 1;
@@ -178,6 +187,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				9B27A6B9F2C84B05B957D601 /* Assets.xcassets in Resources */,
+				C30000000000000000000001 /* Localizable.strings in Resources */,
+				C30000000000000000000003 /* InfoPlist.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -218,6 +229,27 @@
 			targetProxy = A1000000000000000000000C /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		C30000000000000000000002 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				C30000000000000000000004 /* en */,
+				C30000000000000000000005 /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		C30000000000000000000008 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				C30000000000000000000006 /* en */,
+				C30000000000000000000007 /* zh-Hans */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		823DDCA1DD854B86803D508E /* Release */ = {
@@ -281,12 +313,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = J9P29FA5BX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = NomiNative/Info.plist;
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.nomi.native;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ifuryst.nomi;
 				PRODUCT_NAME = Nomi;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -299,7 +331,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = J9P29FA5BX;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1;
@@ -317,7 +349,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = J9P29FA5BX;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1;
@@ -398,12 +430,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = J9P29FA5BX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = NomiNative/Info.plist;
 				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.nomi.native;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ifuryst.nomi;
 				PRODUCT_NAME = Nomi;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;

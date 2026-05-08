@@ -53,6 +53,28 @@ final class NomiNativeUploadFlowUITests: XCTestCase {
         saveScreenshot(named: "nomi-native-real-upload-files-2026-05-07.png")
     }
 
+    func testSidebarLanguageSwitchesBetweenChineseAndEnglish() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["NOMI_DISABLE_RECORD_SYNC"] = "1"
+        app.launchEnvironment["NOMI_RESET_LANGUAGE_PREFERENCE"] = "1"
+        app.launch()
+
+        let sidebarButton = app.buttons.matching(identifier: "sidebar-button").firstMatch
+        XCTAssertTrue(sidebarButton.waitForExistence(timeout: 5), app.debugDescription)
+        sidebarButton.tap()
+
+        let drawer = app.descendants(matching: .any).matching(identifier: "sidebar-drawer").firstMatch
+        XCTAssertTrue(drawer.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Language"].waitForExistence(timeout: 2))
+
+        tapFirstButton(containing: "中文", in: app)
+        XCTAssertTrue(app.staticTexts["语言"].waitForExistence(timeout: 2))
+        saveScreenshot(named: "nomi-native-home-sidebar-zh-2026-05-07.png")
+
+        tapFirstButton(containing: "English", in: app)
+        XCTAssertTrue(app.staticTexts["Language"].waitForExistence(timeout: 2))
+    }
+
     private func selectFirstPhoto() {
         let app = XCUIApplication()
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -112,8 +134,12 @@ final class NomiNativeUploadFlowUITests: XCTestCase {
     private func tapFirstButton(containing text: String, in app: XCUIApplication) {
         let predicate = NSPredicate(format: "label CONTAINS[c] %@", text)
         let button = app.buttons.matching(predicate).firstMatch
-        if button.waitForExistence(timeout: 1), button.isHittable {
-            button.tap()
+        if button.waitForExistence(timeout: 1) {
+            if button.isHittable {
+                button.tap()
+            } else {
+                button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            }
         }
     }
 
@@ -137,12 +163,16 @@ final class NomiNativeUploadFlowUITests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
 
-        guard let directory = ProcessInfo.processInfo.environment["NOMI_SCREENSHOT_DIR"],
-              !directory.isEmpty else {
-            return
-        }
+        let directory = ProcessInfo.processInfo.environment["NOMI_SCREENSHOT_DIR"].flatMap { value in
+            value.isEmpty ? nil : URL(fileURLWithPath: value, isDirectory: true)
+        } ?? URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "docs/generated/verification", directoryHint: .isDirectory)
 
-        let url = URL(fileURLWithPath: directory, isDirectory: true).appendingPathComponent(fileName)
+        let url = directory.appendingPathComponent(fileName)
         do {
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(),
