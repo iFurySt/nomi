@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 enum NomiAPI {
     static let baseURL: URL = {
@@ -105,6 +106,44 @@ struct CreateRecordDraft {
     var source = "macos"
 }
 
+struct ImageExtractionRequest: Encodable {
+    let assetName: String
+    let source: String
+    let mimeType: String
+    let imageBase64: String
+
+    enum CodingKeys: String, CodingKey {
+        case assetName = "asset_name"
+        case source
+        case mimeType = "mime_type"
+        case imageBase64 = "image_base64"
+    }
+}
+
+struct ImageExtraction: Decodable, Equatable {
+    let recordID: String?
+    let imageURI: String?
+    let schemaVersion: String
+    let direction: String
+    let inputCategory: String
+    let outputImpacts: [String]
+    let title: String
+    let summary: String
+    let confidence: Double
+
+    enum CodingKeys: String, CodingKey {
+        case recordID = "record_id"
+        case imageURI = "image_uri"
+        case schemaVersion = "schema_version"
+        case direction
+        case inputCategory = "input_category"
+        case outputImpacts = "output_impacts"
+        case title
+        case summary
+        case confidence
+    }
+}
+
 private struct RecordsResponse: Decodable {
     let records: [SavedRecord]
 }
@@ -167,6 +206,45 @@ enum RecordsClient {
               (200..<300).contains(httpResponse.statusCode) else {
             throw URLError(.badServerResponse)
         }
+    }
+
+    static func extractImage(fileURL: URL) async throws -> ImageExtraction {
+        let didAccess = fileURL.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                fileURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let data = try Data(contentsOf: fileURL)
+        var request = URLRequest(url: NomiAPI.url(path: "ai/extract-image"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(
+            ImageExtractionRequest(
+                assetName: fileURL.lastPathComponent,
+                source: "macos-file",
+                mimeType: mimeType(for: fileURL),
+                imageBase64: data.base64EncodedString()
+            )
+        )
+
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
+        return try JSONDecoder().decode(ImageExtraction.self, from: responseData)
+    }
+
+    private static func mimeType(for fileURL: URL) -> String {
+        if let type = UTType(filenameExtension: fileURL.pathExtension),
+           let mimeType = type.preferredMIMEType {
+            return mimeType
+        }
+
+        return "application/octet-stream"
     }
 }
 

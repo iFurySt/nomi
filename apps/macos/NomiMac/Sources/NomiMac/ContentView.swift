@@ -1,10 +1,5 @@
 import SwiftUI
-
-private enum SidebarSelection: String, CaseIterable, Identifiable {
-    case records
-
-    var id: String { rawValue }
-}
+import UniformTypeIdentifiers
 
 private enum NomiMacType {
     static let title = Font.system(.largeTitle, design: .default, weight: .semibold)
@@ -15,40 +10,34 @@ private enum NomiMacType {
 }
 
 struct ContentView: View {
-    @State private var selection: SidebarSelection? = .records
     @State private var records: [SavedRecord] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showingAddSheet = false
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selection) {
-                Section("Nomi") {
-                    Label("Records", systemImage: "heart.text.square")
-                        .tag(SidebarSelection.records)
-                        .accessibilityIdentifier("mac-sidebar-records")
-                }
-            }
-            .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 280)
-        } detail: {
-            RecordsView(
-                records: records,
-                isLoading: isLoading,
-                errorMessage: errorMessage,
-                onRefresh: refreshRecords,
-                onAdd: { showingAddSheet = true }
-            )
-        }
+        RecordsView(
+            records: records,
+            isLoading: isLoading,
+            errorMessage: errorMessage,
+            onRefresh: refreshRecords,
+            onAdd: { showingAddSheet = true }
+        )
         .tint(.primary)
         .task {
             await loadRecords()
         }
         .sheet(isPresented: $showingAddSheet) {
-            AddRecordSheet { draft in
-                try await RecordsClient.saveRecord(draft)
-                await loadRecords()
-            }
+            AddRecordSheet(
+                onExtractImage: { fileURL in
+                    _ = try await RecordsClient.extractImage(fileURL: fileURL)
+                    await loadRecords()
+                },
+                onSave: { draft in
+                    try await RecordsClient.saveRecord(draft)
+                    await loadRecords()
+                }
+            )
         }
     }
 
@@ -106,20 +95,19 @@ private struct RecordsView: View {
                 .padding(.horizontal, 34)
                 .padding(.top, 28)
                 .padding(.bottom, 34)
-                .frame(maxWidth: 920, alignment: .leading)
+                .frame(maxWidth: 760, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         }
-        .navigationTitle("Records")
         .accessibilityIdentifier("mac-records-view")
     }
 
     private var header: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Records")
+                Text("Nomi")
                     .font(NomiMacType.title)
-                Text("\(records.count) saved")
+                Text(records.isEmpty ? "No records yet" : "\(records.count) saved")
                     .font(NomiMacType.body)
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
@@ -163,17 +151,17 @@ private struct RecordRow: View {
     let record: SavedRecord
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: 12) {
             Text(record.displayTime)
                 .font(NomiMacType.caption)
                 .foregroundStyle(.secondary)
-                .frame(width: 48, alignment: .trailing)
+                .frame(width: 46, alignment: .trailing)
 
             Image(systemName: record.symbolName)
                 .font(.system(.body, design: .default, weight: .semibold))
                 .foregroundStyle(.secondary)
-                .frame(width: 30, height: 30)
-                .background(.quaternary, in: Circle())
+                .frame(width: 26, height: 26)
+                .background(.tertiary, in: Circle())
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
@@ -197,12 +185,12 @@ private struct RecordRow: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 14)
-        .background(.background, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(.separator.opacity(0.45), lineWidth: 1)
+        .padding(.vertical, 11)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(.separator.opacity(0.42))
+                .frame(height: 1)
+                .padding(.leading, 72)
         }
         .accessibilityIdentifier("mac-record-row")
     }
@@ -239,7 +227,7 @@ private struct EmptyRecordsPanel: View {
     let onAdd: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             Image(systemName: "square.and.pencil")
                 .font(.system(.title2, design: .default, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -250,38 +238,48 @@ private struct EmptyRecordsPanel: View {
             Button {
                 onAdd()
             } label: {
-                Label("Add Record", systemImage: "plus")
+                Label("Add", systemImage: "plus")
             }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("mac-empty-add-button")
         }
-        .padding(18)
-        .frame(maxWidth: 360, alignment: .leading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(.separator.opacity(0.45), lineWidth: 1)
-        }
+        .padding(.vertical, 10)
+        .frame(maxWidth: 320, alignment: .leading)
     }
 }
 
 private struct AddRecordSheet: View {
+    let onExtractImage: (URL) async throws -> Void
     let onSave: (CreateRecordDraft) async throws -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var draft = CreateRecordDraft()
     @State private var isSaving = false
+    @State private var isImportingImage = false
     @State private var errorMessage: String?
 
     private let types = ["note", "food", "body_stats", "document"]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Add Record")
+                Text("Add")
                     .font(NomiMacType.section)
                 Spacer()
             }
+
+            Button {
+                isImportingImage = true
+            } label: {
+                Label("Choose Image", systemImage: "photo")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(isSaving)
+            .accessibilityIdentifier("mac-add-image-button")
+
+            Divider()
 
             Picker("Type", selection: $draft.type) {
                 ForEach(types, id: \.self) { type in
@@ -325,13 +323,20 @@ private struct AddRecordSheet: View {
                     }
                 }
                 .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .disabled(!canSave || isSaving)
                 .accessibilityIdentifier("mac-add-save-button")
             }
         }
         .padding(24)
-        .frame(width: 460)
+        .frame(width: 430)
+        .fileImporter(
+            isPresented: $isImportingImage,
+            allowedContentTypes: [.image],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImageImport(result)
+        }
     }
 
     private var canSave: Bool {
@@ -365,6 +370,31 @@ private struct AddRecordSheet: View {
                     isSaving = false
                 }
             }
+        }
+    }
+
+    private func handleImageImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let fileURL = urls.first else { return }
+            isSaving = true
+            errorMessage = nil
+
+            Task {
+                do {
+                    try await onExtractImage(fileURL)
+                    await MainActor.run {
+                        dismiss()
+                    }
+                } catch {
+                    await MainActor.run {
+                        errorMessage = "Image analysis failed. Check that the Nomi server and SeedX are running."
+                        isSaving = false
+                    }
+                }
+            }
+        case .failure:
+            errorMessage = "Could not open that image."
         }
     }
 }
