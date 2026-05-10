@@ -42,9 +42,15 @@ Debug 默认使用 `http://127.0.0.1:8088`，和 iOS 一样可通过 `NOMI_API_B
 ```sh
 cd apps/macos/NomiMac
 ./scripts/build-app.sh
+./scripts/build-dmg.sh
 
-NOMI_API_BASE_URL=http://127.0.0.1:8088 open .build/NomiMac.app
+NOMI_API_BASE_URL=http://127.0.0.1:8088 .build/NomiMac.app/Contents/MacOS/NomiMac
 ```
+
+产物位置：
+
+- `.build/NomiMac.app`
+- `.build/dist/NomiMac.dmg`
 
 ## 设计约束
 
