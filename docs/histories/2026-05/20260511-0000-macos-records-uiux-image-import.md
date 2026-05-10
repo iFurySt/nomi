@@ -10,6 +10,7 @@ macOS 版本已有，但界面太丑、无用元素太多；按给定视觉方�
 - 记录行从重卡片改为轻分隔列表，正文宽度收窄，窗口最小尺寸降低，让内容成为首屏重点。
 - Add sheet 增加 `Choose Image` 主入口，选择图片后调用同一个 server `POST /ai/extract-image`，由本地 SeedX/Codex 分析并保存记录。
 - 保留手动文字记录 fallback，但弱化为次级保存按钮。
+- 将 SwiftPM macOS app 入口改为显式 AppKit `NSWindow` 承载 `ContentView`，避免手工打包 `.app` 时进程启动但没有可见窗口。
 - 同步更新 macOS 架构、前端说明和质量评分文档。
 
 ## 设计动机
@@ -22,4 +23,7 @@ macOS 版本已有，但界面太丑、无用元素太多；按给定视觉方�
 
 - `cd apps/macos/NomiMac && ./scripts/build-app.sh`
 
-后续本轮还需要启动本地 server、保持 `seedx daemon connect` 在线，并用 Debug app 选择图片做端到端验证。
+- `GOTOOLCHAIN=auto go test ./...`（`apps/server`）
+- `make check-docs`
+- 启动本地 `postgres17`、Nomi server 和 SeedX daemon 后，调用 `POST /ai/extract-image` 成功返回 `record_id`、`schema_version: 2026-05-08.seedx-codex-image.v1`、`input_category` 和 SeedX/Codex 生成的 summary，并可通过 `GET /records` 读回记录。
+- Debug app 使用 `NOMI_API_BASE_URL=http://127.0.0.1:8088` 启动；临时诊断确认主窗口 `isVisible == true`。当前 Computer Use / `screencapture` 在本机返回不到 Nomi 窗口画面，因此本轮截图证据未可靠生成。

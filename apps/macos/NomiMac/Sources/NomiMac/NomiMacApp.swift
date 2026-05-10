@@ -2,18 +2,50 @@ import AppKit
 import SwiftUI
 
 @main
-struct NomiMacApp: App {
-    init() {
-        NSApplication.shared.setActivationPolicy(.regular)
-        NSApplication.shared.activate()
+@MainActor
+final class NomiMacApp: NSObject, NSApplicationDelegate {
+    private static var appDelegate: NomiMacApp?
+    private var window: NSWindow?
+
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = NomiMacApp()
+        appDelegate = delegate
+        app.delegate = delegate
+        app.setActivationPolicy(.regular)
+        app.finishLaunching()
+        delegate.openMainWindow()
+        app.run()
     }
 
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .frame(minWidth: 760, minHeight: 560)
-        }
-        .windowStyle(.titleBar)
-        .windowToolbarStyle(.unified)
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        openMainWindow()
+    }
+
+    private func openMainWindow() {
+        guard window == nil else { return }
+
+        let contentView = ContentView()
+            .frame(minWidth: 760, minHeight: 560)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 860, height: 620),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Nomi"
+        window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .unified
+        window.contentView = NSHostingView(rootView: contentView)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        self.window = window
+
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
     }
 }
