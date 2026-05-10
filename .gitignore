@@ -24,6 +24,7 @@ node_modules/
 .yarn/
 .turbo/
 .next/
+.build/
 dist/
 build/
 coverage/

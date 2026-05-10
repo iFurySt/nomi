@@ -1,5 +1,0 @@
----
-triple:          'arm64-apple-darwin'
-binary-path:     '/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac'
-relocations:     []
-...
