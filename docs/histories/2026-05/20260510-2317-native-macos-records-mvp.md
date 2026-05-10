@@ -21,3 +21,5 @@
 ## 验证
 
 - `cd apps/macos/NomiMac && ./scripts/build-app.sh`
+- 启动本地 Postgres 和 server 后，通过 Computer Use 操作 `dev.nomi.mac`：打开 Add sheet，输入一条测试记录，保存后右侧 Records 列表刷新为 `1 saved`。
+- 视觉截图：`docs/generated/verification/nomi-macos-records-mvp-2026-05-10.png`
