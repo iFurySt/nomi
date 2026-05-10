@@ -6,7 +6,7 @@
 
 ## 主要改动
 
-- 新增 `apps/macos/NomiMac/` SwiftPM 原生 SwiftUI app。
+- 新增 `apps/macos/NomiMac/` SwiftPM 原生 SwiftUI app，并提供 `scripts/build-app.sh` 生成本地 `.app` bundle 方便普通 macOS 启动和 Accessibility 验证。
 - 使用 `NavigationSplitView` 实现 macOS 常见 sidebar + detail 结构。
 - 右侧 Records 主体支持从同一个 server `GET /records` 读取记录、显示加载和连接失败状态。
 - toolbar 增加 Refresh 和 Add，Add sheet 通过 `POST /records` 写入简单文字记录。
@@ -20,4 +20,4 @@
 
 ## 验证
 
-- `cd apps/macos/NomiMac && swift build`
+- `cd apps/macos/NomiMac && ./scripts/build-app.sh`

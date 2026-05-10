@@ -45,8 +45,8 @@ MVP 目标拓扑：
 - Native iOS simulator run：`xcrun simctl install <simulator-udid> ~/Library/Developer/Xcode/DerivedData/NomiNative-*/Build/Products/Debug-iphonesimulator/Nomi.app && xcrun simctl launch --terminate-running-process <simulator-udid> com.ifuryst.nomi`
 - Native iOS upload UI test：`xcodebuild test -project apps/ios/NomiNative.xcodeproj -scheme Nomi -configuration Debug -destination 'platform=iOS Simulator,id=<simulator-udid>' -only-testing:NomiNativeUITests/NomiNativeUploadFlowUITests`
 - Native iOS TestFlight release：`docs/IOS_TESTFLIGHT_RELEASE.md` 记录 `com.ifuryst.nomi` / team `J9P29FA5BX` / App Store Connect App ID `6767420142` 的手动 archive 和 upload 流程。
-- Native macOS build：`cd apps/macos/NomiMac && swift build`
-- Native macOS run：启动 server 后运行 `cd apps/macos/NomiMac && NOMI_API_BASE_URL=http://127.0.0.1:8088 swift run NomiMac`
+- Native macOS build：`cd apps/macos/NomiMac && ./scripts/build-app.sh`
+- Native macOS run：启动 server 后运行 `cd apps/macos/NomiMac && NOMI_API_BASE_URL=http://127.0.0.1:8088 open .build/NomiMac.app`
 - Server tests：`cd apps/server && go test ./...`
 - Server local run：`cd apps/server && NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088`
 - SeedX daemon local run：先启动 server，再运行 `seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key`；`--once` 只验证 hello，不会处理图片分析 command。
