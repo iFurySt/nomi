@@ -39,25 +39,6 @@ struct ContentView: View {
                 onRefresh: refreshRecords,
                 onAdd: { showingAddSheet = true }
             )
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button {
-                        refreshRecords()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .help("Refresh")
-                    .accessibilityIdentifier("mac-refresh-button")
-
-                    Button {
-                        showingAddSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .help("Add")
-                    .accessibilityIdentifier("mac-add-button")
-                }
-            }
         }
         .tint(.primary)
         .task {
@@ -152,6 +133,28 @@ private struct RecordsView: View {
                     .padding(.top, 12)
                     .accessibilityIdentifier("mac-records-loading")
             }
+
+            Button {
+                onRefresh()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.borderless)
+            .help("Refresh")
+            .accessibilityIdentifier("mac-refresh-button")
+            .padding(.top, 6)
+
+            Button {
+                onAdd()
+            } label: {
+                Image(systemName: "plus")
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.borderless)
+            .help("Add")
+            .accessibilityIdentifier("mac-add-button")
+            .padding(.top, 6)
         }
     }
 }
