@@ -40,20 +40,21 @@ struct ContentView: View {
                 onAdd: { showingAddSheet = true }
             )
             .toolbar {
-                ToolbarItemGroup {
+                ToolbarItemGroup(placement: .primaryAction) {
                     Button {
                         refreshRecords()
                     } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
+                        Image(systemName: "arrow.clockwise")
                     }
+                    .help("Refresh")
                     .accessibilityIdentifier("mac-refresh-button")
 
                     Button {
                         showingAddSheet = true
                     } label: {
-                        Label("Add", systemImage: "plus")
+                        Image(systemName: "plus")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .help("Add")
                     .accessibilityIdentifier("mac-add-button")
                 }
             }

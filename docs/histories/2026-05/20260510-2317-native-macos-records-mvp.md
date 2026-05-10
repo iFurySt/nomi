@@ -10,6 +10,7 @@
 - 使用 `NavigationSplitView` 实现 macOS 常见 sidebar + detail 结构。
 - 右侧 Records 主体支持从同一个 server `GET /records` 读取记录、显示加载和连接失败状态。
 - toolbar 增加 Refresh 和 Add，Add sheet 通过 `POST /records` 写入简单文字记录。
+- 将 macOS toolbar 的 Refresh / Add 改为明确的 `.primaryAction` icon-only items，避免展开 / 收起 sidebar 后右上角出现系统 overflow `»` 图标。
 - 新增 macOS 前端启动说明，并在架构和质量文档里登记桌面端入口。
 
 ## 设计动机
@@ -23,4 +24,5 @@
 - `cd apps/macos/NomiMac && ./scripts/build-app.sh`
 - `cd apps/macos/NomiMac && ./scripts/build-dmg.sh`
 - 启动本地 Postgres 和 server 后，通过 Computer Use 操作 `dev.nomi.mac`：打开 Add sheet，输入一条测试记录，保存后右侧 Records 列表刷新为 `1 saved`。
+- 通过 Computer Use 操作 `dev.nomi.mac` 展开 / 收起 sidebar，确认 toolbar 只保留 Show/Hide Sidebar、Refresh、Add，没有 `»` overflow 项。
 - 视觉截图：`docs/generated/verification/nomi-macos-records-mvp-2026-05-10.png`
