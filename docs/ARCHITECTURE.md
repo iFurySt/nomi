@@ -5,6 +5,7 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 ## 当前仓库结构
 
 - `apps/ios/`：原生 SwiftUI iOS app。当前先实现 iPhone 优先的 home-only mobile skeleton：首页默认不填假 timeline，摄入能量、蛋白质、训练、步行、久坐、睡眠等今日总览从真实上传记录派生；timeline 为空时显示真实空态。底部使用 iOS 26 原生 `TabView` Liquid Glass tab bar：左侧 Today / 我的为普通 tab 组，右侧 Add 使用 `TabRole.search` 分离成独立圆形 action，中间空档和选中 glass 高亮交给系统处理。Add 只打开上拉上传 sheet 并回到上一个内容 tab；真实 PhotosPicker / fileImporter 选择图片后调用 server image extraction contract 生成 timeline 项。底部“我的”进入 My 页，当前只保留语言切换；首次启动自动写入识别出的中 / 英语言，后续可在 English / 简体中文 / 繁體中文之间切换。视觉方向使用系统黑白灰语义色、系统字体 / Dynamic Type、SwiftUI 系统 sheet 外层圆角、Liquid Glass 风格按钮 / 玻璃卡片和轻量动画。
+- `apps/macos/`：原生 SwiftUI macOS app。当前以 SwiftPM executable 形式提供 `NomiMac`，复用同一个 Go server `/records` contract；界面使用 macOS 常见 `NavigationSplitView` 左侧 sidebar + 右侧主体，右侧先交付记录列表、Refresh 和 Add toolbar action，Add sheet 可写入简单记录到 server。
 - `apps/server/`：Go API server。当前提供 health、record persistence、Ask mock boundary、图片上传落盘、SeedX/Codex 图片提取、Postgres schema 初始化和 SeedX daemon websocket 控制面。
 - `infra/amoylab/`：amoylab server 部署模板，包含 Docker Compose 和环境变量示例；真实部署目录是 `amoylab:/opt/nomi`。
 - `docs/product-specs/`：产品规格和 MVP 验收范围。
@@ -24,9 +25,10 @@ Nomi / 知己 是一个个人身体与生活记录产品。第一阶段目标是
 MVP 目标拓扑：
 
 1. Mobile app 通过 API 读取和写入个人记录。
-2. Go server 持久化记录到 Postgres，并提供 Ask / extraction 的接口边界。
-3. `seedx daemon connect` 在用户设备启动后主动连接 Go server 的 websocket 地址。
-4. Go server 通过 SeedX daemon 协议发送 `daemon:ping` / 后续 `daemon:command`，SeedX 返回 `daemon:pong` / `daemon:result`。
+2. macOS app 通过同一组 API 读取和写入个人记录，先覆盖桌面端回看和简单添加。
+3. Go server 持久化记录到 Postgres，并提供 Ask / extraction 的接口边界。
+4. `seedx daemon connect` 在用户设备启动后主动连接 Go server 的 websocket 地址。
+5. Go server 通过 SeedX daemon 协议发送 `daemon:ping` / 后续 `daemon:command`，SeedX 返回 `daemon:pong` / `daemon:result`。
 
 当前原生 iOS app 首页 timeline 启动时通过 `GET /records` 加载服务端已保存记录，初始状态不注入假数据；上传 sheet 通过 PhotosPicker / fileImporter 选择图片，上传时把 image data base64、来源和 MIME type 发送到 `POST /ai/extract-image`。Go server 先把图片写入 `NOMI_IMAGE_STORAGE_DIR`，再通过已连接的 SeedX daemon 发送 `daemon:command` / `method:"run"`，让本机 Codex 使用 SeedX 0.2.0 的 Codex v2 `input` contract 分析图片：`input[0]` 是严格 JSON prompt，`input[1]` 是 `{ "type": "localImage", "path": "..." }`。server 解析结果后把 title、input category、confidence、image URI 和 metadata 写入 `records`，再把带 `record_id` 的 extraction 返回给 iOS，同时插入本地 timeline。Go server 已提供 `GET /health`、`GET /records`、`POST /records`、`POST /ask`、`POST /ai/extract-image`，并在启动时初始化 Postgres records schema。图片提取 schema 覆盖 input category（food、beverage、caffeine、alcohol、nicotine、information、exercise、sunlight、social）、output impacts（energy、mood、sleep、recovery、focus、health）和 kcal、protein、fat、carbs、fiber、water、caffeine、nicotine、duration 等 metadata。SeedX 连接使用 `GET /daemon/connect`，同时保留旧的 `GET /seedx/ws` 兼容本地 smoke；daemon API key 通过 `Authorization: Bearer ...` WebSocket 握手 header 传递。
 
@@ -43,6 +45,8 @@ MVP 目标拓扑：
 - Native iOS simulator run：`xcrun simctl install <simulator-udid> ~/Library/Developer/Xcode/DerivedData/NomiNative-*/Build/Products/Debug-iphonesimulator/Nomi.app && xcrun simctl launch --terminate-running-process <simulator-udid> com.ifuryst.nomi`
 - Native iOS upload UI test：`xcodebuild test -project apps/ios/NomiNative.xcodeproj -scheme Nomi -configuration Debug -destination 'platform=iOS Simulator,id=<simulator-udid>' -only-testing:NomiNativeUITests/NomiNativeUploadFlowUITests`
 - Native iOS TestFlight release：`docs/IOS_TESTFLIGHT_RELEASE.md` 记录 `com.ifuryst.nomi` / team `J9P29FA5BX` / App Store Connect App ID `6767420142` 的手动 archive 和 upload 流程。
+- Native macOS build：`cd apps/macos/NomiMac && swift build`
+- Native macOS run：启动 server 后运行 `cd apps/macos/NomiMac && NOMI_API_BASE_URL=http://127.0.0.1:8088 swift run NomiMac`
 - Server tests：`cd apps/server && go test ./...`
 - Server local run：`cd apps/server && NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088`
 - SeedX daemon local run：先启动 server，再运行 `seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key`；`--once` 只验证 hello，不会处理图片分析 command。

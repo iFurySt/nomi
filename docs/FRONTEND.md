@@ -3,6 +3,7 @@
 当前前端只有一个版本化移动端实现路径：
 
 - `apps/ios/`：原生 SwiftUI iOS app，是 mobile 体验的主推进方向。
+- `apps/macos/NomiMac/`：原生 SwiftUI macOS app，是桌面端 MVP 入口；当前使用 SwiftPM executable 组织，复用 server records API。
 
 ## 原生 iOS 本地启动
 
@@ -32,6 +33,18 @@ SIMCTL_CHILD_NOMI_OPEN_UPLOAD=1 \
 - Native iOS Home：顶部是 Today 总览，覆盖摄入能量、剩余卡路里、蛋白质、力量训练、步行、久坐和睡眠等今日数据，并从真实 timeline items 派生；初始状态不填假数据，空 timeline 不显示 `Timeline 0` 标题行。底部使用 iOS 26 原生 `TabView` Liquid Glass tab bar：左侧 Today / 我的为普通 tab 组，右侧 Add 使用 `TabRole.search` 分离成独立圆形 action，中间空档、按压 glass 高亮、左右移动预览和释放确认都交给系统实现。Add 打开上传 sheet 后回到上一个内容 tab，“我的”进入只包含语言切换的 My 页。Home / My 使用系统黑白灰语义色、统一 Dynamic Type 字体 token 和低装饰灰阶 timeline；Log / Trends 暂不回到主入口，避免空页面和解释文案占据产品界面。
 - Native iOS Upload Sheet：提供 Camera / Photos / Files 三个来源，并使用系统 sheet 背景、单一 detent、drag indicator 和系统外层圆角；不再对 sheet 外层设置固定 `.presentationCornerRadius(...)` 或整页自定义背景。单一 detent 用于避免上拖进入 full-height sheet 时出现另一套更实的系统视觉状态。Photos 使用 `PhotosPicker`，Files 使用 SwiftUI `fileImporter`，选择图片后通过 `POST /ai/extract-image` 取得 SeedX/Codex metadata；server 会在同一请求里保存图片和 record，iOS 只在 response 没有 `record_id` 的 fallback 场景才补一次 `/records`。app 下次启动通过 `GET /records` 恢复 timeline。Simulator 上 Camera 暂为 unavailable placeholder。
 - Native iOS Language：首次启动根据 iOS 语言自动写入一个实际语言值；之后 My 页只提供语言切换，不放其他占位设置。语言选择通过 `@AppStorage` 持久化，并用 SwiftUI locale 立即更新界面；语言选项自身使用固定目标语言显示名（`English`、`简体中文`、`繁體中文`），不随当前 locale 翻译成 `Chinese` / `Traditional Chinese`，也不额外添加括号说明。当前本地化资源覆盖 `en`、`zh-Hans` 与 `zh-Hant`，包括 `Localizable.strings`；照片权限 `InfoPlist.strings` 当前覆盖 `en` 与 `zh-Hans`。
+- Native macOS Records：桌面端使用 `NavigationSplitView`，左侧 sidebar 保留 Records，右侧主体显示记录列表、数量、加载和 server 连接失败状态；toolbar 提供 Refresh 和 Add。Add sheet 先覆盖简单文字记录，类型收敛到 server 当前允许的 `note`、`food`、`body_stats`、`document`，保存后刷新右侧列表。视觉使用 macOS 系统 window background、sidebar、toolbar、segmented picker、bordered prominent button 和 8px 以内内容卡片圆角，不复刻 iOS 底栏或上传 sheet。
+
+## 原生 macOS 本地启动
+
+Debug 默认使用 `http://127.0.0.1:8088`，和 iOS 一样可通过 `NOMI_API_BASE_URL` 覆盖。
+
+```sh
+cd apps/macos/NomiMac
+swift build
+
+NOMI_API_BASE_URL=http://127.0.0.1:8088 swift run NomiMac
+```
 
 ## 设计约束
 

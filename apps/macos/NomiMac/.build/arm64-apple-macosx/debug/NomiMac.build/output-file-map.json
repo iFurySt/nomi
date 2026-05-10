@@ -1,0 +1,26 @@
+{
+  "": {
+    "swift-dependencies": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/master.swiftdeps"
+  },
+  "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/Sources/NomiMac/ContentView.swift": {
+    "dependencies": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/ContentView.d",
+    "object": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/ContentView.swift.o",
+    "swiftmodule": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/ContentView.swiftdeps",
+    "diagnostics": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/ContentView.dia"
+  },
+  "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/Sources/NomiMac/NomiMacApp.swift": {
+    "dependencies": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/NomiMacApp.d",
+    "object": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/NomiMacApp.swift.o",
+    "swiftmodule": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/NomiMacApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/NomiMacApp.swiftdeps",
+    "diagnostics": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/NomiMacApp.dia"
+  },
+  "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/Sources/NomiMac/RecordsClient.swift": {
+    "dependencies": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/RecordsClient.d",
+    "object": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/RecordsClient.swift.o",
+    "swiftmodule": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/RecordsClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/RecordsClient.swiftdeps",
+    "diagnostics": "/Users/ifuryst/projects/github/nomi/apps/macos/NomiMac/.build/arm64-apple-macosx/debug/NomiMac.build/RecordsClient.dia"
+  }
+}
