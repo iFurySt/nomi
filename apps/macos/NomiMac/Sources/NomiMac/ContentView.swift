@@ -254,25 +254,29 @@ private struct ExpandableToolbarSearch: View {
     @Binding var text: String
     @Binding var isExpanded: Bool
     @State private var showsExpandedControls = false
+    @State private var showsCollapsedButton = true
     @State private var pendingCollapse: DispatchWorkItem?
+    @State private var pendingReveal: DispatchWorkItem?
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            if isExpanded, showsExpandedControls {
-                HStack(spacing: 8) {
-                    NativeToolbarSearchField(text: $text)
-                        .frame(width: 286, height: 30)
+            if isExpanded {
+                if showsExpandedControls {
+                    HStack(spacing: 8) {
+                        NativeToolbarSearchField(text: $text)
+                            .frame(width: 286, height: 30)
 
-                    Button("关闭搜索", systemImage: "xmark") {
-                        collapse()
+                        Button("关闭搜索", systemImage: "xmark") {
+                            collapse()
+                        }
+                        .labelStyle(.iconOnly)
+                        .nativeToolbarIconButton()
+                        .help("关闭搜索")
                     }
-                    .labelStyle(.iconOnly)
-                    .nativeToolbarIconButton()
-                    .help("关闭搜索")
+                    .frame(width: 330, height: 34, alignment: .trailing)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .trailing)))
                 }
-                .frame(width: 330, height: 34, alignment: .trailing)
-                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .trailing)))
-            } else {
+            } else if showsCollapsedButton {
                 Button("搜索", systemImage: "magnifyingglass") {
                     expand()
                 }
@@ -289,7 +293,16 @@ private struct ExpandableToolbarSearch: View {
 
     private func expand() {
         pendingCollapse?.cancel()
+        pendingReveal?.cancel()
         pendingCollapse = nil
+        pendingReveal = nil
+
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            showsCollapsedButton = false
+        }
+
         withAnimation(.smooth(duration: 0.24)) {
             isExpanded = true
             showsExpandedControls = true
@@ -298,11 +311,13 @@ private struct ExpandableToolbarSearch: View {
 
     private func collapse() {
         pendingCollapse?.cancel()
+        pendingReveal?.cancel()
 
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             showsExpandedControls = false
+            showsCollapsedButton = false
         }
 
         let workItem = DispatchWorkItem {
@@ -310,6 +325,13 @@ private struct ExpandableToolbarSearch: View {
                 isExpanded = false
             }
             pendingCollapse = nil
+
+            let revealItem = DispatchWorkItem {
+                showsCollapsedButton = true
+                pendingReveal = nil
+            }
+            pendingReveal = revealItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: revealItem)
         }
         pendingCollapse = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.04, execute: workItem)
