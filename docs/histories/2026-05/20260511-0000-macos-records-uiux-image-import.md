@@ -19,6 +19,7 @@ macOS 版本已有，但界面太丑、无用元素太多；按给定视觉方�
 - 再按 `LandmarksBuildingAnAppWithLiquidGlass` 收口底层窗口结构：移除手工 AppKit `NSWindow` 入口，改为 SwiftUI `WindowGroup` 承载 `NavigationSplitView(preferredCompactColumn:)`；保留系统红黄绿 / sidebar toggle，把搜索和 Add 移到 SwiftUI toolbar，删除内容层 breadcrumb / search / Add 顶部栏。
 - 继续按 Landmarks / Calendar toolbar 修正：右侧搜索和 Add 改为两个独立 icon-only toolbar button，中间用固定空隙避免 Liquid Glass 融合成一个背景；搜索从独立 icon 向左展开为原生 `NSSearchField`，Add 保持独立按钮；不再在 toolbar 常驻组合搜索框，也不再为标题区手画宽背景容器。
 - Add overlay 不再使用整页 material 遮罩、背景 blur 或页面缩放，只在当前页面上叠加居中表单；面板外透明 hit-test 区域和再次点击 Add 都可以关闭弹窗。
+- 搜索 toolbar 收起动画改为先无动画移除原生 `NSSearchField`，再收缩外层宽度，并对外层加 clipping，避免 placeholder 文本在关闭时向右越界闪现。
 
 ## 设计动机
 
@@ -44,3 +45,4 @@ macOS 版本已有，但界面太丑、无用元素太多；按给定视觉方�
 - Landmarks-style 窗口修正后再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，用 Computer Use 确认 accessibility 中出现 `SidebarNavigationSplitView`，系统 sidebar toggle 可折叠 / 展开，内容区没有自定义顶部栏，搜索和 Add 位于系统 toolbar，记录页仍可通过 sidebar 进入；截图保存到 `docs/generated/verification/nomi-macos-landmarks-style-sidebar-2026-05-11.png`。
 - Calendar-style toolbar icon 修正后再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，用 Computer Use 确认右侧搜索和 Add 是两个独立 toolbar button，搜索 button 可向左展开为宽搜索框，Add button 可打开添加 overlay；截图保存到 `docs/generated/verification/nomi-macos-calendar-toolbar-icons-2026-05-11.png`、`docs/generated/verification/nomi-macos-expandable-toolbar-search-2026-05-11.png`、`docs/generated/verification/nomi-macos-native-glass-toolbar-search-2026-05-11.png` 和 `docs/generated/verification/nomi-macos-separated-toolbar-icons-light-add-2026-05-11.png`。
 - Add overlay 背景位移修正后再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，用 Computer Use 确认 Add 打开时底层内容不再上移，面板外点击和再次点击 Add 都能关闭；截图保存到 `docs/generated/verification/nomi-macos-add-overlay-no-bg-shift-2026-05-11.png`。
+- 搜索收起闪字修正后再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`；窗口验证阶段本机进入锁屏，未能追加 Computer Use 截图。

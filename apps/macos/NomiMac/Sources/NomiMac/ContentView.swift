@@ -253,10 +253,12 @@ struct ContentView: View {
 private struct ExpandableToolbarSearch: View {
     @Binding var text: String
     @Binding var isExpanded: Bool
+    @State private var showsExpandedControls = false
+    @State private var pendingCollapse: DispatchWorkItem?
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            if isExpanded {
+            if isExpanded, showsExpandedControls {
                 HStack(spacing: 8) {
                     NativeToolbarSearchField(text: $text)
                         .frame(width: 286, height: 30)
@@ -281,19 +283,36 @@ private struct ExpandableToolbarSearch: View {
             }
         }
         .frame(width: isExpanded ? 330 : 34, height: 34, alignment: .trailing)
+        .clipped()
         .animation(.smooth(duration: 0.24), value: isExpanded)
     }
 
     private func expand() {
+        pendingCollapse?.cancel()
+        pendingCollapse = nil
         withAnimation(.smooth(duration: 0.24)) {
             isExpanded = true
+            showsExpandedControls = true
         }
     }
 
     private func collapse() {
-        withAnimation(.smooth(duration: 0.2)) {
-            isExpanded = false
+        pendingCollapse?.cancel()
+
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            showsExpandedControls = false
         }
+
+        let workItem = DispatchWorkItem {
+            withAnimation(.smooth(duration: 0.2)) {
+                isExpanded = false
+            }
+            pendingCollapse = nil
+        }
+        pendingCollapse = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04, execute: workItem)
     }
 }
 
