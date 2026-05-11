@@ -12,6 +12,9 @@ macOS 版本已有，但界面太丑、无用元素太多；按给定视觉方�
 - 保留手动文字记录 fallback，但弱化为次级保存按钮。
 - 将 SwiftPM macOS app 入口改为显式 AppKit `NSWindow` 承载 `ContentView`，避免手工打包 `.app` 时进程启动但没有可见窗口。
 - 同步更新 macOS 架构、前端说明和质量评分文档。
+- 后续迭代按 Figma 文件 `YzJi7uEIR0SGi0kWSbQLsS` 的节点 `2:2`、`20:5`、`25:2`、`43:2` 重建 macOS MVP UI：恢复左侧 sidebar 母版、统一顶部 breadcrumb / search / Add 入口、健康看板、记录列表详情、添加记录 overlay 和图片预览 overlay。
+- 将 Figma 参考图片打包为 SwiftPM resources，并更新 `build-app.sh` 复制 resource bundle，保证手工 `.app` 内缩略图和大图可正常显示。
+- Add overlay 支持点击 file importer、拖拽文件 URL 和文本 fallback；图片预览 overlay 支持从详情图放大进入和关闭返回。
 
 ## 设计动机
 
@@ -26,4 +29,6 @@ macOS 版本已有，但界面太丑、无用元素太多；按给定视觉方�
 - `GOTOOLCHAIN=auto go test ./...`（`apps/server`）
 - `make check-docs`
 - 启动本地 `postgres17`、Nomi server 和 SeedX daemon 后，调用 `POST /ai/extract-image` 成功返回 `record_id`、`schema_version: 2026-05-08.seedx-codex-image.v1`、`input_category` 和 SeedX/Codex 生成的 summary，并可通过 `GET /records` 读回记录。
-- Debug app 使用 `NOMI_API_BASE_URL=http://127.0.0.1:8088` 启动；临时诊断确认主窗口 `isVisible == true`。当前 Computer Use / `screencapture` 在本机返回不到 Nomi 窗口画面，因此本轮截图证据未可靠生成。
+- Debug app 使用 `NOMI_API_BASE_URL=http://127.0.0.1:8088` 启动；临时诊断确认主窗口 `isVisible == true`。上一阶段 Computer Use / `screencapture` 在本机返回不到 Nomi 窗口画面，因此当时截图证据未可靠生成。
+- 后续 Figma MVP 迭代再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，并通过 Computer Use 验证概览、记录页、添加记录 overlay、图片预览 overlay 都可进入。
+- 视觉截图保存到 `docs/generated/verification/nomi-macos-figma-dashboard-2026-05-11.png`、`nomi-macos-figma-records-detail-2026-05-11.png`、`nomi-macos-figma-add-overlay-2026-05-11.png`、`nomi-macos-figma-image-preview-2026-05-11.png`。

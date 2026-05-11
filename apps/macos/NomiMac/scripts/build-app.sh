@@ -12,6 +12,9 @@ swift build
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR"
 cp "$ROOT_DIR/.build/debug/NomiMac" "$MACOS_DIR/NomiMac"
+if [ -d "$ROOT_DIR/.build/debug/NomiMac_NomiMac.bundle" ]; then
+  cp -R "$ROOT_DIR/.build/debug/NomiMac_NomiMac.bundle" "$APP_DIR/NomiMac_NomiMac.bundle"
+fi
 
 cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

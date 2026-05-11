@@ -26,10 +26,10 @@ final class NomiMacApp: NSObject, NSApplicationDelegate {
         guard window == nil else { return }
 
         let contentView = ContentView()
-            .frame(minWidth: 760, minHeight: 560)
+            .frame(minWidth: 960, minHeight: 640)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 860, height: 620),
+            contentRect: NSRect(x: 0, y: 0, width: 1024, height: 718),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
