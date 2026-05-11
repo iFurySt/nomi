@@ -117,8 +117,6 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             appShell
-                .blur(radius: showingAddOverlay ? 0.8 : 0)
-                .animation(.smooth(duration: 0.22), value: showingAddOverlay)
 
             if showingAddOverlay {
                 AddRecordOverlay(
@@ -191,7 +189,7 @@ struct ContentView: View {
             ToolbarItem {
                 Button("添加记录", systemImage: "plus") {
                     withAnimation(.smooth(duration: 0.22)) {
-                        showingAddOverlay = true
+                        showingAddOverlay.toggle()
                     }
                 }
                 .labelStyle(.iconOnly)
@@ -1063,8 +1061,10 @@ private struct AddRecordOverlay: View {
 
     var body: some View {
         ZStack {
-            Color.white.opacity(0.12)
+            Rectangle()
+                .fill(Color.black.opacity(0.001))
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
                 .onTapGesture {
                     guard !isSaving else { return }
                     isPresented = false
