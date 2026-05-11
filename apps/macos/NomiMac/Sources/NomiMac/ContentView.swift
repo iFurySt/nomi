@@ -89,6 +89,7 @@ struct ContentView: View {
     @State private var selectedFilter: RecordFilter = .all
     @State private var selectedRecordID = "breakfast"
     @State private var searchText = ""
+    @State private var isSearchPresented = false
     @State private var showingAddOverlay = false
     @State private var previewRecord: NomiRecord?
 
@@ -166,21 +167,32 @@ struct ContentView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
-        .searchable(text: $searchText, prompt: "搜索记录、数据、洞察...")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .automatic) {
+                ExpandableToolbarSearch(
+                    text: $searchText,
+                    isExpanded: $isSearchPresented
+                )
+                .padding(.trailing, 18)
+                .accessibilityIdentifier("mac-search-button")
+            }
+
+            ToolbarItem(placement: .automatic) {
                 Button {
                     withAnimation(.smooth(duration: 0.22)) {
                         showingAddOverlay = true
                     }
                 } label: {
                     Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(width: 34, height: 34)
                 }
+                .buttonStyle(.plain)
+                .toolbarGlass(in: Circle())
                 .help("添加记录")
                 .accessibilityIdentifier("mac-add-button")
             }
         }
-        .toolbar(removing: .title)
     }
 
     private func detailColumn(for section: SidebarSection) -> some View {
@@ -209,6 +221,7 @@ struct ContentView: View {
                     PlaceholderPage(section: section)
                 }
             }
+            .navigationTitle(section.rawValue)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(NomiMacColor.content)
         }
@@ -229,6 +242,101 @@ struct ContentView: View {
         }
 
         isLoading = false
+    }
+}
+
+private struct ExpandableToolbarSearch: View {
+    @Binding var text: String
+    @Binding var isExpanded: Bool
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            if isExpanded {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.secondary)
+
+                    TextField("搜索记录、数据、洞察...", text: $text)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 14))
+                        .focused($isFocused)
+
+                    Button {
+                        if text.isEmpty {
+                            collapse()
+                        } else {
+                            text = ""
+                        }
+                    } label: {
+                        Image(systemName: text.isEmpty ? "xmark" : "xmark.circle.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(text.isEmpty ? "关闭搜索" : "清除搜索")
+                }
+                .padding(.leading, 13)
+                .padding(.trailing, 10)
+                .frame(width: 330, height: 34)
+                .toolbarGlass(in: Capsule())
+                .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .trailing)))
+            } else {
+                Button {
+                    expand()
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 34, height: 34)
+                }
+                .buttonStyle(.plain)
+                .toolbarGlass(in: Circle())
+                .help("搜索")
+                .transition(.opacity.combined(with: .scale(scale: 0.82, anchor: .trailing)))
+            }
+        }
+        .frame(width: isExpanded ? 330 : 34, height: 34, alignment: .trailing)
+        .animation(.smooth(duration: 0.24), value: isExpanded)
+        .onChange(of: isExpanded) { _, expanded in
+            if expanded {
+                DispatchQueue.main.async {
+                    isFocused = true
+                }
+            }
+        }
+    }
+
+    private func expand() {
+        withAnimation(.smooth(duration: 0.24)) {
+            isExpanded = true
+        }
+    }
+
+    private func collapse() {
+        withAnimation(.smooth(duration: 0.2)) {
+            isFocused = false
+            isExpanded = false
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func toolbarGlass<S: Shape>(in shape: S) -> some View {
+        if #available(macOS 26.0, *) {
+            self
+                .background(.regularMaterial, in: shape)
+                .glassEffect(.regular.interactive(), in: shape)
+                .shadow(color: .black.opacity(0.08), radius: 10, y: 2)
+        } else {
+            self
+                .background(.regularMaterial, in: shape)
+                .overlay {
+                    shape
+                        .stroke(.white.opacity(0.45), lineWidth: 0.5)
+                }
+        }
     }
 }
 
