@@ -172,11 +172,23 @@ struct ContentView: View {
                 ToolbarSpacer(.flexible)
             }
 
+            if isSearchPresented {
+                ToolbarItem {
+                    NativeToolbarSearchField(text: $searchText)
+                        .frame(width: 286, height: 30)
+                        .accessibilityIdentifier("mac-search-field")
+                }
+            }
+
             ToolbarItem {
-                ExpandableToolbarSearch(
-                    text: $searchText,
-                    isExpanded: $isSearchPresented
-                )
+                Button(isSearchPresented ? "关闭搜索" : "搜索", systemImage: isSearchPresented ? "xmark" : "magnifyingglass") {
+                    withAnimation(.smooth(duration: 0.2)) {
+                        isSearchPresented.toggle()
+                    }
+                }
+                .labelStyle(.iconOnly)
+                .nativeToolbarIconButton()
+                .help(isSearchPresented ? "关闭搜索" : "搜索")
                 .accessibilityIdentifier("mac-search-button")
             }
 
@@ -247,94 +259,6 @@ struct ContentView: View {
         }
 
         isLoading = false
-    }
-}
-
-private struct ExpandableToolbarSearch: View {
-    @Binding var text: String
-    @Binding var isExpanded: Bool
-    @State private var showsExpandedControls = false
-    @State private var showsCollapsedButton = true
-    @State private var pendingCollapse: DispatchWorkItem?
-    @State private var pendingReveal: DispatchWorkItem?
-
-    var body: some View {
-        ZStack(alignment: .trailing) {
-            if isExpanded {
-                if showsExpandedControls {
-                    HStack(spacing: 8) {
-                        NativeToolbarSearchField(text: $text)
-                            .frame(width: 286, height: 30)
-
-                        Button("关闭搜索", systemImage: "xmark") {
-                            collapse()
-                        }
-                        .labelStyle(.iconOnly)
-                        .nativeToolbarIconButton()
-                        .help("关闭搜索")
-                    }
-                    .frame(width: 330, height: 34, alignment: .trailing)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .trailing)))
-                }
-            } else if showsCollapsedButton {
-                Button("搜索", systemImage: "magnifyingglass") {
-                    expand()
-                }
-                .labelStyle(.iconOnly)
-                .nativeToolbarIconButton()
-                .help("搜索")
-                .transition(.opacity.combined(with: .scale(scale: 0.82, anchor: .trailing)))
-            }
-        }
-        .frame(width: isExpanded ? 330 : 34, height: 34, alignment: .trailing)
-        .clipped()
-        .animation(.smooth(duration: 0.24), value: isExpanded)
-    }
-
-    private func expand() {
-        pendingCollapse?.cancel()
-        pendingReveal?.cancel()
-        pendingCollapse = nil
-        pendingReveal = nil
-
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            showsCollapsedButton = false
-        }
-
-        withAnimation(.smooth(duration: 0.24)) {
-            isExpanded = true
-            showsExpandedControls = true
-        }
-    }
-
-    private func collapse() {
-        pendingCollapse?.cancel()
-        pendingReveal?.cancel()
-
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            showsExpandedControls = false
-            showsCollapsedButton = false
-        }
-
-        let workItem = DispatchWorkItem {
-            withAnimation(.smooth(duration: 0.2)) {
-                isExpanded = false
-            }
-            pendingCollapse = nil
-
-            let revealItem = DispatchWorkItem {
-                showsCollapsedButton = true
-                pendingReveal = nil
-            }
-            pendingReveal = revealItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: revealItem)
-        }
-        pendingCollapse = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04, execute: workItem)
     }
 }
 
