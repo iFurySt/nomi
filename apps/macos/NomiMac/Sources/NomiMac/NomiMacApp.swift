@@ -30,12 +30,12 @@ final class NomiMacApp: NSObject, NSApplicationDelegate {
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1024, height: 718),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Nomi"
-        window.titlebarAppearsTransparent = true
+        window.titlebarAppearsTransparent = false
         window.toolbarStyle = .unified
         window.contentView = NSHostingView(rootView: contentView)
         window.center()

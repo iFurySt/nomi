@@ -25,7 +25,7 @@ private enum NomiMacColor {
     static let softFill = Color(hex: 0xf3f3f2)
 }
 
-private enum SidebarSection: String, CaseIterable, Identifiable {
+private enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case overview = "概览"
     case records = "记录"
     case data = "数据"
@@ -85,7 +85,6 @@ struct ContentView: View {
     @State private var records: [SavedRecord] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var selectedSection: SidebarSection = .overview
     @State private var selectedFilter: RecordFilter = .all
     @State private var selectedRecordID = "breakfast"
     @State private var searchText = ""
@@ -152,52 +151,57 @@ struct ContentView: View {
     }
 
     private var appShell: some View {
-        GeometryReader { proxy in
-            let sidebarWidth: CGFloat = proxy.size.width < 880 ? 132 : 164
+        NavigationSplitView {
+            NativeSidebarView()
+                .frame(minWidth: 180)
+                .navigationSplitViewColumnWidth(196)
+                .navigationDestination(for: SidebarSection.self) { section in
+                    detailColumn(for: section)
+                }
+        } detail: {
+            detailColumn(for: .overview)
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
 
-            HStack(spacing: 0) {
-                SidebarView(
-                    selectedSection: $selectedSection,
-                    sidebarWidth: sidebarWidth
+    private func detailColumn(for section: SidebarSection) -> some View {
+        GeometryReader { _ in
+            VStack(spacing: 0) {
+                TopBar(
+                    selectedSection: section,
+                    searchText: $searchText,
+                    onAdd: {
+                        withAnimation(.smooth(duration: 0.22)) {
+                            showingAddOverlay = true
+                        }
+                    }
                 )
 
-                VStack(spacing: 0) {
-                    TopBar(
-                        selectedSection: selectedSection,
-                        searchText: $searchText,
-                        onAdd: {
+                if section == .overview {
+                    DashboardView(records: displayRecords.prefix(4).map { $0 })
+                        .transition(.opacity)
+                } else if section == .records {
+                    RecordsPage(
+                        records: filteredRecords,
+                        selectedRecordID: $selectedRecordID,
+                        selectedFilter: $selectedFilter,
+                        selectedRecord: selectedRecord,
+                        isLoading: isLoading,
+                        errorMessage: errorMessage,
+                        onRetry: { Task { await loadRecords() } },
+                        onPreview: { record in
                             withAnimation(.smooth(duration: 0.22)) {
-                                showingAddOverlay = true
+                                previewRecord = record
                             }
                         }
                     )
-
-                    if selectedSection == .overview {
-                        DashboardView(records: displayRecords.prefix(4).map { $0 })
-                            .transition(.opacity)
-                    } else if selectedSection == .records {
-                        RecordsPage(
-                            records: filteredRecords,
-                            selectedRecordID: $selectedRecordID,
-                            selectedFilter: $selectedFilter,
-                            selectedRecord: selectedRecord,
-                            isLoading: isLoading,
-                            errorMessage: errorMessage,
-                            onRetry: { Task { await loadRecords() } },
-                            onPreview: { record in
-                                withAnimation(.smooth(duration: 0.22)) {
-                                    previewRecord = record
-                                }
-                            }
-                        )
-                        .transition(.opacity)
-                    } else {
-                        PlaceholderPage(section: selectedSection)
-                    }
+                    .transition(.opacity)
+                } else {
+                    PlaceholderPage(section: section)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(NomiMacColor.content)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(NomiMacColor.content)
         }
     }
 
@@ -219,111 +223,44 @@ struct ContentView: View {
     }
 }
 
-private struct SidebarView: View {
-    @Binding var selectedSection: SidebarSection
-    let sidebarWidth: CGFloat
-
+private struct NativeSidebarView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 7) {
-                Circle().fill(Color.red.opacity(0.78)).frame(width: 8, height: 8)
-                Circle().fill(Color.yellow.opacity(0.86)).frame(width: 8, height: 8)
-                Circle().fill(Color.green.opacity(0.82)).frame(width: 8, height: 8)
-                Spacer()
-                Button {
-                } label: {
-                    Image(systemName: "sidebar.left")
-                        .font(.system(size: 12, weight: .bold))
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.plain)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .help("Sidebar")
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
-
-            HStack(spacing: 10) {
-                ResourceImage(name: "avatar", contentMode: .fill)
-                    .frame(width: 30, height: 30)
-                    .clipShape(Circle())
-                Text("Leo")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(NomiMacColor.ink)
-            }
-            .padding(.top, 22)
-            .padding(.horizontal, 17)
-
-            VStack(spacing: 4) {
-                ForEach(SidebarSection.allCases) { section in
-                    SidebarRow(
-                        section: section,
-                        isSelected: section == selectedSection,
-                        action: {
-                            withAnimation(.smooth(duration: 0.18)) {
-                                selectedSection = section
-                            }
-                        }
-                    )
-                }
-            }
-            .padding(.top, 17)
-            .padding(.horizontal, 11)
-
-            Spacer(minLength: 20)
-
-            Button {
-            } label: {
+        List {
+            Section {
                 HStack(spacing: 10) {
-                    Image(systemName: "gearshape")
-                        .frame(width: 18)
-                    Text("设置")
+                    ResourceImage(name: "avatar", contentMode: .fill)
+                        .frame(width: 30, height: 30)
+                        .clipShape(Circle())
+                    Text("Leo")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.primary)
                 }
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(NomiMacColor.secondaryInk)
-                .frame(height: 28)
+                .padding(.vertical, 8)
+                .listRowBackground(Color.clear)
+                .accessibilityIdentifier("mac-sidebar-profile")
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 17)
-            .padding(.bottom, 20)
-        }
-        .frame(width: sidebarWidth)
-        .frame(maxHeight: .infinity)
-        .background(NomiMacColor.sidebar)
-        .overlay(alignment: .trailing) {
-            Rectangle().fill(Color.white.opacity(0.9)).frame(width: 1)
-        }
-    }
-}
 
-private struct SidebarRow: View {
-    let section: SidebarSection
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: section.symbolName)
-                    .font(.system(size: 11, weight: .bold))
-                    .frame(width: 18)
-                Text(section.rawValue)
-                    .font(.system(size: 12, weight: .bold))
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(isSelected ? NomiMacColor.ink : NomiMacColor.secondaryInk)
-            .padding(.horizontal, 14)
-            .frame(height: 26)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(Color.white)
-                        .shadow(color: .black.opacity(0.05), radius: 11, y: 4)
+            Section {
+                ForEach(SidebarSection.allCases) { section in
+                    NavigationLink(value: section) {
+                        Label(section.rawValue, systemImage: section.symbolName)
+                            .font(.body.weight(.semibold))
+                    }
+                    .accessibilityIdentifier("mac-sidebar-\(section.rawValue)")
                 }
             }
+
+            Section {
+                Label("设置", systemImage: "gearshape")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .listRowBackground(Color.clear)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("mac-sidebar-\(section.rawValue)")
+        .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(.bar)
+        .accessibilityIdentifier("mac-native-sidebar")
     }
 }
 
@@ -559,6 +496,8 @@ private struct RecentRecordsCard: View {
                         Text(label)
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(label == "全部" ? NomiMacColor.ink : Color(hex: 0x7c7c7c))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                             .padding(.horizontal, label == "全部" ? 12 : 0)
                             .frame(height: 24)
                             .background {
