@@ -82,6 +82,7 @@ private struct NomiRecord: Identifiable, Equatable {
 }
 
 struct ContentView: View {
+    @State private var preferredColumn: NavigationSplitViewColumn = .detail
     @State private var records: [SavedRecord] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -151,32 +152,40 @@ struct ContentView: View {
     }
 
     private var appShell: some View {
-        NavigationSplitView {
+        NavigationSplitView(preferredCompactColumn: $preferredColumn) {
             NativeSidebarView()
-                .frame(minWidth: 180)
-                .navigationSplitViewColumnWidth(196)
+                .frame(minWidth: 220)
                 .navigationDestination(for: SidebarSection.self) { section in
-                    detailColumn(for: section)
+                    NavigationStack {
+                        detailColumn(for: section)
+                    }
                 }
         } detail: {
-            detailColumn(for: .overview)
+            NavigationStack {
+                detailColumn(for: .overview)
+            }
         }
         .navigationSplitViewStyle(.balanced)
+        .searchable(text: $searchText, prompt: "搜索记录、数据、洞察...")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    withAnimation(.smooth(duration: 0.22)) {
+                        showingAddOverlay = true
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .help("添加记录")
+                .accessibilityIdentifier("mac-add-button")
+            }
+        }
+        .toolbar(removing: .title)
     }
 
     private func detailColumn(for section: SidebarSection) -> some View {
         GeometryReader { _ in
-            VStack(spacing: 0) {
-                TopBar(
-                    selectedSection: section,
-                    searchText: $searchText,
-                    onAdd: {
-                        withAnimation(.smooth(duration: 0.22)) {
-                            showingAddOverlay = true
-                        }
-                    }
-                )
-
+            Group {
                 if section == .overview {
                     DashboardView(records: displayRecords.prefix(4).map { $0 })
                         .transition(.opacity)
@@ -261,49 +270,6 @@ private struct NativeSidebarView: View {
         .scrollContentBackground(.hidden)
         .background(.bar)
         .accessibilityIdentifier("mac-native-sidebar")
-    }
-}
-
-private struct TopBar: View {
-    let selectedSection: SidebarSection
-    @Binding var searchText: String
-    let onAdd: () -> Void
-
-    var body: some View {
-        HStack(spacing: 18) {
-            Text("健康看板 / \(selectedSection.rawValue)")
-                .font(NomiMacType.breadcrumb)
-                .foregroundStyle(NomiMacColor.ink)
-                .lineLimit(1)
-
-            Spacer(minLength: 18)
-
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(Color(hex: 0x999999))
-                TextField("搜索记录、数据、洞察...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(NomiMacType.body)
-            }
-            .padding(.horizontal, 14)
-            .frame(width: 270, height: 30)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-            .shadow(color: .black.opacity(0.04), radius: 11, y: 4)
-
-            Button(action: onAdd) {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .bold))
-                    .frame(width: 30, height: 30)
-            }
-            .buttonStyle(.plain)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
-            .help("添加记录")
-            .accessibilityIdentifier("mac-add-button")
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 18)
-        .frame(height: 56)
     }
 }
 
