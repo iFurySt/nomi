@@ -117,6 +117,8 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             appShell
+                .blur(radius: showingAddOverlay ? 0.8 : 0)
+                .animation(.smooth(duration: 0.22), value: showingAddOverlay)
 
             if showingAddOverlay {
                 AddRecordOverlay(
@@ -180,13 +182,9 @@ struct ContentView: View {
                 .accessibilityIdentifier("mac-search-button")
             }
 
-            if #available(macOS 26.0, *) {
-                ToolbarSpacer(.fixed)
-            }
-
             ToolbarItem {
-                Color.clear
-                    .frame(width: 14, height: 1)
+                Spacer(minLength: 22)
+                    .frame(width: 22, height: 1)
                     .accessibilityHidden(true)
             }
 
@@ -304,15 +302,12 @@ private struct ExpandableToolbarSearch: View {
 private extension View {
     @ViewBuilder
     func nativeToolbarIconButton() -> some View {
-        if #available(macOS 26.0, *) {
-            self
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-        } else {
-            self
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.circle)
-        }
+        self
+            .font(.system(size: 19, weight: .regular))
+            .foregroundStyle(Color(nsColor: .labelColor))
+            .frame(width: 32, height: 32)
+            .contentShape(Circle())
+            .buttonStyle(.plain)
     }
 }
 
@@ -1068,8 +1063,7 @@ private struct AddRecordOverlay: View {
 
     var body: some View {
         ZStack {
-            Color(hex: 0xf7f8f8).opacity(0.68)
-                .background(.ultraThinMaterial)
+            Color.white.opacity(0.12)
                 .ignoresSafeArea()
                 .onTapGesture {
                     guard !isSaving else { return }
