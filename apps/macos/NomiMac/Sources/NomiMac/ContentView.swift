@@ -14,8 +14,9 @@ private enum NomiMacType {
 }
 
 private enum NomiMacColor {
-    static let appBackground = Color(hex: 0xf7f7f6)
-    static let sidebar = Color(hex: 0xf1f1ef)
+    static let appBackground = Color(hex: 0xfafaf8)
+    static let sidebar = Color(hex: 0xe9e9e5)
+    static let sidebarSelection = Color(hex: 0xe8e1d6)
     static let content = Color(hex: 0xfafaf8)
     static let surface = Color.white
     static let ink = Color(hex: 0x111111)
@@ -174,22 +175,18 @@ struct ContentView: View {
 
             if isSearchPresented {
                 ToolbarItem {
-                    NativeToolbarSearchField(text: $searchText)
+                    NativeToolbarSearchField(text: $searchText) {
+                        withAnimation(.smooth(duration: 0.18)) {
+                            isSearchPresented = false
+                        }
+                    }
                         .frame(width: 286, height: 30)
                         .accessibilityIdentifier("mac-search-field")
                 }
             }
 
             ToolbarItem {
-                Button(isSearchPresented ? "关闭搜索" : "搜索", systemImage: isSearchPresented ? "xmark" : "magnifyingglass") {
-                    withAnimation(.smooth(duration: 0.2)) {
-                        isSearchPresented.toggle()
-                    }
-                }
-                .labelStyle(.iconOnly)
-                .nativeToolbarIconButton()
-                .help(isSearchPresented ? "关闭搜索" : "搜索")
-                .accessibilityIdentifier("mac-search-button")
+                SearchToolbarButton(isPresented: $isSearchPresented)
             }
 
             ToolbarItem {
@@ -262,6 +259,24 @@ struct ContentView: View {
     }
 }
 
+private struct SearchToolbarButton: View {
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        let closesSearch = isPresented
+
+        Button(closesSearch ? "关闭搜索" : "搜索", systemImage: closesSearch ? "xmark" : "magnifyingglass") {
+            withAnimation(.smooth(duration: 0.2)) {
+                isPresented = !closesSearch
+            }
+        }
+        .labelStyle(.iconOnly)
+        .nativeToolbarIconButton()
+        .help(closesSearch ? "关闭搜索" : "搜索")
+        .accessibilityIdentifier("mac-search-button")
+    }
+}
+
 private extension View {
     @ViewBuilder
     func nativeToolbarIconButton() -> some View {
@@ -276,6 +291,7 @@ private extension View {
 
 private struct NativeToolbarSearchField: NSViewRepresentable {
     @Binding var text: String
+    let onEditingEnded: () -> Void
 
     func makeNSView(context: Context) -> NSSearchField {
         let searchField = NSSearchField()
@@ -286,6 +302,7 @@ private struct NativeToolbarSearchField: NSViewRepresentable {
         DispatchQueue.main.async {
             searchField.window?.makeFirstResponder(searchField)
         }
+        context.coordinator.attach(to: searchField)
         return searchField
     }
 
@@ -293,27 +310,65 @@ private struct NativeToolbarSearchField: NSViewRepresentable {
         if searchField.stringValue != text {
             searchField.stringValue = text
         }
-        DispatchQueue.main.async {
-            if searchField.window?.firstResponder !== searchField.currentEditor() {
-                searchField.window?.makeFirstResponder(searchField)
-            }
-        }
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
+        Coordinator(text: $text, onEditingEnded: onEditingEnded)
     }
 
+    static func dismantleNSView(_ nsView: NSSearchField, coordinator: Coordinator) {
+        coordinator.detach()
+    }
+
+    @MainActor
     final class Coordinator: NSObject, NSSearchFieldDelegate {
         @Binding private var text: String
+        private let onEditingEnded: () -> Void
+        private var mouseMonitor: Any?
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, onEditingEnded: @escaping () -> Void) {
             _text = text
+            self.onEditingEnded = onEditingEnded
+        }
+
+        func attach(to searchField: NSSearchField) {
+            detach()
+            mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self, weak searchField] event in
+                let shouldClose = MainActor.assumeIsolated {
+                    guard let searchField, event.window === searchField.window else {
+                        return false
+                    }
+
+                    let pointInSearchField = searchField.convert(event.locationInWindow, from: nil)
+                    return !searchField.bounds.insetBy(dx: -8, dy: -8).contains(pointInSearchField)
+                }
+
+                if shouldClose {
+                    Task { @MainActor [weak self] in
+                        self?.onEditingEnded()
+                    }
+                }
+
+                return event
+            }
+        }
+
+        func detach() {
+            if let mouseMonitor {
+                NSEvent.removeMonitor(mouseMonitor)
+                self.mouseMonitor = nil
+            }
         }
 
         func controlTextDidChange(_ notification: Notification) {
             guard let searchField = notification.object as? NSSearchField else { return }
             text = searchField.stringValue
+        }
+
+        func controlTextDidEndEditing(_ notification: Notification) {
+            DispatchQueue.main.async {
+                self.onEditingEnded()
+            }
         }
     }
 }
@@ -327,35 +382,55 @@ private struct NativeSidebarView: View {
                         .frame(width: 30, height: 30)
                         .clipShape(Circle())
                     Text("Leo")
-                        .font(.headline.weight(.semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.primary)
                 }
-                .padding(.vertical, 8)
-                .listRowBackground(Color.clear)
+                .padding(.vertical, 12)
+                .listRowInsets(EdgeInsets(top: 10, leading: 18, bottom: 8, trailing: 12))
+                .listRowBackground(NomiMacColor.sidebar)
                 .accessibilityIdentifier("mac-sidebar-profile")
             }
 
             Section {
                 ForEach(SidebarSection.allCases) { section in
                     NavigationLink(value: section) {
-                        Label(section.rawValue, systemImage: section.symbolName)
-                            .font(.body.weight(.semibold))
+                        SidebarItemLabel(section: section)
                     }
+                    .listRowInsets(EdgeInsets(top: 3, leading: 12, bottom: 3, trailing: 12))
+                    .listRowBackground(NomiMacColor.sidebar)
                     .accessibilityIdentifier("mac-sidebar-\(section.rawValue)")
                 }
             }
 
             Section {
                 Label("设置", systemImage: "gearshape")
-                    .font(.body.weight(.semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .listRowBackground(Color.clear)
+                    .padding(.vertical, 7)
+                    .listRowInsets(EdgeInsets(top: 18, leading: 18, bottom: 8, trailing: 12))
+                    .listRowBackground(NomiMacColor.sidebar)
             }
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
-        .background(.bar)
+        .background(NomiMacColor.sidebar)
         .accessibilityIdentifier("mac-native-sidebar")
+    }
+}
+
+private struct SidebarItemLabel: View {
+    let section: SidebarSection
+
+    var body: some View {
+        Label {
+            Text(section.rawValue)
+                .font(.system(size: 14, weight: .semibold))
+        } icon: {
+            Image(systemName: section.symbolName)
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 19)
+        }
+        .padding(.vertical, 7)
     }
 }
 

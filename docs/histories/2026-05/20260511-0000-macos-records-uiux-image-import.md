@@ -20,6 +20,7 @@ macOS 版本已有，但界面太丑、无用元素太多；按给定视觉方�
 - 继续按 Landmarks / Calendar toolbar 修正：右侧搜索和 Add 改为两个独立 icon-only toolbar button，中间用固定空隙避免 Liquid Glass 融合成一个背景；搜索从独立 icon 向左展开为原生 `NSSearchField`，Add 保持独立按钮；不再在 toolbar 常驻组合搜索框，也不再为标题区手画宽背景容器。
 - Add overlay 不再使用整页 material 遮罩、背景 blur 或页面缩放，只在当前页面上叠加居中表单；面板外透明 hit-test 区域和再次点击 Add 都可以关闭弹窗。
 - 搜索 toolbar 改为原生 toolbar item 组合：`NSSearchField` 作为独立 item 在左侧出现 / 消失，右侧同一个 icon button 只在放大镜和 `xmark` 之间切换，避免收起时 placeholder 闪出、放大镜漂移或空白帧。
+- 搜索展开后监听窗口内点击，点击搜索框以外区域会自动收回；sidebar 背景加深到比主体 `#FAFAF8` 更清晰的灰阶，并放大 sidebar 行高和字号。
 
 ## 设计动机
 
@@ -46,3 +47,4 @@ macOS 版本已有，但界面太丑、无用元素太多；按给定视觉方�
 - Calendar-style toolbar icon 修正后再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，用 Computer Use 确认右侧搜索和 Add 是两个独立 toolbar button，搜索 button 可向左展开为宽搜索框，Add button 可打开添加 overlay；截图保存到 `docs/generated/verification/nomi-macos-calendar-toolbar-icons-2026-05-11.png`、`docs/generated/verification/nomi-macos-expandable-toolbar-search-2026-05-11.png`、`docs/generated/verification/nomi-macos-native-glass-toolbar-search-2026-05-11.png` 和 `docs/generated/verification/nomi-macos-separated-toolbar-icons-light-add-2026-05-11.png`。
 - Add overlay 背景位移修正后再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，用 Computer Use 确认 Add 打开时底层内容不再上移，面板外点击和再次点击 Add 都能关闭；截图保存到 `docs/generated/verification/nomi-macos-add-overlay-no-bg-shift-2026-05-11.png`。
 - 搜索收起闪字、icon 漂移和空白帧修正后再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，用 Computer Use 确认搜索可展开 / 收起，关闭后直接回到稳定放大镜位置；截图保存到 `docs/generated/verification/nomi-macos-search-collapse-stable-2026-05-11.png`。
+- 搜索失焦收回和 sidebar 视觉修正后再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，用 Computer Use 确认搜索展开后点击页面主体会自动收回，sidebar 与主体背景区分更明显；截图保存到 `docs/generated/verification/nomi-macos-sidebar-search-focus-2026-05-11.png`。
