@@ -2,19 +2,21 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="$ROOT_DIR/.build/NomiMac.app"
+APP_DIR="$ROOT_DIR/.build/Nomi.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
+RESOURCES_DIR="$CONTENTS_DIR/Resources"
 
 cd "$ROOT_DIR"
 swift build
 
 rm -rf "$APP_DIR"
-mkdir -p "$MACOS_DIR"
-cp "$ROOT_DIR/.build/debug/NomiMac" "$MACOS_DIR/NomiMac"
+mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
+cp "$ROOT_DIR/.build/debug/NomiMac" "$MACOS_DIR/Nomi"
 if [ -d "$ROOT_DIR/.build/debug/NomiMac_NomiMac.bundle" ]; then
   cp -R "$ROOT_DIR/.build/debug/NomiMac_NomiMac.bundle" "$APP_DIR/NomiMac_NomiMac.bundle"
 fi
+cp "$ROOT_DIR/Sources/NomiMac/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 
 cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -25,9 +27,13 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleExecutable</key>
-  <string>NomiMac</string>
+  <string>Nomi</string>
   <key>CFBundleIdentifier</key>
   <string>dev.nomi.mac</string>
+  <key>CFBundleDisplayName</key>
+  <string>Nomi</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundleName</key>
   <string>Nomi</string>
   <key>CFBundlePackageType</key>

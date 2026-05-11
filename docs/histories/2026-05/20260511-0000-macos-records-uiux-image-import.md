@@ -21,6 +21,9 @@ macOS 版本已有，但界面太丑、无用元素太多；按给定视觉方�
 - Add overlay 不再使用整页 material 遮罩、背景 blur 或页面缩放，只在当前页面上叠加居中表单；面板外透明 hit-test 区域和再次点击 Add 都可以关闭弹窗。
 - 搜索 toolbar 改为原生 toolbar item 组合：`NSSearchField` 作为独立 item 在左侧出现 / 消失，右侧同一个 icon button 只在放大镜和 `xmark` 之间切换，避免收起时 placeholder 闪出、放大镜漂移或空白帧。
 - 搜索展开后监听窗口内点击，点击搜索框以外区域会自动收回；sidebar 背景加深到比主体 `#FAFAF8` 更清晰的灰阶，并放大 sidebar 行高和字号。
+- macOS 手工 app bundle / DMG 从 `NomiMac` 统一改为对外显示 `Nomi`，`Info.plist` 写入 `CFBundleDisplayName` / `CFBundleName` / `CFBundleExecutable: Nomi`，并复用移动端 logo 生成 `AppIcon.icns`。
+- sidebar 改为系统 `.sidebar` List 外壳加自定义 section state，不再依赖系统 `NavigationLink` 的浅色选中态；选中行改为深灰底白字，hover 行和 sidebar 背景也继续加深，避免和主体 `#FAFAF8` 过近。
+- 图片预览 overlay 改为和 Add overlay 一样直接在当前页面上打开，去掉背后的 material blur，只保留透明点击区用于点外关闭。
 
 ## 设计动机
 
@@ -48,3 +51,4 @@ macOS 版本已有，但界面太丑、无用元素太多；按给定视觉方�
 - Add overlay 背景位移修正后再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，用 Computer Use 确认 Add 打开时底层内容不再上移，面板外点击和再次点击 Add 都能关闭；截图保存到 `docs/generated/verification/nomi-macos-add-overlay-no-bg-shift-2026-05-11.png`。
 - 搜索收起闪字、icon 漂移和空白帧修正后再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，用 Computer Use 确认搜索可展开 / 收起，关闭后直接回到稳定放大镜位置；截图保存到 `docs/generated/verification/nomi-macos-search-collapse-stable-2026-05-11.png`。
 - 搜索失焦收回和 sidebar 视觉修正后再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，用 Computer Use 确认搜索展开后点击页面主体会自动收回，sidebar 与主体背景区分更明显；截图保存到 `docs/generated/verification/nomi-macos-sidebar-search-focus-2026-05-11.png`。
+- macOS branding / sidebar selected pass 再次运行 `cd apps/macos/NomiMac && ./scripts/build-app.sh`，并用 `plutil -p .build/Nomi.app/Contents/Info.plist` 确认 bundle display name、executable 和 icon 均为 `Nomi` / `AppIcon`。

@@ -15,8 +15,9 @@ private enum NomiMacType {
 
 private enum NomiMacColor {
     static let appBackground = Color(hex: 0xfafaf8)
-    static let sidebar = Color(hex: 0xe9e9e5)
-    static let sidebarSelection = Color(hex: 0xe8e1d6)
+    static let sidebar = Color(hex: 0xe2e2dc)
+    static let sidebarSelection = Color(hex: 0x30302d)
+    static let sidebarHover = Color(hex: 0xd2d2cc)
     static let content = Color(hex: 0xfafaf8)
     static let surface = Color.white
     static let ink = Color(hex: 0x111111)
@@ -87,6 +88,7 @@ struct ContentView: View {
     @State private var records: [SavedRecord] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var selectedSection: SidebarSection = .overview
     @State private var selectedFilter: RecordFilter = .all
     @State private var selectedRecordID = "breakfast"
     @State private var searchText = ""
@@ -155,16 +157,11 @@ struct ContentView: View {
 
     private var appShell: some View {
         NavigationSplitView(preferredCompactColumn: $preferredColumn) {
-            NativeSidebarView()
+            NativeSidebarView(selectedSection: $selectedSection)
                 .frame(minWidth: 220)
-                .navigationDestination(for: SidebarSection.self) { section in
-                    NavigationStack {
-                        detailColumn(for: section)
-                    }
-                }
         } detail: {
             NavigationStack {
-                detailColumn(for: .overview)
+                detailColumn(for: selectedSection)
             }
         }
         .navigationSplitViewStyle(.balanced)
@@ -374,6 +371,8 @@ private struct NativeToolbarSearchField: NSViewRepresentable {
 }
 
 private struct NativeSidebarView: View {
+    @Binding var selectedSection: SidebarSection
+
     var body: some View {
         List {
             Section {
@@ -393,9 +392,11 @@ private struct NativeSidebarView: View {
 
             Section {
                 ForEach(SidebarSection.allCases) { section in
-                    NavigationLink(value: section) {
-                        SidebarItemLabel(section: section)
-                    }
+                    SidebarNavigationRow(
+                        section: section,
+                        isSelected: selectedSection == section,
+                        action: { selectedSection = section }
+                    )
                     .listRowInsets(EdgeInsets(top: 3, leading: 12, bottom: 3, trailing: 12))
                     .listRowBackground(NomiMacColor.sidebar)
                     .accessibilityIdentifier("mac-sidebar-\(section.rawValue)")
@@ -403,10 +404,7 @@ private struct NativeSidebarView: View {
             }
 
             Section {
-                Label("设置", systemImage: "gearshape")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 7)
+                SidebarUtilityRow(title: "设置", symbolName: "gearshape")
                     .listRowInsets(EdgeInsets(top: 18, leading: 18, bottom: 8, trailing: 12))
                     .listRowBackground(NomiMacColor.sidebar)
             }
@@ -418,18 +416,73 @@ private struct NativeSidebarView: View {
     }
 }
 
-private struct SidebarItemLabel: View {
+private struct SidebarNavigationRow: View {
     let section: SidebarSection
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var isHovered = false
 
     var body: some View {
-        Label {
-            Text(section.rawValue)
-                .font(.system(size: 14, weight: .semibold))
-        } icon: {
-            Image(systemName: section.symbolName)
+        Button(action: action) {
+            SidebarItemLabel(
+                title: section.rawValue,
+                symbolName: section.symbolName,
+                foreground: isSelected ? Color.white : NomiMacColor.ink
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(rowBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var rowBackground: Color {
+        if isSelected {
+            NomiMacColor.sidebarSelection
+        } else if isHovered {
+            NomiMacColor.sidebarHover
+        } else {
+            .clear
+        }
+    }
+}
+
+private struct SidebarUtilityRow: View {
+    let title: String
+    let symbolName: String
+
+    @State private var isHovered = false
+
+    var body: some View {
+        SidebarItemLabel(
+            title: title,
+            symbolName: symbolName,
+            foreground: .secondary
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isHovered ? NomiMacColor.sidebarHover : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .onHover { isHovered = $0 }
+    }
+}
+
+private struct SidebarItemLabel: View {
+    let title: String
+    let symbolName: String
+    let foreground: Color
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbolName)
                 .font(.system(size: 14, weight: .semibold))
                 .frame(width: 19)
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+            Spacer(minLength: 0)
         }
+        .foregroundStyle(foreground)
+        .padding(.horizontal, 8)
         .padding(.vertical, 7)
     }
 }
@@ -1301,9 +1354,10 @@ private struct ImagePreviewOverlay: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.38)
-                .background(.ultraThinMaterial)
+            Rectangle()
+                .fill(Color.black.opacity(0.001))
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
                 .onTapGesture(perform: onClose)
 
             VStack(spacing: 0) {

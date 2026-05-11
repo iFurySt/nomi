@@ -2,10 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="$ROOT_DIR/.build/NomiMac.app"
+APP_DIR="$ROOT_DIR/.build/Nomi.app"
 DIST_DIR="$ROOT_DIR/.build/dist"
 STAGE_DIR="$ROOT_DIR/.build/dmg-stage"
-DMG_PATH="$DIST_DIR/NomiMac.dmg"
+DMG_PATH="$DIST_DIR/Nomi.dmg"
 
 "$ROOT_DIR/scripts/build-app.sh" >/dev/null
 
