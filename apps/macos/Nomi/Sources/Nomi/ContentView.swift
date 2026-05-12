@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-private enum NomiMacType {
+private enum NomiType {
     static let breadcrumb = Font.system(size: 14, weight: .bold, design: .default)
     static let title = Font.system(size: 23, weight: .bold, design: .default)
     static let section = Font.system(size: 18, weight: .bold, design: .default)
@@ -13,7 +13,7 @@ private enum NomiMacType {
     static let value = Font.system(size: 25, weight: .regular, design: .default)
 }
 
-private enum NomiMacColor {
+private enum NomiColor {
     static let appBackground = Color(hex: 0xfafaf8)
     static let sidebar = Color(hex: 0xe2e2dc)
     static let sidebarSelection = Color(hex: 0x30302d)
@@ -148,7 +148,7 @@ struct ContentView: View {
             }
         }
         .tint(.primary)
-        .background(NomiMacColor.appBackground)
+        .background(NomiColor.appBackground)
         .task {
             await loadRecords()
         }
@@ -158,7 +158,7 @@ struct ContentView: View {
     private var appShell: some View {
         NavigationSplitView(preferredCompactColumn: $preferredColumn) {
             NativeSidebarView(selectedSection: $selectedSection)
-                .frame(minWidth: 220)
+                .frame(minWidth: 180, idealWidth: 220)
         } detail: {
             NavigationStack {
                 detailColumn(for: selectedSection)
@@ -166,40 +166,40 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar {
-            if #available(macOS 26.0, *) {
-                ToolbarSpacer(.flexible)
+            ToolbarItem(placement: .principal) {
+                Text(selectedSection.rawValue)
+                    .font(.system(size: 17, weight: .bold, design: .default))
+                    .lineLimit(1)
+                    .accessibilityIdentifier("mac-titlebar-title")
             }
 
             if isSearchPresented {
-                ToolbarItem {
+                ToolbarItem(placement: .primaryAction) {
                     NativeToolbarSearchField(text: $searchText) {
                         withAnimation(.smooth(duration: 0.18)) {
                             isSearchPresented = false
                         }
                     }
-                        .frame(width: 286, height: 30)
-                        .accessibilityIdentifier("mac-search-field")
+                    .frame(width: 220, height: 30)
+                    .accessibilityIdentifier("mac-search-field")
                 }
             }
 
-            ToolbarItem {
+            ToolbarItem(placement: .primaryAction) {
                 SearchToolbarButton(isPresented: $isSearchPresented)
             }
 
-            ToolbarItem {
-                Spacer(minLength: 22)
-                    .frame(width: 22, height: 1)
-                    .accessibilityHidden(true)
-            }
-
-            ToolbarItem {
-                Button("添加记录", systemImage: "plus") {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
                     withAnimation(.smooth(duration: 0.22)) {
+                        isSearchPresented = false
                         showingAddOverlay.toggle()
                     }
+                } label: {
+                    Image(systemName: "plus")
                 }
-                .labelStyle(.iconOnly)
-                .nativeToolbarIconButton()
+                .nativeGlassToolbarIcon()
+                .accessibilityLabel("添加记录")
                 .help("添加记录")
                 .accessibilityIdentifier("mac-add-button")
             }
@@ -233,8 +233,9 @@ struct ContentView: View {
                 }
             }
             .navigationTitle(section.rawValue)
+            .toolbar(removing: .title)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(NomiMacColor.content)
+            .background(NomiColor.content)
         }
     }
 
@@ -262,13 +263,15 @@ private struct SearchToolbarButton: View {
     var body: some View {
         let closesSearch = isPresented
 
-        Button(closesSearch ? "关闭搜索" : "搜索", systemImage: closesSearch ? "xmark" : "magnifyingglass") {
+        Button {
             withAnimation(.smooth(duration: 0.2)) {
                 isPresented = !closesSearch
             }
+        } label: {
+            Image(systemName: closesSearch ? "xmark" : "magnifyingglass")
         }
-        .labelStyle(.iconOnly)
-        .nativeToolbarIconButton()
+        .nativeGlassToolbarIcon()
+        .accessibilityLabel(closesSearch ? "关闭搜索" : "搜索")
         .help(closesSearch ? "关闭搜索" : "搜索")
         .accessibilityIdentifier("mac-search-button")
     }
@@ -276,13 +279,17 @@ private struct SearchToolbarButton: View {
 
 private extension View {
     @ViewBuilder
-    func nativeToolbarIconButton() -> some View {
-        self
-            .font(.system(size: 19, weight: .regular))
-            .foregroundStyle(Color(nsColor: .labelColor))
-            .frame(width: 32, height: 32)
-            .contentShape(Circle())
-            .buttonStyle(.plain)
+    func nativeGlassToolbarIcon() -> some View {
+        if #available(macOS 26.0, *) {
+            self
+                .labelStyle(.iconOnly)
+                .controlSize(.large)
+                .buttonBorderShape(.circle)
+                .buttonStyle(.glass)
+        } else {
+            self
+                .labelStyle(.iconOnly)
+        }
     }
 }
 
@@ -385,8 +392,8 @@ private struct NativeSidebarView: View {
                         .foregroundStyle(.primary)
                 }
                 .padding(.vertical, 12)
-                .listRowInsets(EdgeInsets(top: 10, leading: 18, bottom: 8, trailing: 12))
-                .listRowBackground(NomiMacColor.sidebar)
+                .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 8, trailing: 8))
+                .listRowBackground(NomiColor.sidebar)
                 .accessibilityIdentifier("mac-sidebar-profile")
             }
 
@@ -397,21 +404,21 @@ private struct NativeSidebarView: View {
                         isSelected: selectedSection == section,
                         action: { selectedSection = section }
                     )
-                    .listRowInsets(EdgeInsets(top: 3, leading: 12, bottom: 3, trailing: 12))
-                    .listRowBackground(NomiMacColor.sidebar)
+                    .listRowInsets(EdgeInsets(top: 3, leading: 6, bottom: 3, trailing: 6))
+                    .listRowBackground(NomiColor.sidebar)
                     .accessibilityIdentifier("mac-sidebar-\(section.rawValue)")
                 }
             }
 
             Section {
                 SidebarUtilityRow(title: "设置", symbolName: "gearshape")
-                    .listRowInsets(EdgeInsets(top: 18, leading: 18, bottom: 8, trailing: 12))
-                    .listRowBackground(NomiMacColor.sidebar)
+                    .listRowInsets(EdgeInsets(top: 18, leading: 12, bottom: 8, trailing: 6))
+                    .listRowBackground(NomiColor.sidebar)
             }
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
-        .background(NomiMacColor.sidebar)
+        .background(NomiColor.sidebar)
         .accessibilityIdentifier("mac-native-sidebar")
     }
 }
@@ -428,7 +435,7 @@ private struct SidebarNavigationRow: View {
             SidebarItemLabel(
                 title: section.rawValue,
                 symbolName: section.symbolName,
-                foreground: isSelected ? Color.white : NomiMacColor.ink
+                foreground: isSelected ? Color.white : NomiColor.ink
             )
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(rowBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -440,9 +447,9 @@ private struct SidebarNavigationRow: View {
 
     private var rowBackground: Color {
         if isSelected {
-            NomiMacColor.sidebarSelection
+            NomiColor.sidebarSelection
         } else if isHovered {
-            NomiMacColor.sidebarHover
+            NomiColor.sidebarHover
         } else {
             .clear
         }
@@ -462,7 +469,7 @@ private struct SidebarUtilityRow: View {
             foreground: .secondary
         )
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isHovered ? NomiMacColor.sidebarHover : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(isHovered ? NomiColor.sidebarHover : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .onHover { isHovered = $0 }
     }
 }
@@ -496,8 +503,8 @@ private struct DashboardView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("早上好，Leo")
-                            .font(NomiMacType.title)
-                            .foregroundStyle(NomiMacColor.ink)
+                            .font(NomiType.title)
+                            .foregroundStyle(NomiColor.ink)
                         Text("这是你健康旅程的第 128 天")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Color(hex: 0xa0a0a0))
@@ -581,7 +588,7 @@ private struct MetricCard: View {
         CardSurface(radius: 13) {
             VStack(alignment: .leading, spacing: 13) {
                 Text(title)
-                    .font(NomiMacType.cardTitle)
+                    .font(NomiType.cardTitle)
                     .foregroundStyle(Color(hex: 0x262626))
 
                 if unit == "/100" {
@@ -609,7 +616,7 @@ private struct MetricCard: View {
 
     private var valueText: some View {
         Text(value)
-            .font(NomiMacType.value)
+            .font(NomiType.value)
             .foregroundStyle(Color.black)
             .lineLimit(1)
             .minimumScaleFactor(0.55)
@@ -632,12 +639,12 @@ private struct SuggestionCard: View {
         CardSurface(radius: 13) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("今日建议")
-                    .font(NomiMacType.cardTitle)
+                    .font(NomiType.cardTitle)
                     .foregroundStyle(Color(hex: 0x292929))
                 Text("你的睡眠时间比平时晚了 30 分钟，\n建议今晚 11:00 前入睡。")
                     .font(.system(size: 12, weight: .semibold))
                     .lineSpacing(3)
-                    .foregroundStyle(NomiMacColor.muted)
+                    .foregroundStyle(NomiColor.muted)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
@@ -652,7 +659,7 @@ private struct SuggestionCard: View {
                     .foregroundStyle(Color(hex: 0x2f2f2f))
                     .padding(.horizontal, 15)
                     .frame(height: 32)
-                    .background(NomiMacColor.softFill, in: Capsule())
+                    .background(NomiColor.softFill, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
@@ -668,14 +675,14 @@ private struct RecentRecordsCard: View {
         CardSurface(radius: 13) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("最近记录")
-                    .font(NomiMacType.section)
+                    .font(NomiType.section)
                     .foregroundStyle(Color(hex: 0x222222))
 
                 HStack(spacing: 18) {
                     ForEach(["全部", "饮食", "健身", "体检", "文本", "语音"], id: \.self) { label in
                         Text(label)
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(label == "全部" ? NomiMacColor.ink : Color(hex: 0x7c7c7c))
+                            .foregroundStyle(label == "全部" ? NomiColor.ink : Color(hex: 0x7c7c7c))
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                             .padding(.horizontal, label == "全部" ? 12 : 0)
@@ -694,7 +701,7 @@ private struct RecentRecordsCard: View {
                     ForEach(records.prefix(4)) { record in
                         CompactRecordRow(record: record)
                         if record.id != records.prefix(4).last?.id {
-                            Divider().overlay(NomiMacColor.hairline)
+                            Divider().overlay(NomiColor.hairline)
                         }
                     }
                 }
@@ -713,13 +720,13 @@ private struct CompactRecordRow: View {
                 .frame(width: 63, height: 50)
             VStack(alignment: .leading, spacing: 4) {
                 Text(record.dayGroup == "今天" ? "今天 \(record.time)" : "\(record.dayGroup) \(record.time)")
-                    .font(NomiMacType.body)
+                    .font(NomiType.body)
                     .foregroundStyle(Color(hex: 0x9a9a9a))
                 Text(record.title)
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Color(hex: 0x222222))
                 Text(record.summary)
-                    .font(NomiMacType.body)
+                    .font(NomiType.body)
                     .foregroundStyle(Color(hex: 0x7a7a7a))
                     .lineLimit(1)
             }
@@ -738,7 +745,7 @@ private struct InsightCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("AI 洞察")
-                        .font(NomiMacType.section)
+                        .font(NomiType.section)
                     Spacer()
                     Text("查看全部")
                         .font(.system(size: 11, weight: .bold))
@@ -753,7 +760,7 @@ private struct InsightCard: View {
                     .padding(.top, 10)
                 Text("过去 7 天，你的活动量和睡眠质量都有提升，\n继续保持均衡饮食，注意多摄入蛋白质。")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(NomiMacColor.muted)
+                    .foregroundStyle(NomiColor.muted)
                     .lineSpacing(3)
 
                 ChartSketch()
@@ -798,7 +805,7 @@ private struct DataSourcesCard: View {
         CardSurface(radius: 13) {
             VStack(alignment: .leading, spacing: 13) {
                 Text("数据来源")
-                    .font(NomiMacType.section)
+                    .font(NomiType.section)
                 HStack(spacing: 40) {
                     DataSourceItem(symbol: "applewatch", title: "Apple Watch", subtitle: "同步于 9:30")
                     DataSourceItem(symbol: "heart.fill", title: "健康", subtitle: "同步于 9:30")
@@ -859,8 +866,8 @@ private struct RecordsPage: View {
                         ForEach(groupedRecords, id: \.key) { group in
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(group.key)
-                                    .font(NomiMacType.section)
-                                    .foregroundStyle(NomiMacColor.ink)
+                                    .font(NomiType.section)
+                                    .foregroundStyle(NomiColor.ink)
                                 Text(group.value.first?.dateLabel ?? "")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(Color(hex: 0x777777))
@@ -915,7 +922,7 @@ private struct FilterPills: View {
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(filter == selectedFilter ? Color.white : Color(hex: 0x333333))
                             .frame(width: 56, height: 30)
-                            .background(filter == selectedFilter ? NomiMacColor.ink : Color(hex: 0xf1f1f1), in: Capsule())
+                            .background(filter == selectedFilter ? NomiColor.ink : Color(hex: 0xf1f1f1), in: Capsule())
                             .shadow(color: filter == selectedFilter ? .black.opacity(0.16) : .clear, radius: 9, y: 4)
                     }
                     .buttonStyle(.plain)
@@ -978,7 +985,7 @@ private struct FullRecordRow: View {
                     VStack {
                         Spacer()
                         Rectangle()
-                            .fill(NomiMacColor.hairline)
+                            .fill(NomiColor.hairline)
                             .frame(height: 1)
                     }
                 }
@@ -1167,7 +1174,7 @@ private struct AddRecordOverlay: View {
                 HStack {
                     Text("添加记录")
                         .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(NomiMacColor.ink)
+                        .foregroundStyle(NomiColor.ink)
                     Spacer()
                     Button {
                         isPresented = false
@@ -1263,7 +1270,7 @@ private struct AddRecordOverlay: View {
 
                 if let errorMessage {
                     Text(errorMessage)
-                        .font(NomiMacType.caption)
+                        .font(NomiType.caption)
                         .foregroundStyle(Color(hex: 0x777777))
                 }
             }
@@ -1390,7 +1397,7 @@ private struct ImagePreviewOverlay: View {
                             HStack(spacing: 12) {
                                 Text(record.title)
                                     .font(.system(size: 28, weight: .bold))
-                                    .foregroundStyle(NomiMacColor.ink)
+                                    .foregroundStyle(NomiColor.ink)
                                 TagPill(record.tag)
                             }
                             Text("\(record.dayGroup) \(record.time)")
@@ -1519,10 +1526,10 @@ private struct PlaceholderPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(section.rawValue)
-                .font(NomiMacType.title)
+                .font(NomiType.title)
             Text("这个入口会在对应能力具备真实内容后继续补齐。")
-                .font(NomiMacType.body)
-                .foregroundStyle(NomiMacColor.muted)
+                .font(NomiType.body)
+                .foregroundStyle(NomiColor.muted)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(32)
@@ -1624,8 +1631,8 @@ private struct ServerStatePanel: View {
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 14, weight: .semibold))
             Text(message)
-                .font(NomiMacType.body)
-                .foregroundStyle(NomiMacColor.secondaryInk)
+                .font(NomiType.body)
+                .foregroundStyle(NomiColor.secondaryInk)
                 .lineLimit(1)
             Spacer()
             Button("重试", action: action)
@@ -1634,7 +1641,7 @@ private struct ServerStatePanel: View {
         .background(Color.white, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(NomiMacColor.hairline, lineWidth: 1)
+                .stroke(NomiColor.hairline, lineWidth: 1)
         }
     }
 }

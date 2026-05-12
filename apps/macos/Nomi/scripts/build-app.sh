@@ -12,11 +12,11 @@ swift build
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
-cp "$ROOT_DIR/.build/debug/NomiMac" "$MACOS_DIR/Nomi"
-if [ -d "$ROOT_DIR/.build/debug/NomiMac_NomiMac.bundle" ]; then
-  cp -R "$ROOT_DIR/.build/debug/NomiMac_NomiMac.bundle" "$APP_DIR/NomiMac_NomiMac.bundle"
+cp "$ROOT_DIR/.build/debug/Nomi" "$MACOS_DIR/Nomi"
+if [ -d "$ROOT_DIR/.build/debug/Nomi_Nomi.bundle" ]; then
+  cp -R "$ROOT_DIR/.build/debug/Nomi_Nomi.bundle" "$APP_DIR/Nomi_Nomi.bundle"
 fi
-cp "$ROOT_DIR/Sources/NomiMac/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+cp "$ROOT_DIR/Sources/Nomi/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 
 cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

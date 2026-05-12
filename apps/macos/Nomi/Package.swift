@@ -3,16 +3,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "NomiMac",
+    name: "Nomi",
     platforms: [
         .macOS(.v15)
     ],
     products: [
-        .executable(name: "NomiMac", targets: ["NomiMac"])
+        .executable(name: "Nomi", targets: ["Nomi"])
     ],
     targets: [
         .executableTarget(
-            name: "NomiMac",
+            name: "Nomi",
             resources: [
                 .process("Resources")
             ]
