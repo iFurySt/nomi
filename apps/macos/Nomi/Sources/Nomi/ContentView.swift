@@ -16,7 +16,7 @@ private enum NomiType {
 private enum NomiColor {
     static let appBackground = Color(hex: 0xfafaf8)
     static let sidebar = Color(hex: 0xe2e2dc)
-    static let sidebarSelection = Color(hex: 0x30302d)
+    static let sidebarSelection = Color(hex: 0x5f6059)
     static let sidebarHover = Color(hex: 0xd2d2cc)
     static let content = Color(hex: 0xfafaf8)
     static let surface = Color.white
@@ -157,7 +157,7 @@ struct ContentView: View {
     private var appShell: some View {
         NavigationSplitView(preferredCompactColumn: $preferredColumn) {
             NativeSidebarView(selectedSection: $selectedSection)
-                .frame(minWidth: 180, idealWidth: 220)
+                .navigationSplitViewColumnWidth(min: 150, ideal: 188, max: 220)
         } detail: {
             NavigationStack {
                 detailColumn(for: selectedSection)
@@ -238,14 +238,14 @@ private struct NativeSidebarView: View {
             Section {
                 HStack(spacing: 10) {
                     ResourceImage(name: "avatar", contentMode: .fill)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 28, height: 28)
                         .clipShape(Circle())
                     Text("Leo")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13.5, weight: .semibold))
                         .foregroundStyle(.primary)
                 }
-                .padding(.vertical, 12)
-                .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 8, trailing: 8))
+                .padding(.vertical, 8)
+                .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
                 .listRowBackground(NomiColor.sidebar)
                 .accessibilityIdentifier("mac-sidebar-profile")
             }
@@ -257,7 +257,7 @@ private struct NativeSidebarView: View {
                         isSelected: selectedSection == section,
                         action: { selectedSection = section }
                     )
-                    .listRowInsets(EdgeInsets(top: 3, leading: 6, bottom: 3, trailing: 6))
+                    .listRowInsets(EdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4))
                     .listRowBackground(NomiColor.sidebar)
                     .accessibilityIdentifier("mac-sidebar-\(section.rawValue)")
                 }
@@ -265,7 +265,7 @@ private struct NativeSidebarView: View {
 
             Section {
                 SidebarUtilityRow(title: "设置", symbolName: "gearshape")
-                    .listRowInsets(EdgeInsets(top: 18, leading: 12, bottom: 8, trailing: 6))
+                    .listRowInsets(EdgeInsets(top: 14, leading: 4, bottom: 6, trailing: 4))
                     .listRowBackground(NomiColor.sidebar)
             }
         }
@@ -333,17 +333,17 @@ private struct SidebarItemLabel: View {
     let foreground: Color
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 9) {
             Image(systemName: symbolName)
-                .font(.system(size: 14, weight: .semibold))
-                .frame(width: 19)
+                .font(.system(size: 13.5, weight: .semibold))
+                .frame(width: 16)
             Text(title)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 13.5, weight: .semibold))
             Spacer(minLength: 0)
         }
         .foregroundStyle(foreground)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 6)
+        .frame(height: 28)
     }
 }
 
@@ -1017,11 +1017,9 @@ private struct AddRecordOverlay: View {
             Rectangle()
                 .fill(Color.black.opacity(0.001))
                 .ignoresSafeArea()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    guard !isSaving else { return }
-                    isPresented = false
-                }
+                .onTapGesture(perform: dismissIfAllowed)
 
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
@@ -1030,7 +1028,7 @@ private struct AddRecordOverlay: View {
                         .foregroundStyle(NomiColor.ink)
                     Spacer()
                     Button {
-                        isPresented = false
+                        dismissIfAllowed()
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 16, weight: .semibold))
@@ -1154,7 +1152,16 @@ private struct AddRecordOverlay: View {
                 return true
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .dismissOnEscapeAndFocusLoss(isEnabled: !isSaving && !isImportingImage, perform: dismissIfAllowed)
         .accessibilityIdentifier("mac-add-overlay")
+    }
+
+    private func dismissIfAllowed() {
+        guard !isSaving && !isImportingImage else { return }
+        withAnimation(.smooth(duration: 0.18)) {
+            isPresented = false
+        }
     }
 
     private func saveNote() {
@@ -1205,6 +1212,78 @@ private struct AddRecordOverlay: View {
                 }
             }
         }
+    }
+}
+
+private struct EscapeAndFocusLossDismissModifier: ViewModifier {
+    let isEnabled: Bool
+    let onDismiss: () -> Void
+
+    @State private var keyMonitor: Any?
+    @State private var resignActiveObserver: NSObjectProtocol?
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear(perform: installIfNeeded)
+            .onDisappear(perform: uninstall)
+            .onChange(of: isEnabled) { _, enabled in
+                if enabled {
+                    installIfNeeded()
+                } else {
+                    uninstall()
+                }
+            }
+            .onExitCommand {
+                if isEnabled {
+                    onDismiss()
+                }
+            }
+    }
+
+    private func installIfNeeded() {
+        guard isEnabled else { return }
+
+        if keyMonitor == nil {
+            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                if event.keyCode == 53 {
+                    Task { @MainActor in
+                        onDismiss()
+                    }
+                    return nil
+                }
+                return event
+            }
+        }
+
+        if resignActiveObserver == nil {
+            resignActiveObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didResignActiveNotification,
+                object: NSApp,
+                queue: .main
+            ) { _ in
+                Task { @MainActor in
+                    onDismiss()
+                }
+            }
+        }
+    }
+
+    private func uninstall() {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+            self.keyMonitor = nil
+        }
+
+        if let resignActiveObserver {
+            NotificationCenter.default.removeObserver(resignActiveObserver)
+            self.resignActiveObserver = nil
+        }
+    }
+}
+
+private extension View {
+    func dismissOnEscapeAndFocusLoss(isEnabled: Bool, perform action: @escaping () -> Void) -> some View {
+        modifier(EscapeAndFocusLossDismissModifier(isEnabled: isEnabled, onDismiss: action))
     }
 }
 
