@@ -336,7 +336,7 @@ func (h *Handler) handleLegacySeedXSmoke(conn *websocket.Conn) error {
 		CreatedAt: time.Now(),
 		Payload: map[string]any{
 			"prompt": "Summarize the latest saved body log without medical advice.",
-			"mode":   "mock",
+			"mode":   "smoke",
 		},
 	}
 	if err := conn.WriteJSON(request); err != nil {
@@ -398,7 +398,7 @@ func seedXSmokeExchange(ctx context.Context, url string, apiKey string) error {
 		CreatedAt: time.Now(),
 		Payload: map[string]any{
 			"request_id": request.ID,
-			"text":       "Mock SeedX response.",
+			"text":       "SeedX smoke response.",
 		},
 	}
 	return conn.WriteJSON(response)

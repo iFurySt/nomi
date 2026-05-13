@@ -15,6 +15,7 @@
 - iOS 上传路径删除本地 `ImageExtraction.fallback` 和二次 `POST /records` 兜底保存；上传成功只插入 server 返回的 record/status，上传失败不造假数据。
 - Server 在 macOS 本地开发环境用 `sips` 将 HEIC 上传转换成旁路 JPEG 供 SeedX/Codex 分析，避免 Codex 因 HEIC 不可读而只能返回信息类占位结果。
 - 修复大写图片扩展名导致存储文件名出现 `.JPG.jpg` 的问题。
+- Ask 和 legacy SeedX smoke 文案移除 mock 表述，避免和真实记录链路混淆。
 
 ## 验证
 

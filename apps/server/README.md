@@ -1,6 +1,6 @@
 # Nomi Server
 
-Go API skeleton for Nomi / 知己. It owns record persistence, asynchronous image analysis, mock Ask responses, and websocket coordination with the SeedX daemon exposed by the local `seedx` CLI.
+Go API skeleton for Nomi / 知己. It owns record persistence, asynchronous image analysis, Ask API boundaries, and websocket coordination with the SeedX daemon exposed by the local `seedx` CLI.
 
 ## Local Setup
 
@@ -91,4 +91,4 @@ The extraction smoke requires a long-running `seedx daemon connect ...` process,
 
 ## Boundaries
 
-The server returns mock Ask answers for now. Medical diagnosis, treatment, medication, dosage, emergency, disease risk, and abnormality language is blocked with non-medical boundary copy.
+The Ask endpoint is not connected to an LLM yet. Medical diagnosis, treatment, medication, dosage, emergency, disease risk, and abnormality language is blocked with non-medical boundary copy.

@@ -305,7 +305,7 @@ func BuildAskAnswer(question string, records []Record) AskAnswer {
 
 	return AskAnswer{
 		Blocked:             false,
-		Answer:              "Based on saved records, I can summarize food, body, image, and note patterns. This mock answer only uses stored records and will not invent missing personal data.",
+		Answer:              "Ask is not connected to an LLM yet. Saved records are available through the records API for timeline and review surfaces.",
 		ReferencedRecordIDs: referenced,
 		Range:               recordRange,
 	}
