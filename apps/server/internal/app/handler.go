@@ -17,6 +17,8 @@ type Store interface {
 	EnsureSchema(ctx context.Context) error
 	ListRecords(ctx context.Context) ([]Record, error)
 	CreateRecord(ctx context.Context, input CreateRecordInput) (Record, error)
+	UpdateRecordStatus(ctx context.Context, id string, status string, metadata map[string]string) (Record, error)
+	CompleteRecordWithExtraction(ctx context.Context, id string, extraction ImageExtraction, image StoredImage) (Record, error)
 }
 
 type Handler struct {
@@ -155,53 +157,82 @@ func (h *Handler) extractImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	extraction, err := h.imageAnalyzer.AnalyzeImage(r.Context(), storedImage)
+	record, err := h.createPendingImageRecord(r.Context(), storedImage)
 	if err != nil {
-		h.logger.Warn(
-			"image analysis failed",
-			zap.String("asset_name", input.AssetName),
-			zap.String("source", input.Source),
-			zap.Error(err),
-		)
-		writeError(w, http.StatusServiceUnavailable, "image_analysis_unavailable")
-		return
-	}
-	extraction.ImageURI = storedImage.URI
-
-	record, err := h.persistImageExtraction(r.Context(), extraction, storedImage)
-	if err != nil {
-		h.logger.Error("persist image extraction failed", zap.Error(err))
+		h.logger.Error("create pending image record failed", zap.Error(err))
 		writeError(w, http.StatusInternalServerError, "record_create_failed")
 		return
 	}
-	extraction.RecordID = record.ID
+
+	go h.analyzeImageRecord(record.ID, storedImage)
 
 	h.logger.Info(
-		"image extraction completed",
+		"image extraction queued",
+		zap.String("record_id", record.ID),
 		zap.String("asset_name", input.AssetName),
 		zap.String("source", input.Source),
-		zap.String("input_category", extraction.InputCategory),
-		zap.Float64("confidence", extraction.Confidence),
 	)
-	writeJSON(w, http.StatusOK, extraction)
+	writeJSON(w, http.StatusAccepted, map[string]any{"record": record})
 }
 
-func (h *Handler) persistImageExtraction(ctx context.Context, extraction ImageExtraction, image StoredImage) (Record, error) {
+func (h *Handler) createPendingImageRecord(ctx context.Context, image StoredImage) (Record, error) {
 	if h.store == nil {
 		return Record{}, errors.New("record_store_unavailable")
 	}
 
-	confidence := extraction.Confidence
 	return h.store.CreateRecord(ctx, CreateRecordInput{
-		Type:       recordTypeForInputCategory(extraction.InputCategory),
-		Source:     image.Source,
-		Title:      extraction.Title,
-		Summary:    extractionSummary(extraction),
-		RawText:    extraction.Summary,
-		ImageURI:   image.URI,
-		Metadata:   extractionRecordMetadata(extraction, image),
-		Confidence: &confidence,
+		Type:     "document",
+		Status:   RecordStatusPending,
+		Source:   image.Source,
+		Title:    "图片识别中",
+		Summary:  "已上传，等待 Nomi server 通过 SeedX 识别。",
+		ImageURI: image.URI,
+		Metadata: pendingImageRecordMetadata(image),
 	})
+}
+
+func (h *Handler) analyzeImageRecord(recordID string, image StoredImage) {
+	ctx := context.Background()
+	if _, err := h.store.UpdateRecordStatus(ctx, recordID, RecordStatusProcessing, map[string]string{
+		"analysis_started_at": time.Now().UTC().Format(time.RFC3339Nano),
+	}); err != nil {
+		h.logger.Error("mark image record processing failed", zap.String("record_id", recordID), zap.Error(err))
+		return
+	}
+
+	extraction, err := h.imageAnalyzer.AnalyzeImage(ctx, image)
+	if err != nil {
+		h.logger.Warn(
+			"image analysis failed",
+			zap.String("record_id", recordID),
+			zap.String("asset_name", image.AssetName),
+			zap.String("source", image.Source),
+			zap.Error(err),
+		)
+		if _, updateErr := h.store.UpdateRecordStatus(ctx, recordID, RecordStatusFailed, map[string]string{
+			"analysis_error":       err.Error(),
+			"analysis_finished_at": time.Now().UTC().Format(time.RFC3339Nano),
+		}); updateErr != nil {
+			h.logger.Error("mark image record failed failed", zap.String("record_id", recordID), zap.Error(updateErr))
+		}
+		return
+	}
+	extraction.ImageURI = image.URI
+	extraction.RecordID = recordID
+
+	if _, err := h.store.CompleteRecordWithExtraction(ctx, recordID, extraction, image); err != nil {
+		h.logger.Error("complete image extraction record failed", zap.String("record_id", recordID), zap.Error(err))
+		return
+	}
+
+	h.logger.Info(
+		"image extraction completed",
+		zap.String("record_id", recordID),
+		zap.String("asset_name", image.AssetName),
+		zap.String("source", image.Source),
+		zap.String("input_category", extraction.InputCategory),
+		zap.Float64("confidence", extraction.Confidence),
+	)
 }
 
 func (h *Handler) ask(w http.ResponseWriter, r *http.Request) {

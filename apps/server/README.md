@@ -1,6 +1,6 @@
 # Nomi Server
 
-Go API skeleton for Nomi / 知己. It owns record persistence, mock Ask responses, and websocket coordination with the SeedX daemon exposed by the local `seedx` CLI.
+Go API skeleton for Nomi / 知己. It owns record persistence, asynchronous image analysis, mock Ask responses, and websocket coordination with the SeedX daemon exposed by the local `seedx` CLI.
 
 ## Local Setup
 
@@ -59,7 +59,16 @@ Current SeedX flow:
 2. Server accepts `Authorization: Bearer ...` when `NOMI_SEEDX_API_KEY` is configured.
 3. Server sends `daemon:ping`; long-running SeedX daemon responds with `daemon:pong`.
 4. Image extraction sends `daemon:command` with `method:"run"` and `runtime:"codex"`; `params.input` contains a strict JSON text prompt plus a Codex v2 `{ "type": "localImage", "path": "..." }` item for the stored upload.
-5. SeedX returns `daemon:result`; server parses the Codex text, stores the record in Postgres, and returns the extraction with `record_id`.
+5. `POST /ai/extract-image` stores the image and immediately creates a `pending` record, then returns `202 Accepted` with that record.
+6. A background worker marks the record `processing`, waits for SeedX `daemon:result`, parses the Codex text, and updates the same record to `completed`.
+7. If SeedX or parsing fails, the record becomes `failed`; no nutrition fallback is generated.
+
+Record status values are:
+
+- `pending`: upload accepted and queued for analysis.
+- `processing`: SeedX/Codex analysis is running.
+- `completed`: analysis succeeded and record fields / nutrition metadata were updated.
+- `failed`: analysis failed; clients should show an error state and avoid using nutrition metadata.
 
 `GET /seedx/ws` remains as a temporary compatibility path for older local smoke clients.
 

@@ -23,6 +23,7 @@ enum NomiAPI {
 struct SavedRecord: Identifiable, Decodable, Equatable {
     let id: String
     let type: String
+    let status: String
     let occurredAt: String
     let source: String
     let title: String
@@ -34,6 +35,7 @@ struct SavedRecord: Identifiable, Decodable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id
         case type
+        case status
         case occurredAt = "occurred_at"
         case source
         case title
@@ -148,6 +150,10 @@ private struct RecordsResponse: Decodable {
     let records: [SavedRecord]
 }
 
+private struct ImageUploadResponse: Decodable {
+    let record: SavedRecord
+}
+
 private struct CreateRecordRequest: Encodable {
     let type: String
     let source: String
@@ -208,7 +214,7 @@ enum RecordsClient {
         }
     }
 
-    static func extractImage(fileURL: URL) async throws -> ImageExtraction {
+    static func extractImage(fileURL: URL) async throws -> SavedRecord {
         let didAccess = fileURL.startAccessingSecurityScopedResource()
         defer {
             if didAccess {
@@ -235,7 +241,7 @@ enum RecordsClient {
             throw URLError(.badServerResponse)
         }
 
-        return try JSONDecoder().decode(ImageExtraction.self, from: responseData)
+        return try JSONDecoder().decode(ImageUploadResponse.self, from: responseData).record
     }
 
     private static func mimeType(for fileURL: URL) -> String {

@@ -384,3 +384,17 @@ func extractionRecordMetadata(extraction ImageExtraction, image StoredImage) map
 	addString("vitamins", strings.Join(extraction.Metadata.Vitamins, ","))
 	return values
 }
+
+func pendingImageRecordMetadata(image StoredImage) map[string]string {
+	return map[string]string{
+		"direction":          "input",
+		"input_category":     "information",
+		"asset_name":         image.AssetName,
+		"source":             image.Source,
+		"mime_type":          image.MimeType,
+		"image_uri":          image.URI,
+		"detail":             "等待 SeedX 识别图片内容",
+		"analysis_provider":  "seedx.codex",
+		"analysis_transport": "seedx.daemon.command.run",
+	}
+}

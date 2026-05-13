@@ -5,9 +5,17 @@ import (
 	"time"
 )
 
+const (
+	RecordStatusPending    = "pending"
+	RecordStatusProcessing = "processing"
+	RecordStatusCompleted  = "completed"
+	RecordStatusFailed     = "failed"
+)
+
 type Record struct {
 	ID         string            `json:"id"`
 	Type       string            `json:"type"`
+	Status     string            `json:"status"`
 	OccurredAt time.Time         `json:"occurred_at"`
 	CreatedAt  time.Time         `json:"created_at"`
 	Source     string            `json:"source"`
@@ -21,6 +29,7 @@ type Record struct {
 
 type CreateRecordInput struct {
 	Type       string            `json:"type"`
+	Status     string            `json:"status,omitempty"`
 	OccurredAt *time.Time        `json:"occurred_at,omitempty"`
 	Source     string            `json:"source"`
 	Title      string            `json:"title"`
@@ -34,6 +43,9 @@ type CreateRecordInput struct {
 func (i CreateRecordInput) Validate() error {
 	if !validRecordType(i.Type) {
 		return errors.New("invalid_record_type")
+	}
+	if i.Status != "" && !validRecordStatus(i.Status) {
+		return errors.New("invalid_record_status")
 	}
 	if i.Source == "" {
 		return errors.New("source_required")
@@ -50,6 +62,15 @@ func (i CreateRecordInput) Validate() error {
 func validRecordType(recordType string) bool {
 	switch recordType {
 	case "food", "body_stats", "document", "note":
+		return true
+	default:
+		return false
+	}
+}
+
+func validRecordStatus(status string) bool {
+	switch status {
+	case RecordStatusPending, RecordStatusProcessing, RecordStatusCompleted, RecordStatusFailed:
 		return true
 	default:
 		return false

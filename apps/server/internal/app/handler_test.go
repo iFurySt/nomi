@@ -66,67 +66,6 @@ func TestCreateRecordInputValidate(t *testing.T) {
 	}
 }
 
-func TestBuildImageExtractionFoodMetadata(t *testing.T) {
-	t.Parallel()
-
-	extraction := BuildImageExtraction(ImageExtractionRequest{
-		AssetName:   "lunch-photo.jpg",
-		Source:      "library",
-		MimeType:    "image/jpeg",
-		ImageBase64: "aGVsbG8=",
-	})
-
-	if extraction.Direction != "input" {
-		t.Fatalf("direction = %q", extraction.Direction)
-	}
-	if extraction.InputCategory != "food" {
-		t.Fatalf("input category = %q", extraction.InputCategory)
-	}
-	if extraction.Metadata.CaloriesKcal == 0 || extraction.Metadata.ProteinG == 0 {
-		t.Fatalf("expected nutrition metadata: %#v", extraction.Metadata)
-	}
-	if len(extraction.OutputImpacts) == 0 {
-		t.Fatal("expected output impacts")
-	}
-}
-
-func TestBuildImageExtractionFileImageDefaultsFood(t *testing.T) {
-	t.Parallel()
-
-	extraction := BuildImageExtraction(ImageExtractionRequest{
-		AssetName: "IMG_7624.HEIC",
-		Source:    "file",
-		MimeType:  "image/heic",
-	})
-
-	if extraction.InputCategory != "food" {
-		t.Fatalf("input category = %q", extraction.InputCategory)
-	}
-	if extraction.Metadata.OriginalMimeType != "image/heic" {
-		t.Fatalf("mime = %q", extraction.Metadata.OriginalMimeType)
-	}
-}
-
-func TestBuildImageExtractionNicotine(t *testing.T) {
-	t.Parallel()
-
-	extraction := BuildImageExtraction(ImageExtractionRequest{
-		AssetName: "vape-note.jpg",
-		Source:    "library",
-		MimeType:  "image/jpeg",
-	})
-
-	if extraction.InputCategory != "nicotine" {
-		t.Fatalf("input category = %q", extraction.InputCategory)
-	}
-	if extraction.Metadata.NicotineMg == 0 {
-		t.Fatalf("expected nicotine metadata: %#v", extraction.Metadata)
-	}
-	if !containsAny(strings.Join(extraction.OutputImpacts, ","), "focus") {
-		t.Fatalf("expected focus impact: %#v", extraction.OutputImpacts)
-	}
-}
-
 func TestExtractImageHandler(t *testing.T) {
 	t.Parallel()
 
@@ -147,18 +86,20 @@ func TestExtractImageHandler(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
-	var extraction ImageExtraction
-	if err := json.NewDecoder(resp.Body).Decode(&extraction); err != nil {
+	var output struct {
+		Record Record `json:"record"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&output); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if extraction.InputCategory != "caffeine" {
-		t.Fatalf("input category = %q", extraction.InputCategory)
+	if output.Record.ID == "" || output.Record.Status != RecordStatusPending || output.Record.ImageURI == "" {
+		t.Fatalf("expected pending uploaded record: %#v", output.Record)
 	}
-	if extraction.RecordID == "" || extraction.ImageURI == "" {
-		t.Fatalf("expected persisted extraction identifiers: %#v", extraction)
+	if output.Record.Metadata["analysis_provider"] != "seedx.codex" {
+		t.Fatalf("metadata = %#v", output.Record.Metadata)
 	}
 }
 
@@ -252,13 +193,20 @@ func TestBuildImageAnalysisInputUsesSeedXLocalImageItem(t *testing.T) {
 type fakeImageAnalyzer struct{}
 
 func (fakeImageAnalyzer) AnalyzeImage(_ context.Context, image StoredImage) (ImageExtraction, error) {
-	extraction := BuildImageExtraction(ImageExtractionRequest{
-		AssetName:   image.AssetName,
-		Source:      image.Source,
-		MimeType:    image.MimeType,
-		ImageBase64: "aGVsbG8=",
-	})
-	return NormalizeImageExtraction(extraction, image), nil
+	return NormalizeImageExtraction(ImageExtraction{
+		Direction:     "input",
+		InputCategory: "caffeine",
+		OutputImpacts: []string{"energy", "focus", "sleep"},
+		Title:         "Coffee",
+		Summary:       "A visible cup of coffee.",
+		Confidence:    0.74,
+		Metadata: ExtractionMetadata{
+			PortionEstimate: "one cup",
+			CaloriesKcal:    30,
+			CaffeineMg:      95,
+			EstimatedFrom:   []string{"image_content"},
+		},
+	}, image), nil
 }
 
 type fakeStore struct{}
@@ -277,9 +225,14 @@ func (fakeStore) ListRecords(context.Context) ([]Record, error) {
 
 func (fakeStore) CreateRecord(_ context.Context, input CreateRecordInput) (Record, error) {
 	now := time.Now()
+	status := input.Status
+	if status == "" {
+		status = RecordStatusCompleted
+	}
 	return Record{
 		ID:         "rec-test",
 		Type:       input.Type,
+		Status:     status,
 		OccurredAt: now,
 		CreatedAt:  now,
 		Source:     input.Source,
@@ -289,5 +242,40 @@ func (fakeStore) CreateRecord(_ context.Context, input CreateRecordInput) (Recor
 		ImageURI:   input.ImageURI,
 		Metadata:   input.Metadata,
 		Confidence: input.Confidence,
+	}, nil
+}
+
+func (fakeStore) UpdateRecordStatus(_ context.Context, id string, status string, metadata map[string]string) (Record, error) {
+	now := time.Now()
+	return Record{
+		ID:         id,
+		Type:       "document",
+		Status:     status,
+		OccurredAt: now,
+		CreatedAt:  now,
+		Source:     "macos-file",
+		Title:      "图片识别中",
+		Summary:    "已上传，等待 Nomi server 通过 SeedX 识别。",
+		ImageURI:   "local://images/test.jpg",
+		Metadata:   metadata,
+	}, nil
+}
+
+func (fakeStore) CompleteRecordWithExtraction(_ context.Context, id string, extraction ImageExtraction, image StoredImage) (Record, error) {
+	now := time.Now()
+	confidence := extraction.Confidence
+	return Record{
+		ID:         id,
+		Type:       recordTypeForInputCategory(extraction.InputCategory),
+		Status:     RecordStatusCompleted,
+		OccurredAt: now,
+		CreatedAt:  now,
+		Source:     image.Source,
+		Title:      extraction.Title,
+		Summary:    extractionSummary(extraction),
+		RawText:    extraction.Summary,
+		ImageURI:   image.URI,
+		Metadata:   extractionRecordMetadata(extraction, image),
+		Confidence: &confidence,
 	}, nil
 }

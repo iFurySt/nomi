@@ -77,6 +77,7 @@ private struct NomiRecord: Identifiable, Equatable {
     let source: String?
     let tag: RecordFilter
     let visual: Visual
+    let status: String
     let calories: String
     let protein: String
     let carbs: String
@@ -90,14 +91,13 @@ struct ContentView: View {
     @State private var errorMessage: String?
     @State private var selectedSection: SidebarSection = .overview
     @State private var selectedFilter: RecordFilter = .all
-    @State private var selectedRecordID = "breakfast"
+    @State private var selectedRecordID: String?
     @State private var searchText = ""
     @State private var showingAddOverlay = false
     @State private var previewRecord: NomiRecord?
 
     private var displayRecords: [NomiRecord] {
-        let serverRows = records.map(NomiRecord.init(savedRecord:))
-        return serverRows + NomiRecord.figmaFixtures
+        records.map(NomiRecord.init(savedRecord:))
     }
 
     private var filteredRecords: [NomiRecord] {
@@ -112,8 +112,9 @@ struct ContentView: View {
         }
     }
 
-    private var selectedRecord: NomiRecord {
-        displayRecords.first { $0.id == selectedRecordID } ?? displayRecords.first ?? NomiRecord.figmaFixtures[0]
+    private var selectedRecord: NomiRecord? {
+        guard let selectedRecordID else { return nil }
+        return displayRecords.first { $0.id == selectedRecordID }
     }
 
     var body: some View {
@@ -219,8 +220,8 @@ struct ContentView: View {
 
         do {
             records = try await RecordsClient.loadRecords()
-            if let first = records.first {
-                selectedRecordID = first.id
+            if let selectedRecordID, !records.contains(where: { $0.id == selectedRecordID }) {
+                self.selectedRecordID = nil
             }
         } catch {
             errorMessage = "无法连接 \(NomiAPI.baseURL.absoluteString)"
@@ -691,9 +692,9 @@ private struct DataSourceItem: View {
 
 private struct RecordsPage: View {
     let records: [NomiRecord]
-    @Binding var selectedRecordID: String
+    @Binding var selectedRecordID: String?
     @Binding var selectedFilter: RecordFilter
-    let selectedRecord: NomiRecord
+    let selectedRecord: NomiRecord?
     let isLoading: Bool
     let errorMessage: String?
     let onRetry: () -> Void
@@ -714,37 +715,44 @@ private struct RecordsPage: View {
                         .accessibilityIdentifier("mac-records-loading")
                 }
 
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(groupedRecords, id: \.key) { group in
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Text(group.key)
-                                    .font(NomiType.section)
-                                    .foregroundStyle(NomiColor.ink)
-                                Text(group.value.first?.dateLabel ?? "")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(Color(hex: 0x777777))
-                            }
-                            .padding(.top, group.key == groupedRecords.first?.key ? 10 : 24)
-                            .padding(.bottom, 10)
+                if records.isEmpty && !isLoading && errorMessage == nil {
+                    EmptyRecordsView()
+                } else {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(groupedRecords, id: \.key) { group in
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text(group.key)
+                                        .font(NomiType.section)
+                                        .foregroundStyle(NomiColor.ink)
+                                    Text(group.value.first?.dateLabel ?? "")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color(hex: 0x777777))
+                                }
+                                .padding(.top, group.key == groupedRecords.first?.key ? 10 : 24)
+                                .padding(.bottom, 10)
 
-                            ForEach(group.value) { record in
-                                FullRecordRow(
-                                    record: record,
-                                    isSelected: record.id == selectedRecordID,
-                                    action: { selectedRecordID = record.id }
-                                )
+                                ForEach(group.value) { record in
+                                    FullRecordRow(
+                                        record: record,
+                                        isSelected: record.id == selectedRecordID,
+                                        action: { selectedRecordID = record.id }
+                                    )
+                                }
                             }
                         }
+                        .padding(.bottom, 24)
                     }
-                    .padding(.bottom, 24)
                 }
             }
             .frame(minWidth: 500, maxWidth: .infinity, alignment: .topLeading)
 
-            DetailPanel(record: selectedRecord, onPreview: { onPreview(selectedRecord) })
-                .frame(width: 280)
-                .padding(.top, 4)
+            if let selectedRecord {
+                DetailPanel(record: selectedRecord, onPreview: { onPreview(selectedRecord) })
+                    .frame(width: 280)
+                    .padding(.top, 4)
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+            }
         }
         .padding(.horizontal, 24)
         .padding(.top, 28)
@@ -758,6 +766,30 @@ private struct RecordsPage: View {
             guard let value = groups[day], !value.isEmpty else { return nil }
             return (day, value)
         }
+    }
+}
+
+private struct EmptyRecordsView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: "tray")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(NomiColor.secondaryInk)
+            Text("还没有记录")
+                .font(NomiType.section)
+                .foregroundStyle(NomiColor.ink)
+            Text("点击工具栏的 + 添加图片或文字记录。")
+                .font(NomiType.body)
+                .foregroundStyle(NomiColor.secondaryInk)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, minHeight: 180, alignment: .leading)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(NomiColor.hairline, lineWidth: 1)
+        }
+        .accessibilityIdentifier("mac-records-empty")
     }
 }
 
@@ -821,6 +853,8 @@ private struct FullRecordRow: View {
                         .lineLimit(1)
                 }
 
+                RecordStatusBadge(status: record.status)
+
                 TagPill(record.tag)
 
                 Image(systemName: "ellipsis")
@@ -846,6 +880,39 @@ private struct FullRecordRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("mac-record-row")
+    }
+}
+
+private struct RecordStatusBadge: View {
+    let status: String
+
+    var body: some View {
+        if status != "completed" {
+            Text(label)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(foreground)
+                .padding(.horizontal, 8)
+                .frame(height: 20)
+                .background(background, in: Capsule())
+                .accessibilityIdentifier("mac-record-status-\(status)")
+        }
+    }
+
+    private var label: String {
+        switch status {
+        case "pending": "等待识别"
+        case "processing": "识别中"
+        case "failed": "识别失败"
+        default: status
+        }
+    }
+
+    private var foreground: Color {
+        status == "failed" ? Color(hex: 0x8f2f2f) : Color(hex: 0x555555)
+    }
+
+    private var background: Color {
+        status == "failed" ? Color(hex: 0xffeeee) : Color(hex: 0xf1f1f1)
     }
 }
 
@@ -885,6 +952,7 @@ private struct DetailPanel: View {
                                 .foregroundStyle(Color(hex: 0x8f8f8f))
                         }
                         Spacer()
+                        RecordStatusBadge(status: record.status)
                         TagPill(record.tag)
                     }
 
@@ -899,7 +967,11 @@ private struct DetailPanel: View {
                             .foregroundStyle(Color(hex: 0x777777))
                     }
 
-                    NutritionCard(record: record)
+                    if record.status == "completed" {
+                        NutritionCard(record: record)
+                    } else {
+                        RecordAnalysisStateCard(status: record.status)
+                    }
 
                     VStack(alignment: .leading, spacing: 10) {
                         Text("相关数据")
@@ -953,6 +1025,38 @@ private struct NutritionCard: View {
         .padding(12)
         .background(Color(hex: 0xf7f7f6), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .shadow(color: .black.opacity(0.03), radius: 9, y: 4)
+    }
+}
+
+private struct RecordAnalysisStateCard: View {
+    let status: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if status == "failed" {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 14, weight: .semibold))
+            } else {
+                ProgressView()
+                    .controlSize(.small)
+            }
+            Text(message)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color(hex: 0x555555))
+            Spacer()
+        }
+        .padding(12)
+        .background(Color(hex: 0xf7f7f6), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityIdentifier("mac-record-analysis-state")
+    }
+
+    private var message: String {
+        switch status {
+        case "pending": "已上传，等待 SeedX 识别"
+        case "processing": "SeedX 正在识别图片"
+        case "failed": "识别失败，没有写入营养估算"
+        default: "等待记录更新"
+        }
     }
 }
 
@@ -1350,8 +1454,13 @@ private struct ImagePreviewOverlay: View {
                     }
 
                     HStack(spacing: 14) {
-                        NutritionCard(record: record)
-                            .frame(maxWidth: .infinity)
+                        if record.status == "completed" {
+                            NutritionCard(record: record)
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            RecordAnalysisStateCard(status: record.status)
+                                .frame(maxWidth: .infinity)
+                        }
                         VStack(alignment: .leading, spacing: 13) {
                             Text("相关数据")
                                 .font(.system(size: 13, weight: .bold))
@@ -1368,7 +1477,7 @@ private struct ImagePreviewOverlay: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("备注")
                             .font(.system(size: 13, weight: .bold))
-                        Text(record.id == "breakfast" ? "今天早餐吃得不错，水果很新鲜。" : "添加备注...")
+                        Text("添加备注...")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(Color(hex: 0x555555))
                             .padding(.horizontal, 12)
@@ -1606,127 +1715,20 @@ private extension NomiRecord {
         self.init(
             id: savedRecord.id,
             time: savedRecord.displayTime,
-            dayGroup: savedRecord.isToday ? "今天" : "更早",
-            dateLabel: savedRecord.isToday ? "5月18日" : "",
+            dayGroup: savedRecord.dayGroup,
+            dateLabel: savedRecord.dateLabel,
             title: savedRecord.title.isEmpty ? "健康记录" : savedRecord.title,
             summary: savedRecord.detailLine.isEmpty ? savedRecord.summary : savedRecord.detailLine,
             source: savedRecord.source == "macos-file" ? "来自本机图片" : nil,
             tag: tag,
-            visual: savedRecord.imageURI?.isEmpty == false ? .image("breakfast") : .symbol(savedRecord.symbolName, Color(hex: 0xf2f2f1)),
-            calories: savedRecord.metadata["kcal"].map { "\($0) 千卡" } ?? "520 千卡",
-            protein: savedRecord.metadata["protein_g"].map { "\($0) g" } ?? "28 g",
-            carbs: savedRecord.metadata["carbs_g"].map { "\($0) g" } ?? "55 g",
-            fat: savedRecord.metadata["fat_g"].map { "\($0) g" } ?? "18 g"
+            visual: .symbol(savedRecord.symbolName, Color(hex: 0xf2f2f1)),
+            status: savedRecord.status,
+            calories: savedRecord.metadata["calories_kcal"].map { "\($0) 千卡" } ?? "-",
+            protein: savedRecord.metadata["protein_g"].map { "\($0) g" } ?? "-",
+            carbs: savedRecord.metadata["carbs_g"].map { "\($0) g" } ?? "-",
+            fat: savedRecord.metadata["fat_g"].map { "\($0) g" } ?? "-"
         )
     }
-
-    static let figmaFixtures: [NomiRecord] = [
-        NomiRecord(
-            id: "breakfast",
-            time: "08:15",
-            dayGroup: "今天",
-            dateLabel: "5月18日",
-            title: "早餐",
-            summary: "三明治、牛奶、水果",
-            source: nil,
-            tag: .food,
-            visual: .image("breakfast"),
-            calories: "520 千卡",
-            protein: "28 g",
-            carbs: "55 g",
-            fat: "18 g"
-        ),
-        NomiRecord(
-            id: "run",
-            time: "07:30",
-            dayGroup: "今天",
-            dateLabel: "5月18日",
-            title: "跑步",
-            summary: "5.02 公里 · 32 分钟 · 5'42\"/公里",
-            source: "来自 Apple Watch",
-            tag: .fitness,
-            visual: .symbol("figure.run", Color(hex: 0x141716)),
-            calories: "312 千卡",
-            protein: "-",
-            carbs: "-",
-            fat: "-"
-        ),
-        NomiRecord(
-            id: "checkup",
-            time: "",
-            dayGroup: "今天",
-            dateLabel: "5月18日",
-            title: "体检报告",
-            summary: "年度体检报告.pdf · 2.4 MB",
-            source: nil,
-            tag: .file,
-            visual: .image("report"),
-            calories: "-",
-            protein: "-",
-            carbs: "-",
-            fat: "-"
-        ),
-        NomiRecord(
-            id: "sleep-note",
-            time: "",
-            dayGroup: "今天",
-            dateLabel: "5月18日",
-            title: "睡前感受",
-            summary: "今天睡眠一般，下午有点疲惫，喝了咖啡后精神好多了。",
-            source: nil,
-            tag: .text,
-            visual: .symbol("note.text", Color(hex: 0xf2f2f1)),
-            calories: "-",
-            protein: "-",
-            carbs: "-",
-            fat: "-"
-        ),
-        NomiRecord(
-            id: "voice",
-            time: "",
-            dayGroup: "今天",
-            dateLabel: "5月18日",
-            title: "语音记录",
-            summary: "",
-            source: nil,
-            tag: .audio,
-            visual: .waveform,
-            calories: "-",
-            protein: "-",
-            carbs: "-",
-            fat: "-"
-        ),
-        NomiRecord(
-            id: "workout",
-            time: "18:45",
-            dayGroup: "昨天",
-            dateLabel: "5月17日",
-            title: "力量训练",
-            summary: "胸部、肩部、肱三头肌 · 60 分钟",
-            source: "来自 Apple Watch",
-            tag: .fitness,
-            visual: .image("workout"),
-            calories: "420 千卡",
-            protein: "-",
-            carbs: "-",
-            fat: "-"
-        ),
-        NomiRecord(
-            id: "dinner",
-            time: "18:10",
-            dayGroup: "昨天",
-            dateLabel: "5月17日",
-            title: "晚餐",
-            summary: "鸡胸肉、糙米、蔬菜沙拉",
-            source: nil,
-            tag: .food,
-            visual: .image("breakfast"),
-            calories: "610 千卡",
-            protein: "42 g",
-            carbs: "64 g",
-            fat: "16 g"
-        )
-    ]
 }
 
 private extension RecordFilter {
@@ -1749,9 +1751,23 @@ private extension RecordFilter {
 }
 
 private extension SavedRecord {
-    var isToday: Bool {
-        guard let date = parsedDate else { return true }
-        return Calendar.current.isDateInToday(date)
+    var dayGroup: String {
+        guard let date = parsedDate else { return "更早" }
+        if Calendar.current.isDateInToday(date) {
+            return "今天"
+        }
+        if Calendar.current.isDateInYesterday(date) {
+            return "昨天"
+        }
+        return "更早"
+    }
+
+    var dateLabel: String {
+        guard let date = parsedDate else { return "" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_Hans")
+        formatter.dateFormat = "M月d日"
+        return formatter.string(from: date)
     }
 
     var parsedDate: Date? {
