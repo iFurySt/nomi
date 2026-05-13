@@ -26,6 +26,7 @@ NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088
 ```
 
 Image uploads are stored under `.nomi/uploads` by default. Override with `NOMI_IMAGE_STORAGE_DIR=/path/to/uploads` when needed.
+On macOS local development, HEIC uploads are also converted to a sibling JPEG with `sips` before SeedX/Codex analysis so Codex receives a readable image while the original upload remains stored.
 
 ## Docker
 

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"mime"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -75,12 +76,16 @@ func (s *FileImageStore) Save(_ context.Context, input ImageExtractionRequest) (
 	if err != nil {
 		absPath = path
 	}
+	analysisPath := absPath
+	if convertedPath, err := convertHEICForAnalysis(input.MimeType, absPath); err == nil && convertedPath != "" {
+		analysisPath = convertedPath
+	}
 
 	return StoredImage{
 		AssetName: input.AssetName,
 		Source:    input.Source,
 		MimeType:  strings.ToLower(input.MimeType),
-		Path:      absPath,
+		Path:      analysisPath,
 		URI:       "local://images/" + month + "/" + fileName,
 		SizeBytes: len(data),
 	}, nil
@@ -88,16 +93,35 @@ func (s *FileImageStore) Save(_ context.Context, input ImageExtractionRequest) (
 
 func storedImageFileName(assetName string, mimeType string) string {
 	name := sanitizeAssetName(assetName)
-	ext := strings.ToLower(filepath.Ext(name))
+	originalExt := filepath.Ext(name)
+	ext := strings.ToLower(originalExt)
 	if ext == "" {
 		ext = extensionForMimeType(mimeType)
 		name += ext
+		originalExt = ext
 	}
-	stem := strings.TrimSuffix(name, ext)
+	stem := strings.TrimSuffix(name, originalExt)
 	if stem == "" {
 		stem = "upload"
 	}
 	return fmt.Sprintf("%s-%s-%s%s", time.Now().UTC().Format("20060102T150405.000000000"), randomSuffix(), stem, ext)
+}
+
+func convertHEICForAnalysis(mimeType string, sourcePath string) (string, error) {
+	if strings.ToLower(mimeType) != "image/heic" && strings.ToLower(filepath.Ext(sourcePath)) != ".heic" {
+		return "", nil
+	}
+
+	outputPath := strings.TrimSuffix(sourcePath, filepath.Ext(sourcePath)) + "-seedx.jpg"
+	cmd := exec.Command("sips", "-s", "format", "jpeg", sourcePath, "--out", outputPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("heic_convert_failed: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	absPath, err := filepath.Abs(outputPath)
+	if err != nil {
+		return outputPath, nil
+	}
+	return absPath, nil
 }
 
 func sanitizeAssetName(name string) string {

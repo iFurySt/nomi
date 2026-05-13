@@ -66,6 +66,18 @@ func TestCreateRecordInputValidate(t *testing.T) {
 	}
 }
 
+func TestStoredImageFileNameNormalizesUppercaseExtension(t *testing.T) {
+	t.Parallel()
+
+	name := storedImageFileName("IMG_7605.JPG", "image/jpeg")
+	if strings.Contains(name, ".JPG.jpg") {
+		t.Fatalf("expected uppercase extension to be normalized once: %s", name)
+	}
+	if !strings.HasSuffix(name, ".jpg") {
+		t.Fatalf("expected jpg extension: %s", name)
+	}
+}
+
 func TestExtractImageHandler(t *testing.T) {
 	t.Parallel()
 

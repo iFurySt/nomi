@@ -13,17 +13,21 @@
 - macOS 记录页移除 Figma fixture 拼接，只展示 `GET /records` 的真实数据；默认不选中 record，点击列表行后才打开右侧详情。
 - 记录页增加空态、`pending/processing/failed` 状态标签和非完成态的识别状态面板。
 - iOS 上传路径删除本地 `ImageExtraction.fallback` 和二次 `POST /records` 兜底保存；上传成功只插入 server 返回的 record/status，上传失败不造假数据。
+- Server 在 macOS 本地开发环境用 `sips` 将 HEIC 上传转换成旁路 JPEG 供 SeedX/Codex 分析，避免 Codex 因 HEIC 不可读而只能返回信息类占位结果。
+- 修复大写图片扩展名导致存储文件名出现 `.JPG.jpg` 的问题。
 
 ## 验证
 
 - `cd apps/server && go test ./...`
 - `cd apps/macos/Nomi && ./scripts/build-app.sh`
 - `xcodebuild -project apps/ios/Nomi.xcodeproj -scheme Nomi -configuration Debug -destination 'generic/platform=iOS Simulator' build`
+- 本地启动 Nomi server + SeedX daemon 后，用用户提供的 JPG / HEIC 样例图调用 `/ai/extract-image`，验证接口先返回 `202/pending`，后续 `/records` 更新到 `completed`。
 
 ## 影响文件
 
 - `apps/server/internal/app/record.go`
 - `apps/server/internal/app/store.go`
+- `apps/server/internal/app/image_storage.go`
 - `apps/server/internal/app/handler.go`
 - `apps/server/internal/app/extraction.go`
 - `apps/macos/Nomi/Sources/Nomi/ContentView.swift`
