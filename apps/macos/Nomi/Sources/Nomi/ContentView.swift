@@ -63,7 +63,7 @@ private enum RecordFilter: String, CaseIterable, Identifiable {
 
 private struct NomiRecord: Identifiable, Equatable {
     enum Visual: Equatable {
-        case image(String)
+        case image(URL)
         case symbol(String, Color)
         case waveform
     }
@@ -292,7 +292,9 @@ private struct SidebarNavigationRow: View {
                 foreground: isSelected ? Color.white : NomiColor.ink
             )
             .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 32)
             .background(rowBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
@@ -863,6 +865,7 @@ private struct FullRecordRow: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 75)
+            .contentShape(Rectangle())
             .background {
                 if isSelected {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -1596,11 +1599,37 @@ private struct RecordThumb: View {
     let visual: NomiRecord.Visual
 
     var body: some View {
-        switch visual {
-        case .image(let name):
-            ResourceImage(name: name, contentMode: .fill)
-                .clipShape(RoundedRectangle(cornerRadius: name == "report" ? 2 : 7, style: .continuous))
+        GeometryReader { proxy in
+            thumbContent
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 .shadow(color: .black.opacity(0.04), radius: 6, y: 3)
+        }
+    }
+
+    @ViewBuilder
+    private var thumbContent: some View {
+        switch visual {
+        case .image(let url):
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .failure:
+                    imageFallback
+                case .empty:
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(hex: 0xf2f2f1))
+                @unknown default:
+                    imageFallback
+                }
+            }
         case .symbol(let symbol, let background):
             ZStack {
                 background
@@ -1608,7 +1637,6 @@ private struct RecordThumb: View {
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(symbol == "figure.run" ? Color(hex: 0x47e086) : Color(hex: 0x777777))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         case .waveform:
             ZStack {
                 ResourceImage(name: "audio", contentMode: .fill)
@@ -1622,7 +1650,15 @@ private struct RecordThumb: View {
                 }
                 .offset(x: 44)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+    }
+
+    private var imageFallback: some View {
+        ZStack {
+            Color(hex: 0xf2f2f1)
+            Image(systemName: "photo")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color(hex: 0x777777))
         }
     }
 }
@@ -1721,7 +1757,7 @@ private extension NomiRecord {
             summary: savedRecord.detailLine.isEmpty ? savedRecord.summary : savedRecord.detailLine,
             source: savedRecord.source == "macos-file" ? "来自本机图片" : nil,
             tag: tag,
-            visual: .symbol(savedRecord.symbolName, Color(hex: 0xf2f2f1)),
+            visual: savedRecord.imageURL.map(NomiRecord.Visual.image) ?? .symbol(savedRecord.symbolName, Color(hex: 0xf2f2f1)),
             status: savedRecord.status,
             calories: savedRecord.metadata["calories_kcal"].map { "\($0) 千卡" } ?? "-",
             protein: savedRecord.metadata["protein_g"].map { "\($0) g" } ?? "-",
@@ -1751,6 +1787,18 @@ private extension RecordFilter {
 }
 
 private extension SavedRecord {
+    var imageURL: URL? {
+        guard let imageURI, !imageURI.isEmpty else { return nil }
+        if imageURI.hasPrefix("local://images/") {
+            let relativePath = String(imageURI.dropFirst("local://images/".count))
+            let base = NomiAPI.baseURL.absoluteString.hasSuffix("/")
+                ? String(NomiAPI.baseURL.absoluteString.dropLast())
+                : NomiAPI.baseURL.absoluteString
+            return URL(string: base + "/images/" + relativePath)
+        }
+        return URL(string: imageURI)
+    }
+
     var dayGroup: String {
         guard let date = parsedDate else { return "更早" }
         if Calendar.current.isDateInToday(date) {

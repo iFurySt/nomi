@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -75,6 +77,87 @@ func TestStoredImageFileNameNormalizesUppercaseExtension(t *testing.T) {
 	}
 	if !strings.HasSuffix(name, ".jpg") {
 		t.Fatalf("expected jpg extension: %s", name)
+	}
+}
+
+func TestServeImageHandler(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := os.MkdirAll(dir+"/2026-05", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir+"/2026-05/sample.jpg", []byte("image-bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	handler := NewHandler(
+		&fakeStore{},
+		zap.NewNop(),
+		"",
+		WithImageStorageDir(dir),
+		WithImageAnalyzer(fakeImageAnalyzer{}),
+	)
+	server := httptest.NewServer(handler.Routes())
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/images/2026-05/sample.jpg")
+	if err != nil {
+		t.Fatalf("get image: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if strings.Contains(resp.Header.Get("Content-Type"), "application/json") {
+		t.Fatalf("unexpected json content type: %s", resp.Header.Get("Content-Type"))
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "image-bytes" {
+		t.Fatalf("body = %q", string(body))
+	}
+}
+
+func TestServeImageHandlerUsesHEICDisplayJPEG(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := os.MkdirAll(dir+"/2026-05", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir+"/2026-05/sample.heic", []byte("heic-bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir+"/2026-05/sample-seedx.jpg", []byte("jpeg-bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	handler := NewHandler(
+		&fakeStore{},
+		zap.NewNop(),
+		"",
+		WithImageStorageDir(dir),
+		WithImageAnalyzer(fakeImageAnalyzer{}),
+	)
+	server := httptest.NewServer(handler.Routes())
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/images/2026-05/sample.heic")
+	if err != nil {
+		t.Fatalf("get image: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "jpeg-bytes" {
+		t.Fatalf("body = %q", string(body))
 	}
 }
 

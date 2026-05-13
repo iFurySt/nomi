@@ -79,6 +79,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /records", h.listRecords)
 	mux.HandleFunc("POST /records", h.createRecord)
 	mux.HandleFunc("POST /ai/extract-image", h.extractImage)
+	mux.HandleFunc("GET /images/", h.serveImage)
 	mux.HandleFunc("POST /ask", h.ask)
 	mux.HandleFunc("GET /daemon/connect", h.seedXWebSocket)
 	mux.HandleFunc("GET /seedx/ws", h.seedXWebSocket)
@@ -131,6 +132,20 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, record)
+}
+
+func (h *Handler) serveImage(w http.ResponseWriter, r *http.Request) {
+	if h.imageStore == nil {
+		writeError(w, http.StatusNotFound, "image_not_found")
+		return
+	}
+	relativePath := strings.TrimPrefix(r.URL.Path, "/images/")
+	path, err := h.imageStore.ResolveDisplayImagePath(relativePath)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "image_not_found")
+		return
+	}
+	http.ServeFile(w, r, path)
 }
 
 func (h *Handler) extractImage(w http.ResponseWriter, r *http.Request) {
@@ -264,7 +279,9 @@ func writeError(w http.ResponseWriter, status int, code string) {
 
 func withJSONHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		if !strings.HasPrefix(r.URL.Path, "/images/") {
+			w.Header().Set("Content-Type", "application/json")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

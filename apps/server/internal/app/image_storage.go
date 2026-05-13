@@ -46,6 +46,40 @@ func NewFileImageStore(root string) *FileImageStore {
 	return &FileImageStore{root: root}
 }
 
+func (s *FileImageStore) ResolveImagePath(relativePath string) (string, error) {
+	clean := strings.TrimPrefix(filepath.Clean("/"+relativePath), "/")
+	if clean == "." || clean == "" || strings.HasPrefix(clean, "..") {
+		return "", ErrImageInvalid
+	}
+
+	root, err := filepath.Abs(s.root)
+	if err != nil {
+		return "", err
+	}
+	path, err := filepath.Abs(filepath.Join(root, clean))
+	if err != nil {
+		return "", err
+	}
+	if path != root && !strings.HasPrefix(path, root+string(os.PathSeparator)) {
+		return "", ErrImageInvalid
+	}
+	return path, nil
+}
+
+func (s *FileImageStore) ResolveDisplayImagePath(relativePath string) (string, error) {
+	path, err := s.ResolveImagePath(relativePath)
+	if err != nil {
+		return "", err
+	}
+	if strings.EqualFold(filepath.Ext(path), ".heic") {
+		convertedPath := strings.TrimSuffix(path, filepath.Ext(path)) + "-seedx.jpg"
+		if _, err := os.Stat(convertedPath); err == nil {
+			return convertedPath, nil
+		}
+	}
+	return path, nil
+}
+
 func (s *FileImageStore) Save(_ context.Context, input ImageExtractionRequest) (StoredImage, error) {
 	if input.ImageBase64 == "" {
 		return StoredImage{}, ErrImageRequired
