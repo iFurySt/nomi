@@ -81,6 +81,8 @@ curl -s http://localhost:8088/health
 
 curl -s http://localhost:8088/records
 
+curl -X DELETE http://localhost:8088/records/<record-id>
+
 curl -I http://localhost:8088/images/2026-05/example.jpg
 
 printf 'tiny-image' | base64 | tr -d '\n' | \

@@ -185,7 +185,12 @@ struct ContentView: View {
         GeometryReader { _ in
             Group {
                 if section == .overview {
-                    DashboardView(records: displayRecords.prefix(4).map { $0 })
+                    DashboardView(
+                        records: displayRecords.prefix(4).map { $0 },
+                        onDelete: { record in
+                            Task { await deleteRecord(record) }
+                        }
+                    )
                         .transition(.opacity)
                 } else if section == .records {
                     RecordsPage(
@@ -200,6 +205,9 @@ struct ContentView: View {
                             withAnimation(.smooth(duration: 0.22)) {
                                 previewRecord = record
                             }
+                        },
+                        onDelete: { record in
+                            Task { await deleteRecord(record) }
                         }
                     )
                     .transition(.opacity)
@@ -228,6 +236,22 @@ struct ContentView: View {
         }
 
         isLoading = false
+    }
+
+    @MainActor
+    private func deleteRecord(_ record: NomiRecord) async {
+        do {
+            try await RecordsClient.deleteRecord(id: record.id)
+            records.removeAll { $0.id == record.id }
+            if selectedRecordID == record.id {
+                selectedRecordID = nil
+            }
+            if previewRecord?.id == record.id {
+                previewRecord = nil
+            }
+        } catch {
+            errorMessage = "删除记录失败，请稍后重试。"
+        }
     }
 }
 
@@ -352,6 +376,7 @@ private struct SidebarItemLabel: View {
 
 private struct DashboardView: View {
     let records: [NomiRecord]
+    let onDelete: (NomiRecord) -> Void
 
     var body: some View {
         GeometryReader { proxy in
@@ -370,7 +395,7 @@ private struct DashboardView: View {
                     metricsRow(width: proxy.size.width)
 
                     HStack(alignment: .top, spacing: 16) {
-                        RecentRecordsCard(records: records)
+                        RecentRecordsCard(records: records, onDelete: onDelete)
                             .frame(minWidth: 360, maxWidth: .infinity, minHeight: 382)
                         VStack(spacing: 16) {
                             InsightCard()
@@ -526,6 +551,7 @@ private struct SuggestionCard: View {
 
 private struct RecentRecordsCard: View {
     let records: [NomiRecord]
+    let onDelete: (NomiRecord) -> Void
 
     var body: some View {
         CardSurface(radius: 13) {
@@ -555,7 +581,7 @@ private struct RecentRecordsCard: View {
 
                 VStack(spacing: 0) {
                     ForEach(records.prefix(4)) { record in
-                        CompactRecordRow(record: record)
+                        CompactRecordRow(record: record, onDelete: { onDelete(record) })
                         if record.id != records.prefix(4).last?.id {
                             Divider().overlay(NomiColor.hairline)
                         }
@@ -569,6 +595,7 @@ private struct RecentRecordsCard: View {
 
 private struct CompactRecordRow: View {
     let record: NomiRecord
+    let onDelete: () -> Void
 
     var body: some View {
         HStack(spacing: 18) {
@@ -587,9 +614,7 @@ private struct CompactRecordRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
-            Image(systemName: "ellipsis")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Color(hex: 0x4f4f4f))
+            RecordActionsMenu(onDelete: onDelete)
         }
         .frame(height: 74)
     }
@@ -701,6 +726,7 @@ private struct RecordsPage: View {
     let errorMessage: String?
     let onRetry: () -> Void
     let onPreview: (NomiRecord) -> Void
+    let onDelete: (NomiRecord) -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -738,7 +764,8 @@ private struct RecordsPage: View {
                                     FullRecordRow(
                                         record: record,
                                         isSelected: record.id == selectedRecordID,
-                                        action: { selectedRecordID = record.id }
+                                        action: { selectedRecordID = record.id },
+                                        onDelete: { onDelete(record) }
                                     )
                                 }
                             }
@@ -823,66 +850,84 @@ private struct FullRecordRow: View {
     let record: NomiRecord
     let isSelected: Bool
     let action: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 22) {
-                Text(record.time)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color(hex: 0x333333))
-                    .frame(width: 42, alignment: .trailing)
+        HStack(spacing: 22) {
+            Text(record.time)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color(hex: 0x333333))
+                .frame(width: 42, alignment: .trailing)
 
-                RecordThumb(visual: record.visual)
-                    .frame(width: 40, height: 40)
+            RecordThumb(visual: record.visual)
+                .frame(width: 40, height: 40)
 
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(record.title)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color(hex: 0x222222))
-                        .lineLimit(1)
-                    Text(record.summary)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color(hex: 0x777777))
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 8)
-
-                if let source = record.source {
-                    Text(source)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(Color(hex: 0x9a9a9a))
-                        .lineLimit(1)
-                }
-
-                RecordStatusBadge(status: record.status)
-
-                TagPill(record.tag)
-
-                Image(systemName: "ellipsis")
+            VStack(alignment: .leading, spacing: 5) {
+                Text(record.title)
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color(hex: 0x555555))
+                    .foregroundStyle(Color(hex: 0x222222))
+                    .lineLimit(1)
+                Text(record.summary)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(hex: 0x777777))
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 12)
-            .frame(height: 75)
-            .contentShape(Rectangle())
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.white)
-                        .shadow(color: .black.opacity(0.05), radius: 12, y: 5)
-                } else {
-                    VStack {
-                        Spacer()
-                        Rectangle()
-                            .fill(NomiColor.hairline)
-                            .frame(height: 1)
-                    }
+
+            Spacer(minLength: 8)
+
+            if let source = record.source {
+                Text(source)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color(hex: 0x9a9a9a))
+                    .lineLimit(1)
+            }
+
+            RecordStatusBadge(status: record.status)
+
+            TagPill(record.tag)
+
+            RecordActionsMenu(onDelete: onDelete)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 75)
+        .contentShape(Rectangle())
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white)
+                    .shadow(color: .black.opacity(0.05), radius: 12, y: 5)
+            } else {
+                VStack {
+                    Spacer()
+                    Rectangle()
+                        .fill(NomiColor.hairline)
+                        .frame(height: 1)
                 }
             }
         }
-        .buttonStyle(.plain)
+        .onTapGesture(perform: action)
         .accessibilityIdentifier("mac-record-row")
+    }
+}
+
+private struct RecordActionsMenu: View {
+    let onDelete: () -> Void
+
+    var body: some View {
+        Menu {
+            Button(role: .destructive, action: onDelete) {
+                Label("删除", systemImage: "trash")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color(hex: 0x555555))
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("更多")
+        .accessibilityIdentifier("mac-record-actions-menu")
     }
 }
 

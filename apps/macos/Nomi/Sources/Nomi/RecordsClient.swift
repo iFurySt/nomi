@@ -214,6 +214,17 @@ enum RecordsClient {
         }
     }
 
+    static func deleteRecord(id: String) async throws {
+        var request = URLRequest(url: NomiAPI.url(path: "records/\(id)"))
+        request.httpMethod = "DELETE"
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
+
     static func extractImage(fileURL: URL) async throws -> SavedRecord {
         let didAccess = fileURL.startAccessingSecurityScopedResource()
         defer {

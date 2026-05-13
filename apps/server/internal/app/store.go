@@ -133,6 +133,17 @@ returning id::text, type, status, occurred_at, created_at, source, title, summar
 	return record, err
 }
 
+func (s *PostgresStore) DeleteRecord(ctx context.Context, id string) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `
+delete from records
+where id::text = $1
+`, id)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 func (s *PostgresStore) UpdateRecordStatus(ctx context.Context, id string, status string, metadata map[string]string) (Record, error) {
 	if metadata == nil {
 		metadata = map[string]string{}

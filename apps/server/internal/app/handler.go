@@ -17,6 +17,7 @@ type Store interface {
 	EnsureSchema(ctx context.Context) error
 	ListRecords(ctx context.Context) ([]Record, error)
 	CreateRecord(ctx context.Context, input CreateRecordInput) (Record, error)
+	DeleteRecord(ctx context.Context, id string) (bool, error)
 	UpdateRecordStatus(ctx context.Context, id string, status string, metadata map[string]string) (Record, error)
 	CompleteRecordWithExtraction(ctx context.Context, id string, extraction ImageExtraction, image StoredImage) (Record, error)
 }
@@ -78,6 +79,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("GET /records", h.listRecords)
 	mux.HandleFunc("POST /records", h.createRecord)
+	mux.HandleFunc("DELETE /records/{id}", h.deleteRecord)
 	mux.HandleFunc("POST /ai/extract-image", h.extractImage)
 	mux.HandleFunc("GET /images/", h.serveImage)
 	mux.HandleFunc("POST /ask", h.ask)
@@ -132,6 +134,27 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, record)
+}
+
+func (h *Handler) deleteRecord(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "record_id_required")
+		return
+	}
+
+	deleted, err := h.store.DeleteRecord(r.Context(), id)
+	if err != nil {
+		h.logger.Error("delete record failed", zap.String("record_id", id), zap.Error(err))
+		writeError(w, http.StatusInternalServerError, "record_delete_failed")
+		return
+	}
+	if !deleted {
+		writeError(w, http.StatusNotFound, "record_not_found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) serveImage(w http.ResponseWriter, r *http.Request) {

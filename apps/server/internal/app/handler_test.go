@@ -198,6 +198,62 @@ func TestExtractImageHandler(t *testing.T) {
 	}
 }
 
+func TestDeleteRecordHandler(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(
+		&fakeStore{},
+		zap.NewNop(),
+		"",
+		WithImageStorageDir(t.TempDir()),
+		WithImageAnalyzer(fakeImageAnalyzer{}),
+	)
+	server := httptest.NewServer(handler.Routes())
+	defer server.Close()
+
+	request, err := http.NewRequest(http.MethodDelete, server.URL+"/records/rec-test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+func TestDeleteRecordHandlerNotFound(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(
+		&fakeStore{},
+		zap.NewNop(),
+		"",
+		WithImageStorageDir(t.TempDir()),
+		WithImageAnalyzer(fakeImageAnalyzer{}),
+	)
+	server := httptest.NewServer(handler.Routes())
+	defer server.Close()
+
+	request, err := http.NewRequest(http.MethodDelete, server.URL+"/records/missing", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
 func TestParseImageExtractionJSONAllowsMarkdownFence(t *testing.T) {
 	t.Parallel()
 
@@ -338,6 +394,10 @@ func (fakeStore) CreateRecord(_ context.Context, input CreateRecordInput) (Recor
 		Metadata:   input.Metadata,
 		Confidence: input.Confidence,
 	}, nil
+}
+
+func (fakeStore) DeleteRecord(_ context.Context, id string) (bool, error) {
+	return id == "rec-test", nil
 }
 
 func (fakeStore) UpdateRecordStatus(_ context.Context, id string, status string, metadata map[string]string) (Record, error) {
