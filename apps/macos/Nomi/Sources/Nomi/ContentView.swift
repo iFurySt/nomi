@@ -746,7 +746,7 @@ private struct RecordsPage: View {
                 if records.isEmpty && !isLoading && errorMessage == nil {
                     EmptyRecordsView()
                 } else {
-                    ScrollView {
+                    ScrollView(.vertical, showsIndicators: false) {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(groupedRecords, id: \.key) { group in
                                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -970,7 +970,7 @@ private struct DetailPanel: View {
 
     var body: some View {
         CardSurface(radius: 13) {
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     ZStack(alignment: .topTrailing) {
                         RecordThumb(visual: record.visual)
