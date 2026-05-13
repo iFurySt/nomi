@@ -94,7 +94,7 @@ struct ContentView: View {
     @State private var selectedRecordID: String?
     @State private var searchText = ""
     @State private var showingAddOverlay = false
-    @State private var previewRecord: NomiRecord?
+    @State private var expandedRecordID: String?
 
     private var displayRecords: [NomiRecord] {
         records.map(NomiRecord.init(savedRecord:))
@@ -117,6 +117,11 @@ struct ContentView: View {
         return displayRecords.first { $0.id == selectedRecordID }
     }
 
+    private var expandedRecord: NomiRecord? {
+        guard let expandedRecordID else { return nil }
+        return displayRecords.first { $0.id == expandedRecordID }
+    }
+
     var body: some View {
         ZStack {
             appShell
@@ -135,16 +140,6 @@ struct ContentView: View {
                 )
                 .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 .zIndex(10)
-            }
-
-            if let previewRecord {
-                ImagePreviewOverlay(record: previewRecord) {
-                    withAnimation(.smooth(duration: 0.22)) {
-                        self.previewRecord = nil
-                    }
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                .zIndex(20)
             }
         }
         .tint(.primary)
@@ -192,6 +187,16 @@ struct ContentView: View {
                         }
                     )
                         .transition(.opacity)
+                } else if section == .records, let expandedRecord {
+                    RecordExpandedPage(
+                        record: expandedRecord,
+                        onBack: {
+                            withAnimation(.smooth(duration: 0.22)) {
+                                expandedRecordID = nil
+                            }
+                        }
+                    )
+                    .transition(.opacity)
                 } else if section == .records {
                     RecordsPage(
                         records: filteredRecords,
@@ -203,7 +208,7 @@ struct ContentView: View {
                         onRetry: { Task { await loadRecords() } },
                         onPreview: { record in
                             withAnimation(.smooth(duration: 0.22)) {
-                                previewRecord = record
+                                expandedRecordID = record.id
                             }
                         },
                         onDelete: { record in
@@ -215,10 +220,17 @@ struct ContentView: View {
                     PlaceholderPage(section: section)
                 }
             }
-            .navigationTitle(section.rawValue)
+            .navigationTitle(navigationTitle(for: section))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(NomiColor.content)
         }
+    }
+
+    private func navigationTitle(for section: SidebarSection) -> String {
+        if section == .records, let expandedRecord {
+            return "记录 > \(expandedRecord.title)"
+        }
+        return section.rawValue
     }
 
     @MainActor
@@ -230,6 +242,9 @@ struct ContentView: View {
             records = try await RecordsClient.loadRecords()
             if let selectedRecordID, !records.contains(where: { $0.id == selectedRecordID }) {
                 self.selectedRecordID = nil
+            }
+            if let expandedRecordID, !records.contains(where: { $0.id == expandedRecordID }) {
+                self.expandedRecordID = nil
             }
         } catch {
             errorMessage = "无法连接 \(NomiAPI.baseURL.absoluteString)"
@@ -246,8 +261,8 @@ struct ContentView: View {
             if selectedRecordID == record.id {
                 selectedRecordID = nil
             }
-            if previewRecord?.id == record.id {
-                previewRecord = nil
+            if expandedRecordID == record.id {
+                expandedRecordID = nil
             }
         } catch {
             errorMessage = "删除记录失败，请稍后重试。"
@@ -1473,51 +1488,47 @@ private extension View {
     }
 }
 
-private struct ImagePreviewOverlay: View {
+private struct RecordExpandedPage: View {
     let record: NomiRecord
-    let onClose: () -> Void
+    let onBack: () -> Void
 
     var body: some View {
-        ZStack {
-            Rectangle()
-                .fill(Color.black.opacity(0.001))
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture(perform: onClose)
-
-            VStack(spacing: 0) {
-                ZStack(alignment: .top) {
-                    RecordThumb(visual: record.visual)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 315)
-                        .clipped()
-
-                    HStack {
-                        PreviewIconButton(symbol: "xmark", action: onClose)
-                        Spacer()
-                        PreviewIconButton(symbol: "star", action: {})
-                        PreviewIconButton(symbol: "ellipsis", action: {})
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 22) {
+                HStack(spacing: 8) {
+                    Button(action: onBack) {
+                        Text("记录")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color(hex: 0x4a4a4a))
                     }
-                    .padding(20)
+                    .buttonStyle(.plain)
+                    .help("返回记录")
 
-                    HStack {
-                        PreviewIconButton(symbol: "chevron.left", action: {})
-                        Spacer()
-                        PreviewIconButton(symbol: "chevron.right", action: {})
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 140)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color(hex: 0xa0a0a0))
+
+                    Text(record.title)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(NomiColor.ink)
+                        .lineLimit(1)
+
+                    Spacer()
                 }
+                .padding(.top, 6)
+                .accessibilityIdentifier("mac-record-expanded-breadcrumb")
 
                 VStack(alignment: .leading, spacing: 18) {
+                    RecordThumb(visual: record.visual)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 360)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 7) {
-                            HStack(spacing: 12) {
-                                Text(record.title)
-                                    .font(.system(size: 28, weight: .bold))
-                                    .foregroundStyle(NomiColor.ink)
-                                TagPill(record.tag)
-                            }
+                            Text(record.title)
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundStyle(NomiColor.ink)
                             Text("\(record.dayGroup) \(record.time)")
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundStyle(Color(hex: 0x8c8c8c))
@@ -1527,33 +1538,14 @@ private struct ImagePreviewOverlay: View {
                         }
 
                         Spacer()
-
-                        HStack(spacing: 10) {
-                            PreviewAction(symbol: "pencil", title: "编辑")
-                            PreviewAction(symbol: "square.and.arrow.up", title: "分享")
-                            PreviewAction(symbol: "trash", title: "删除")
-                        }
+                        RecordStatusBadge(status: record.status)
+                        TagPill(record.tag)
                     }
 
-                    HStack(spacing: 14) {
-                        if record.status == "completed" {
-                            NutritionCard(record: record)
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            RecordAnalysisStateCard(status: record.status)
-                                .frame(maxWidth: .infinity)
-                        }
-                        VStack(alignment: .leading, spacing: 13) {
-                            Text("相关数据")
-                                .font(.system(size: 13, weight: .bold))
-                            HStack {
-                                RelatedInline(symbol: "scalemass", title: "体重", subtitle: "今天 07:00")
-                                RelatedInline(symbol: "moon.fill", title: "睡眠", subtitle: "7 小时 12 分钟")
-                            }
-                        }
-                        .padding(14)
-                        .frame(maxWidth: .infinity, minHeight: 78)
-                        .background(Color(hex: 0xf7f7f7), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    if record.status == "completed" {
+                        NutritionCard(record: record)
+                    } else {
+                        RecordAnalysisStateCard(status: record.status)
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -1568,78 +1560,15 @@ private struct ImagePreviewOverlay: View {
                             .overlay {
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                                     .stroke(Color(hex: 0xeeeeee), lineWidth: 1)
-                            }
+                        }
                     }
                 }
-                .padding(24)
-                .frame(maxWidth: .infinity)
-                .background(Color.white.opacity(0.98))
+                .frame(maxWidth: 860, alignment: .leading)
             }
-            .frame(width: 784)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: .black.opacity(0.24), radius: 32, y: 13)
+            .padding(.horizontal, 28)
+            .padding(.vertical, 24)
         }
-        .accessibilityIdentifier("mac-image-preview-overlay")
-    }
-}
-
-private struct PreviewIconButton: View {
-    let symbol: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(Color(hex: 0x333333))
-                .frame(width: 32, height: 32)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .shadow(color: .black.opacity(0.08), radius: 12, y: 5)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct PreviewAction: View {
-    let symbol: String
-    let title: String
-
-    var body: some View {
-        Button {
-        } label: {
-            VStack(spacing: 6) {
-                Image(systemName: symbol)
-                    .font(.system(size: 15, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 9, weight: .bold))
-            }
-            .foregroundStyle(Color(hex: 0x555555))
-            .frame(width: 44, height: 48)
-            .background(Color(hex: 0xf9f9f9), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .shadow(color: .black.opacity(0.05), radius: 11, y: 5)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct RelatedInline: View {
-    let symbol: String
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .bold))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 11, weight: .bold))
-                Text(subtitle)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color(hex: 0x555555))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("mac-record-expanded-page")
     }
 }
 
