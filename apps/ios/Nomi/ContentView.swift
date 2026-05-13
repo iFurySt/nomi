@@ -74,6 +74,7 @@ struct TimelineItem: Identifiable, Equatable {
     let image: UIImage?
     let minutesAgo: Int
     let badge: String?
+    let status: String
 }
 
 struct DailyMetric: Identifiable {
@@ -129,76 +130,6 @@ struct ImageExtractionRequest: Encodable {
         case source
         case mimeType = "mime_type"
         case imageBase64 = "image_base64"
-    }
-}
-
-struct ImageExtraction: Decodable, Equatable {
-    let recordID: String?
-    let imageURI: String?
-    let schemaVersion: String
-    let direction: String
-    let inputCategory: String
-    let outputImpacts: [String]
-    let title: String
-    let summary: String
-    let confidence: Double
-    let metadata: ExtractionMetadata
-
-    enum CodingKeys: String, CodingKey {
-        case recordID = "record_id"
-        case imageURI = "image_uri"
-        case schemaVersion = "schema_version"
-        case direction
-        case inputCategory = "input_category"
-        case outputImpacts = "output_impacts"
-        case title
-        case summary
-        case confidence
-        case metadata
-    }
-}
-
-struct ExtractionMetadata: Decodable, Equatable {
-    let foodCategory: String?
-    let portionEstimate: String?
-    let weightG: Int?
-    let caloriesKcal: Int?
-    let proteinG: Int?
-    let fatG: Int?
-    let carbsG: Int?
-    let fiberG: Int?
-    let waterMl: Int?
-    let caffeineMg: Int?
-    let alcoholG: Int?
-    let nicotineMg: Int?
-    let durationMin: Int?
-    let micronutrients: [String]?
-    let minerals: [String]?
-    let vitamins: [String]?
-    let estimatedFrom: [String]?
-    let reviewNeeded: [String]?
-    let originalMimeType: String?
-
-    enum CodingKeys: String, CodingKey {
-        case foodCategory = "food_category"
-        case portionEstimate = "portion_estimate"
-        case weightG = "weight_g"
-        case caloriesKcal = "calories_kcal"
-        case proteinG = "protein_g"
-        case fatG = "fat_g"
-        case carbsG = "carbs_g"
-        case fiberG = "fiber_g"
-        case waterMl = "water_ml"
-        case caffeineMg = "caffeine_mg"
-        case alcoholG = "alcohol_g"
-        case nicotineMg = "nicotine_mg"
-        case durationMin = "duration_min"
-        case micronutrients
-        case minerals
-        case vitamins
-        case estimatedFrom = "estimated_from"
-        case reviewNeeded = "review_needed"
-        case originalMimeType = "original_mime_type"
     }
 }
 
@@ -341,7 +272,6 @@ private extension View {
 
 struct UploadResult {
     let item: TimelineItem
-    let extraction: ImageExtraction
     let source: UploadSource
     let assetName: String
 }
@@ -424,15 +354,6 @@ struct ContentView: View {
                     timelineItems.insert(result.item, at: 0)
                 }
                 showUploadSheet = false
-                Task {
-                    if result.extraction.recordID == nil {
-                        await RecordsClient.save(
-                            extraction: result.extraction,
-                            source: result.source,
-                            assetName: result.assetName
-                        )
-                    }
-                }
             }
             .presentationDetents([.fraction(0.72)])
             .presentationDragIndicator(.visible)
@@ -511,8 +432,9 @@ struct ContentView: View {
                     writeE2EResult("NOMI_E2E_UPLOAD_RESULT skipped invalid-image \(item.fileName)", to: resultsURL)
                     continue
                 }
+                _ = image
 
-                let extraction = await ImageExtractionClient.analyze(
+                let timelineItem = try await RecordsClient.uploadImage(
                     data: imageData,
                     assetName: item.fileName,
                     source: source,
@@ -520,17 +442,10 @@ struct ContentView: View {
                 )
 
                 await MainActor.run {
-                    timelineItems.insert(extraction.timelineItem(source: source, image: image), at: 0)
+                    timelineItems.insert(timelineItem, at: 0)
                     writeE2EResult(
-                        "NOMI_E2E_UPLOAD_RESULT ok \(source.apiValue) \(item.fileName) \(extraction.schemaVersion) \(extraction.inputCategory) \(extraction.title) \(Int((extraction.confidence * 100).rounded()))",
+                        "NOMI_E2E_UPLOAD_RESULT accepted \(source.apiValue) \(item.fileName) \(timelineItem.status) \(timelineItem.title)",
                         to: resultsURL
-                    )
-                }
-                if extraction.recordID == nil {
-                    await RecordsClient.save(
-                        extraction: extraction,
-                        source: source,
-                        assetName: item.fileName
                     )
                 }
             }
@@ -1044,7 +959,7 @@ struct UploadSheet: View {
     @State private var showFileImporter = false
     @State private var isUploading = false
     @State private var uploadProgress = 0.0
-    @State private var extraction: ImageExtraction?
+    @State private var uploadError: String?
     @State private var cameraMessage: String?
     @State private var controlsAppeared = false
 
@@ -1206,28 +1121,13 @@ struct UploadSheet: View {
                 choose(selectedSource)
             }
 
-            if let extraction {
+            if let uploadError {
                 VStack(alignment: .leading, spacing: 9) {
                     HStack {
-                        Text(extraction.title)
+                        Text(uploadError)
                             .font(NomiType.cardTitle)
                         Spacer()
-                        Text("\(Int((extraction.confidence * 100).rounded()))%")
-                            .font(NomiType.captionStrong)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(NomiPalette.fill.opacity(0.58), in: Capsule())
                     }
-
-                    Text(extraction.metadataLine)
-                        .font(NomiType.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-
-                    Text(extraction.outputImpacts.joined(separator: " / "))
-                        .font(NomiType.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
                 }
                 .padding(14)
                 .nomiContentSurface(
@@ -1259,7 +1159,7 @@ struct UploadSheet: View {
         withAnimation(.spring(duration: 0.4, bounce: 0.2)) {
             selectedSource = source
             cameraMessage = nil
-            extraction = nil
+            uploadError = nil
         }
 
         switch source {
@@ -1284,7 +1184,7 @@ struct UploadSheet: View {
                         importedImageData = data
                         importedName = String(localized: "upload.photo.library.image")
                         importedMimeType = mimeType
-                        extraction = nil
+                        uploadError = nil
                     }
                 }
             }
@@ -1317,7 +1217,7 @@ struct UploadSheet: View {
                     importedImageData = data
                     importedName = url.lastPathComponent
                     importedMimeType = mimeType
-                    extraction = nil
+                    uploadError = nil
                 }
             } else {
                 importedName = String(localized: "upload.file.not.image")
@@ -1336,34 +1236,42 @@ struct UploadSheet: View {
         let source = selectedSource
 
         isUploading = true
+        uploadError = nil
         uploadProgress = 0.12
 
         Task {
             await advanceUploadProgress(to: 0.36)
-            let extraction = await ImageExtractionClient.analyze(
-                data: imageData,
-                assetName: assetName,
-                source: source,
-                mimeType: mimeType
-            )
-            await MainActor.run {
-                withAnimation(.smooth(duration: 0.24)) {
-                    self.extraction = extraction
-                    uploadProgress = 0.78
-                }
-            }
-            await advanceUploadProgress(to: 1.0)
-
-            await MainActor.run {
-                let newItem = extraction.timelineItem(source: source, image: importedImage)
-                onUpload(
-                    UploadResult(
-                        item: newItem,
-                        extraction: extraction,
-                        source: source,
-                        assetName: assetName
-                    )
+            do {
+                let timelineItem = try await RecordsClient.uploadImage(
+                    data: imageData,
+                    assetName: assetName,
+                    source: source,
+                    mimeType: mimeType
                 )
+                await MainActor.run {
+                    withAnimation(.smooth(duration: 0.24)) {
+                        uploadProgress = 0.78
+                    }
+                }
+                await advanceUploadProgress(to: 1.0)
+
+                await MainActor.run {
+                    onUpload(
+                        UploadResult(
+                            item: timelineItem,
+                            source: source,
+                            assetName: assetName
+                        )
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    withAnimation(.smooth(duration: 0.24)) {
+                        uploadError = String(localized: "upload.file.import.error")
+                        isUploading = false
+                        uploadProgress = 0
+                    }
+                }
             }
         }
     }
@@ -1427,146 +1335,6 @@ private extension TimelineItem {
             .prefix { $0.isNumber }
             .reversed()
         return Int(String(digits)) ?? 0
-    }
-}
-
-private enum ImageExtractionClient {
-    static func analyze(
-        data: Data,
-        assetName: String,
-        source: UploadSource,
-        mimeType: String
-    ) async -> ImageExtraction {
-        do {
-            var request = URLRequest(url: NomiAPI.url(path: "ai/extract-image"))
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONEncoder().encode(
-                ImageExtractionRequest(
-                    assetName: assetName,
-                    source: source.apiValue,
-                    mimeType: mimeType,
-                    imageBase64: data.base64EncodedString()
-                )
-            )
-
-            let (responseData, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200..<300).contains(httpResponse.statusCode) else {
-                return .fallback(assetName: assetName, source: source, mimeType: mimeType)
-            }
-
-            return try JSONDecoder().decode(ImageExtraction.self, from: responseData)
-        } catch {
-            return .fallback(assetName: assetName, source: source, mimeType: mimeType)
-        }
-    }
-}
-
-extension ImageExtraction {
-    var metadataLine: String {
-        let values = [
-            metadata.caloriesKcal.map { "\($0) kcal" },
-            metadata.proteinG.map { "\($0)g protein" },
-            metadata.carbsG.map { "\($0)g carbs" },
-            metadata.fatG.map { "\($0)g fat" },
-            metadata.fiberG.map { "\($0)g fiber" },
-            metadata.waterMl.map { "\($0)ml water" },
-            metadata.nicotineMg.map { "\($0)mg nicotine" },
-            metadata.durationMin.map { "\($0) min" }
-        ].compactMap(\.self)
-
-        if !values.isEmpty {
-            return values.joined(separator: " / ")
-        }
-
-        return summary
-    }
-
-    static func fallback(assetName: String, source: UploadSource, mimeType: String) -> ImageExtraction {
-        ImageExtraction(
-            recordID: nil,
-            imageURI: nil,
-            schemaVersion: "2026-05-07.inputs-outputs.v1",
-            direction: "input",
-            inputCategory: assetName.localizedCaseInsensitiveContains("receipt") ? "information" : "food",
-            outputImpacts: assetName.localizedCaseInsensitiveContains("receipt") ? ["focus", "mood"] : ["energy", "health"],
-            title: assetName.localizedCaseInsensitiveContains("receipt") ? "Information input" : "Food input",
-            summary: "Estimated upload record. Review details before using it for trends.",
-            confidence: 0.62,
-            metadata: ExtractionMetadata(
-                foodCategory: assetName.localizedCaseInsensitiveContains("receipt") ? nil : "mixed meal",
-                portionEstimate: assetName.localizedCaseInsensitiveContains("receipt") ? nil : "review needed",
-                weightG: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 420,
-                caloriesKcal: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 540,
-                proteinG: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 28,
-                fatG: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 18,
-                carbsG: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 62,
-                fiberG: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 7,
-                waterMl: assetName.localizedCaseInsensitiveContains("receipt") ? nil : 180,
-                caffeineMg: nil,
-                alcoholG: nil,
-                nicotineMg: nil,
-                durationMin: nil,
-                micronutrients: nil,
-                minerals: nil,
-                vitamins: nil,
-                estimatedFrom: ["asset_name", "source"],
-                reviewNeeded: ["context", "portion or duration"],
-                originalMimeType: mimeType
-            )
-        )
-    }
-
-    func timelineItem(source: UploadSource, image: UIImage) -> TimelineItem {
-        TimelineItem(
-            time: "Now",
-            title: title,
-            subtitle: "\(inputCategory.capitalized) / \(direction.capitalized)",
-            detail: metadataLine,
-            symbol: symbolName,
-            tint: tint,
-            image: image,
-            minutesAgo: 0,
-            badge: badgeText
-        )
-    }
-
-    var symbolName: String {
-        switch inputCategory {
-        case "beverage": "drop"
-        case "caffeine": "cup.and.saucer"
-        case "alcohol": "wineglass"
-        case "nicotine": "smoke"
-        case "exercise": "figure.run"
-        case "sunlight": "sun.max"
-        case "social": "person.2"
-        case "information": "doc.text"
-        default: "fork.knife"
-        }
-    }
-
-    var tint: Color {
-        switch inputCategory {
-        case "caffeine", "beverage", "sunlight":
-            Color(uiColor: .label).opacity(0.62)
-        case "exercise", "information", "social":
-            Color(uiColor: .label).opacity(0.70)
-        case "alcohol", "nicotine":
-            Color(uiColor: .secondaryLabel).opacity(0.84)
-        default:
-            Color(uiColor: .label).opacity(0.66)
-        }
-    }
-
-    var badgeText: String? {
-        if let calories = metadata.caloriesKcal {
-            return "\(calories)"
-        }
-        if let duration = metadata.durationMin {
-            return "\(duration)m"
-        }
-        return "\(Int((confidence * 100).rounded()))%"
     }
 }
 

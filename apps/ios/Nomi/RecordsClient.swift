@@ -36,27 +36,26 @@ enum RecordsClient {
         }
     }
 
-    static func save(extraction: ImageExtraction, source: UploadSource, assetName: String) async {
-        do {
-            var request = URLRequest(url: NomiAPI.url(path: "records"))
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONEncoder().encode(
-                CreateRecordRequest(
-                    type: extraction.recordType,
-                    source: source.apiValue,
-                    title: extraction.title,
-                    summary: extraction.metadataLine,
-                    imageURI: assetName,
-                    metadata: extraction.recordMetadata(assetName: assetName, source: source),
-                    confidence: extraction.confidence
-                )
+    static func uploadImage(data: Data, assetName: String, source: UploadSource, mimeType: String) async throws -> TimelineItem {
+        var request = URLRequest(url: NomiAPI.url(path: "ai/extract-image"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(
+            ImageExtractionRequest(
+                assetName: assetName,
+                source: source.apiValue,
+                mimeType: mimeType,
+                imageBase64: data.base64EncodedString()
             )
+        )
 
-            _ = try await URLSession.shared.data(for: request)
-        } catch {
-            return
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
         }
+
+        return try JSONDecoder().decode(ImageUploadResponse.self, from: responseData).record.timelineItem
     }
 }
 
@@ -64,8 +63,14 @@ private struct RecordsResponse: Decodable {
     let records: [SavedRecord]
 }
 
+private struct ImageUploadResponse: Decodable {
+    let record: SavedRecord
+}
+
 private struct SavedRecord: Decodable {
+    let id: String
     let type: String
+    let status: String
     let occurredAt: String
     let source: String
     let title: String
@@ -75,7 +80,9 @@ private struct SavedRecord: Decodable {
     let confidence: Double?
 
     enum CodingKeys: String, CodingKey {
+        case id
         case type
+        case status
         case occurredAt = "occurred_at"
         case source
         case title
@@ -100,8 +107,18 @@ private struct SavedRecord: Decodable {
             tint: tint(for: inputCategory),
             image: nil,
             minutesAgo: 0,
-            badge: badge
+            badge: status == "completed" ? badge : statusBadge,
+            status: status
         )
+    }
+
+    private var statusBadge: String {
+        switch status {
+        case "pending": "Queued"
+        case "processing": "AI"
+        case "failed": "Failed"
+        default: status
+        }
     }
 
     private var timeText: String {
@@ -128,72 +145,6 @@ private struct SavedRecord: Decodable {
         let standard = ISO8601DateFormatter()
         standard.formatOptions = [.withInternetDateTime]
         return standard.date(from: value)
-    }
-}
-
-private struct CreateRecordRequest: Encodable {
-    let type: String
-    let source: String
-    let title: String
-    let summary: String
-    let imageURI: String
-    let metadata: [String: String]
-    let confidence: Double
-
-    enum CodingKeys: String, CodingKey {
-        case type
-        case source
-        case title
-        case summary
-        case imageURI = "image_uri"
-        case metadata
-        case confidence
-    }
-}
-
-private extension ImageExtraction {
-    var recordType: String {
-        switch inputCategory {
-        case "information":
-            return "document"
-        case "body_stats":
-            return "body_stats"
-        case "food", "beverage", "caffeine", "alcohol", "nicotine":
-            return "food"
-        default:
-            return "note"
-        }
-    }
-
-    func recordMetadata(assetName: String, source: UploadSource) -> [String: String] {
-        var values: [String: String] = [
-            "schema_version": schemaVersion,
-            "direction": direction,
-            "input_category": inputCategory,
-            "output_impacts": outputImpacts.joined(separator: ","),
-            "asset_name": assetName,
-            "source": source.apiValue,
-            "detail": metadataLine,
-            "symbol": symbolName
-        ]
-
-        if let badge = badgeText {
-            values["badge"] = badge
-        }
-        if let calories = metadata.caloriesKcal {
-            values["calories_kcal"] = "\(calories)"
-        }
-        if let protein = metadata.proteinG {
-            values["protein_g"] = "\(protein)"
-        }
-        if let duration = metadata.durationMin {
-            values["duration_min"] = "\(duration)"
-        }
-        if let mimeType = metadata.originalMimeType {
-            values["mime_type"] = mimeType
-        }
-
-        return values
     }
 }
 

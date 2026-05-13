@@ -12,11 +12,13 @@
 - 删除 server 旧的文件名驱动 mock image extraction builder。
 - macOS 记录页移除 Figma fixture 拼接，只展示 `GET /records` 的真实数据；默认不选中 record，点击列表行后才打开右侧详情。
 - 记录页增加空态、`pending/processing/failed` 状态标签和非完成态的识别状态面板。
+- iOS 上传路径删除本地 `ImageExtraction.fallback` 和二次 `POST /records` 兜底保存；上传成功只插入 server 返回的 record/status，上传失败不造假数据。
 
 ## 验证
 
 - `cd apps/server && go test ./...`
 - `cd apps/macos/Nomi && ./scripts/build-app.sh`
+- `xcodebuild -project apps/ios/Nomi.xcodeproj -scheme Nomi -configuration Debug -destination 'generic/platform=iOS Simulator' build`
 
 ## 影响文件
 
@@ -26,5 +28,7 @@
 - `apps/server/internal/app/extraction.go`
 - `apps/macos/Nomi/Sources/Nomi/ContentView.swift`
 - `apps/macos/Nomi/Sources/Nomi/RecordsClient.swift`
+- `apps/ios/Nomi/ContentView.swift`
+- `apps/ios/Nomi/RecordsClient.swift`
 - `apps/server/README.md`
 - `docs/ARCHITECTURE.md`
