@@ -276,14 +276,28 @@ private struct NativeSidebarView: View {
     var body: some View {
         List {
             Section {
-                HStack(spacing: 10) {
-                    ResourceImage(name: "avatar", contentMode: .fill)
-                        .frame(width: 28, height: 28)
-                        .clipShape(Circle())
-                    Text("Leo")
-                        .font(.system(size: 13.5, weight: .semibold))
-                        .foregroundStyle(.primary)
+                Menu {
+                    Button {
+                        selectedSection = .profile
+                    } label: {
+                        Label("设置", systemImage: "gearshape")
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        ResourceImage(name: "avatar", contentMode: .fill)
+                            .frame(width: 28, height: 28)
+                            .clipShape(Circle())
+                        Text("Leo")
+                            .font(.system(size: 13.5, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Color(hex: 0x777777))
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .padding(.vertical, 8)
                 .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
                 .listRowBackground(NomiColor.sidebar)
@@ -301,12 +315,6 @@ private struct NativeSidebarView: View {
                     .listRowBackground(NomiColor.sidebar)
                     .accessibilityIdentifier("mac-sidebar-\(section.rawValue)")
                 }
-            }
-
-            Section {
-                SidebarUtilityRow(title: "设置", symbolName: "gearshape")
-                    .listRowInsets(EdgeInsets(top: 14, leading: 4, bottom: 6, trailing: 4))
-                    .listRowBackground(NomiColor.sidebar)
             }
         }
         .listStyle(.sidebar)
@@ -348,24 +356,6 @@ private struct SidebarNavigationRow: View {
         } else {
             .clear
         }
-    }
-}
-
-private struct SidebarUtilityRow: View {
-    let title: String
-    let symbolName: String
-
-    @State private var isHovered = false
-
-    var body: some View {
-        SidebarItemLabel(
-            title: title,
-            symbolName: symbolName,
-            foreground: .secondary
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isHovered ? NomiColor.sidebarHover : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .onHover { isHovered = $0 }
     }
 }
 
