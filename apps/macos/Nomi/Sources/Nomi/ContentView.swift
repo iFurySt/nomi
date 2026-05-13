@@ -777,7 +777,11 @@ private struct RecordsPage: View {
             .frame(minWidth: 500, maxWidth: .infinity, alignment: .topLeading)
 
             if let selectedRecord {
-                DetailPanel(record: selectedRecord, onPreview: { onPreview(selectedRecord) })
+                DetailPanel(
+                    record: selectedRecord,
+                    onCollapse: { selectedRecordID = nil },
+                    onPreview: { onPreview(selectedRecord) }
+                )
                     .frame(width: 280)
                     .padding(.top, 4)
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
@@ -966,6 +970,7 @@ private struct RecordStatusBadge: View {
 
 private struct DetailPanel: View {
     let record: NomiRecord
+    let onCollapse: () -> Void
     let onPreview: () -> Void
 
     var body: some View {
@@ -978,17 +983,21 @@ private struct DetailPanel: View {
                             .frame(height: 120)
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-                        Button(action: onPreview) {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(Color.white)
-                                .frame(width: 24, height: 24)
-                                .background(Color(hex: 0x6e6e6e).opacity(0.9), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        HStack(spacing: 6) {
+                            DetailPanelIconButton(
+                                symbol: "chevron.right",
+                                accessibilityLabel: "收起预览",
+                                help: "收起预览",
+                                action: onCollapse
+                            )
+                            DetailPanelIconButton(
+                                symbol: "arrow.up.left.and.arrow.down.right",
+                                accessibilityLabel: "放大预览",
+                                help: "放大预览",
+                                action: onPreview
+                            )
                         }
-                        .buttonStyle(.plain)
                         .padding(8)
-                        .help("放大预览")
-                        .accessibilityIdentifier("mac-preview-image-button")
                     }
 
                     HStack(alignment: .top) {
@@ -1048,6 +1057,31 @@ private struct DetailPanel: View {
                 .padding(16)
             }
         }
+    }
+}
+
+private struct DetailPanelIconButton: View {
+    let symbol: String
+    let accessibilityLabel: String
+    let help: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color(hex: 0x333333))
+                .frame(width: 26, height: 26)
+                .background(Color.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .help(help)
+        .accessibilityIdentifier("mac-detail-panel-\(symbol)-button")
     }
 }
 
