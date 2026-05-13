@@ -1046,15 +1046,6 @@ private struct DetailPanel: View {
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("相关数据")
-                            .font(.system(size: 12, weight: .bold))
-                        RelatedDataRow(symbol: "scalemass", title: "体重", subtitle: "今天 07:00")
-                        RelatedDataRow(symbol: "moon.fill", title: "睡眠", subtitle: "7 小时 12 分钟\n昨晚")
-                    }
-
-                    Divider()
-
-                    VStack(alignment: .leading, spacing: 10) {
                         Text("备注")
                             .font(.system(size: 12, weight: .bold))
                         TextField("添加备注...", text: .constant(""))
@@ -1171,35 +1162,6 @@ private struct NutritionItem: View {
                 .foregroundStyle(Color(hex: 0x222222))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct RelatedDataRow: View {
-    let symbol: String
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 12, weight: .bold))
-                Text(subtitle)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color(hex: 0x999999))
-                    .lineLimit(2)
-            }
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Color(hex: 0x777777))
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 50)
-        .background(Color(hex: 0xf8f8f7), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 }
 
