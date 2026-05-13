@@ -92,7 +92,6 @@ struct ContentView: View {
     @State private var selectedFilter: RecordFilter = .all
     @State private var selectedRecordID = "breakfast"
     @State private var searchText = ""
-    @State private var isSearchPresented = false
     @State private var showingAddOverlay = false
     @State private var previewRecord: NomiRecord?
 
@@ -166,39 +165,14 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(selectedSection.rawValue)
-                    .font(.system(size: 17, weight: .bold, design: .default))
-                    .lineLimit(1)
-                    .accessibilityIdentifier("mac-titlebar-title")
-            }
-
-            if isSearchPresented {
-                ToolbarItem(placement: .primaryAction) {
-                    NativeToolbarSearchField(text: $searchText) {
-                        withAnimation(.smooth(duration: 0.18)) {
-                            isSearchPresented = false
-                        }
-                    }
-                    .frame(width: 220, height: 30)
-                    .accessibilityIdentifier("mac-search-field")
-                }
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                SearchToolbarButton(isPresented: $isSearchPresented)
-            }
-
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .automatic) {
                 Button {
                     withAnimation(.smooth(duration: 0.22)) {
-                        isSearchPresented = false
                         showingAddOverlay.toggle()
                     }
                 } label: {
                     Image(systemName: "plus")
                 }
-                .nativeGlassToolbarIcon()
                 .accessibilityLabel("添加记录")
                 .help("添加记录")
                 .accessibilityIdentifier("mac-add-button")
@@ -233,7 +207,6 @@ struct ContentView: View {
                 }
             }
             .navigationTitle(section.rawValue)
-            .toolbar(removing: .title)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(NomiColor.content)
         }
@@ -254,126 +227,6 @@ struct ContentView: View {
         }
 
         isLoading = false
-    }
-}
-
-private struct SearchToolbarButton: View {
-    @Binding var isPresented: Bool
-
-    var body: some View {
-        let closesSearch = isPresented
-
-        Button {
-            withAnimation(.smooth(duration: 0.2)) {
-                isPresented = !closesSearch
-            }
-        } label: {
-            Image(systemName: closesSearch ? "xmark" : "magnifyingglass")
-        }
-        .nativeGlassToolbarIcon()
-        .accessibilityLabel(closesSearch ? "关闭搜索" : "搜索")
-        .help(closesSearch ? "关闭搜索" : "搜索")
-        .accessibilityIdentifier("mac-search-button")
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func nativeGlassToolbarIcon() -> some View {
-        if #available(macOS 26.0, *) {
-            self
-                .labelStyle(.iconOnly)
-                .controlSize(.large)
-                .buttonBorderShape(.circle)
-                .buttonStyle(.glass)
-        } else {
-            self
-                .labelStyle(.iconOnly)
-        }
-    }
-}
-
-private struct NativeToolbarSearchField: NSViewRepresentable {
-    @Binding var text: String
-    let onEditingEnded: () -> Void
-
-    func makeNSView(context: Context) -> NSSearchField {
-        let searchField = NSSearchField()
-        searchField.placeholderString = "搜索记录、数据、洞察..."
-        searchField.delegate = context.coordinator
-        searchField.sendsSearchStringImmediately = true
-        searchField.focusRingType = .none
-        DispatchQueue.main.async {
-            searchField.window?.makeFirstResponder(searchField)
-        }
-        context.coordinator.attach(to: searchField)
-        return searchField
-    }
-
-    func updateNSView(_ searchField: NSSearchField, context: Context) {
-        if searchField.stringValue != text {
-            searchField.stringValue = text
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, onEditingEnded: onEditingEnded)
-    }
-
-    static func dismantleNSView(_ nsView: NSSearchField, coordinator: Coordinator) {
-        coordinator.detach()
-    }
-
-    @MainActor
-    final class Coordinator: NSObject, NSSearchFieldDelegate {
-        @Binding private var text: String
-        private let onEditingEnded: () -> Void
-        private var mouseMonitor: Any?
-
-        init(text: Binding<String>, onEditingEnded: @escaping () -> Void) {
-            _text = text
-            self.onEditingEnded = onEditingEnded
-        }
-
-        func attach(to searchField: NSSearchField) {
-            detach()
-            mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self, weak searchField] event in
-                let shouldClose = MainActor.assumeIsolated {
-                    guard let searchField, event.window === searchField.window else {
-                        return false
-                    }
-
-                    let pointInSearchField = searchField.convert(event.locationInWindow, from: nil)
-                    return !searchField.bounds.insetBy(dx: -8, dy: -8).contains(pointInSearchField)
-                }
-
-                if shouldClose {
-                    Task { @MainActor [weak self] in
-                        self?.onEditingEnded()
-                    }
-                }
-
-                return event
-            }
-        }
-
-        func detach() {
-            if let mouseMonitor {
-                NSEvent.removeMonitor(mouseMonitor)
-                self.mouseMonitor = nil
-            }
-        }
-
-        func controlTextDidChange(_ notification: Notification) {
-            guard let searchField = notification.object as? NSSearchField else { return }
-            text = searchField.stringValue
-        }
-
-        func controlTextDidEndEditing(_ notification: Notification) {
-            DispatchQueue.main.async {
-                self.onEditingEnded()
-            }
-        }
     }
 }
 
