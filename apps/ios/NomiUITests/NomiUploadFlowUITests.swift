@@ -1,7 +1,7 @@
 import XCTest
 
 @MainActor
-final class NomiNativeUploadFlowUITests: XCTestCase {
+final class NomiUploadFlowUITests: XCTestCase {
     private let uploadTimeout: TimeInterval = 12
 
     override func setUpWithError() throws {

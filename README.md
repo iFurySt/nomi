@@ -15,7 +15,7 @@ Nomi 不是医疗产品，不提供诊断、治疗、药物或急症判断。
 ## iOS 本地启动
 
 ```sh
-xcodebuild -project apps/ios/NomiNative.xcodeproj \
+xcodebuild -project apps/ios/Nomi.xcodeproj \
   -scheme Nomi \
   -configuration Debug \
   -destination 'platform=iOS Simulator,id=<simulator-udid>' \

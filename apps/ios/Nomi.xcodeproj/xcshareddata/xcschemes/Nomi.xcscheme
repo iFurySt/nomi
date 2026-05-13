@@ -17,8 +17,8 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "0FF6978DDC7146DC93E5C18C"
                BuildableName = "Nomi.app"
-               BlueprintName = "NomiNative"
-               ReferencedContainer = "container:NomiNative.xcodeproj">
+               BlueprintName = "Nomi"
+               ReferencedContainer = "container:Nomi.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -30,9 +30,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A10000000000000000000008"
-               BuildableName = "NomiNativeUITests.xctest"
-               BlueprintName = "NomiNativeUITests"
-               ReferencedContainer = "container:NomiNative.xcodeproj">
+               BuildableName = "NomiUITests.xctest"
+               BlueprintName = "NomiUITests"
+               ReferencedContainer = "container:Nomi.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -49,9 +49,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A10000000000000000000008"
-               BuildableName = "NomiNativeUITests.xctest"
-               BlueprintName = "NomiNativeUITests"
-               ReferencedContainer = "container:NomiNative.xcodeproj">
+               BuildableName = "NomiUITests.xctest"
+               BlueprintName = "NomiUITests"
+               ReferencedContainer = "container:Nomi.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -72,8 +72,8 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "0FF6978DDC7146DC93E5C18C"
             BuildableName = "Nomi.app"
-            BlueprintName = "NomiNative"
-            ReferencedContainer = "container:NomiNative.xcodeproj">
+            BlueprintName = "Nomi"
+            ReferencedContainer = "container:Nomi.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -89,8 +89,8 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "0FF6978DDC7146DC93E5C18C"
             BuildableName = "Nomi.app"
-            BlueprintName = "NomiNative"
-            ReferencedContainer = "container:NomiNative.xcodeproj">
+            BlueprintName = "Nomi"
+            ReferencedContainer = "container:Nomi.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct NomiNativeApp: App {
+struct NomiApp: App {
     @AppStorage(AppLanguage.storageKey) private var languagePreference = AppLanguage.detected.rawValue
 
     init() {

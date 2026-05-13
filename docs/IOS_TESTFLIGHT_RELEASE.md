@@ -11,7 +11,7 @@
 - Apple Developer team：`J9P29FA5BX`
 - Xcode account：Yifan PANG
 - Scheme：`Nomi`
-- Project：`apps/ios/NomiNative.xcodeproj`
+- Project：`apps/ios/Nomi.xcodeproj`
 - Production API：`https://nomi.ifuryst.com`
 
 The app binary display name can remain `Nomi` through `PRODUCT_NAME`; App Store Connect 的展示名可以后续随新版本审核再调整。`Bundle ID` 和 `SKU` 创建后不要再改。
@@ -27,7 +27,7 @@ The app binary display name can remain `Nomi` through `PRODUCT_NAME`; App Store 
 
 ```sh
 security find-identity -v -p codesigning
-xcodebuild -project apps/ios/NomiNative.xcodeproj -scheme Nomi -configuration Release -showBuildSettings -destination 'generic/platform=iOS' | rg 'DEVELOPMENT_TEAM|PRODUCT_BUNDLE_IDENTIFIER|MARKETING_VERSION|CURRENT_PROJECT_VERSION'
+xcodebuild -project apps/ios/Nomi.xcodeproj -scheme Nomi -configuration Release -showBuildSettings -destination 'generic/platform=iOS' | rg 'DEVELOPMENT_TEAM|PRODUCT_BUNDLE_IDENTIFIER|MARKETING_VERSION|CURRENT_PROJECT_VERSION'
 curl --noproxy '*' -fsS https://nomi.ifuryst.com/health
 ```
 
@@ -59,7 +59,7 @@ CURRENT_PROJECT_VERSION = 3
 1. 先跑本地验证。
 
 ```sh
-xcodebuild -project apps/ios/NomiNative.xcodeproj -scheme Nomi -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+xcodebuild -project apps/ios/Nomi.xcodeproj -scheme Nomi -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 ```
 
 1. Archive。
@@ -68,7 +68,7 @@ xcodebuild -project apps/ios/NomiNative.xcodeproj -scheme Nomi -configuration De
 rm -rf build/Nomi-TestFlight.xcarchive build/Nomi-TestFlight-export build/Nomi-TestFlight-upload
 
 xcodebuild \
-  -project apps/ios/NomiNative.xcodeproj \
+  -project apps/ios/Nomi.xcodeproj \
   -scheme Nomi \
   -configuration Release \
   -destination 'generic/platform=iOS' \
