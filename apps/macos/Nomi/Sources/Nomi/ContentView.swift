@@ -161,6 +161,18 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                ToolbarBreadcrumbTitle(
+                    section: selectedSection,
+                    expandedRecord: expandedRecord,
+                    onBackToRecords: {
+                        withAnimation(.smooth(duration: 0.22)) {
+                            expandedRecordID = nil
+                        }
+                    }
+                )
+            }
+
             ToolbarItem(placement: .automatic) {
                 Button {
                     withAnimation(.smooth(duration: 0.22)) {
@@ -189,12 +201,7 @@ struct ContentView: View {
                         .transition(.opacity)
                 } else if section == .records, let expandedRecord {
                     RecordExpandedPage(
-                        record: expandedRecord,
-                        onBack: {
-                            withAnimation(.smooth(duration: 0.22)) {
-                                expandedRecordID = nil
-                            }
-                        }
+                        record: expandedRecord
                     )
                     .transition(.opacity)
                 } else if section == .records {
@@ -220,17 +227,10 @@ struct ContentView: View {
                     PlaceholderPage(section: section)
                 }
             }
-            .navigationTitle(navigationTitle(for: section))
+            .navigationTitle("")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(NomiColor.content)
         }
-    }
-
-    private func navigationTitle(for section: SidebarSection) -> String {
-        if section == .records, let expandedRecord {
-            return "记录 > \(expandedRecord.title)"
-        }
-        return section.rawValue
     }
 
     @MainActor
@@ -321,6 +321,42 @@ private struct NativeSidebarView: View {
         .scrollContentBackground(.hidden)
         .background(NomiColor.sidebar)
         .accessibilityIdentifier("mac-native-sidebar")
+    }
+}
+
+private struct ToolbarBreadcrumbTitle: View {
+    let section: SidebarSection
+    let expandedRecord: NomiRecord?
+    let onBackToRecords: () -> Void
+
+    var body: some View {
+        if section == .records, let expandedRecord {
+            HStack(spacing: 7) {
+                Button(action: onBackToRecords) {
+                    Text("记录")
+                        .font(NomiType.breadcrumb)
+                        .foregroundStyle(Color(hex: 0x4a4a4a))
+                }
+                .buttonStyle(.plain)
+                .help("返回记录")
+                .accessibilityIdentifier("mac-titlebar-records-breadcrumb-button")
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color(hex: 0xa0a0a0))
+
+                Text(expandedRecord.title)
+                    .font(NomiType.breadcrumb)
+                    .foregroundStyle(NomiColor.ink)
+                    .lineLimit(1)
+            }
+            .accessibilityIdentifier("mac-titlebar-record-breadcrumb")
+        } else {
+            Text(section.rawValue)
+                .font(NomiType.breadcrumb)
+                .foregroundStyle(NomiColor.ink)
+                .accessibilityIdentifier("mac-titlebar-section-title")
+        }
     }
 }
 
@@ -1442,34 +1478,10 @@ private extension View {
 
 private struct RecordExpandedPage: View {
     let record: NomiRecord
-    let onBack: () -> Void
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 22) {
-                HStack(spacing: 8) {
-                    Button(action: onBack) {
-                        Text("记录")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Color(hex: 0x4a4a4a))
-                    }
-                    .buttonStyle(.plain)
-                    .help("返回记录")
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Color(hex: 0xa0a0a0))
-
-                    Text(record.title)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(NomiColor.ink)
-                        .lineLimit(1)
-
-                    Spacer()
-                }
-                .padding(.top, 6)
-                .accessibilityIdentifier("mac-record-expanded-breadcrumb")
-
                 VStack(alignment: .leading, spacing: 18) {
                     RecordThumb(visual: record.visual)
                         .frame(maxWidth: .infinity)

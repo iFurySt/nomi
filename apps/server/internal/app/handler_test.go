@@ -201,8 +201,9 @@ func TestExtractImageHandler(t *testing.T) {
 func TestDeleteRecordHandler(t *testing.T) {
 	t.Parallel()
 
+	store := &deleteTrackingStore{}
 	handler := NewHandler(
-		&fakeStore{},
+		store,
 		zap.NewNop(),
 		"",
 		WithImageStorageDir(t.TempDir()),
@@ -223,6 +224,9 @@ func TestDeleteRecordHandler(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if len(store.deletedIDs) != 1 || store.deletedIDs[0] != "rec-test" {
+		t.Fatalf("deleted ids = %#v", store.deletedIDs)
 	}
 }
 
@@ -398,6 +402,16 @@ func (fakeStore) CreateRecord(_ context.Context, input CreateRecordInput) (Recor
 
 func (fakeStore) DeleteRecord(_ context.Context, id string) (bool, error) {
 	return id == "rec-test", nil
+}
+
+type deleteTrackingStore struct {
+	fakeStore
+	deletedIDs []string
+}
+
+func (s *deleteTrackingStore) DeleteRecord(_ context.Context, id string) (bool, error) {
+	s.deletedIDs = append(s.deletedIDs, id)
+	return true, nil
 }
 
 func (fakeStore) UpdateRecordStatus(_ context.Context, id string, status string, metadata map[string]string) (Record, error) {
