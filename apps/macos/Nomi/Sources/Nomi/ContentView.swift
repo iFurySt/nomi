@@ -273,15 +273,13 @@ struct ContentView: View {
 private struct NativeSidebarView: View {
     @Binding var selectedSection: SidebarSection
 
+    @State private var isProfilePopoverPresented = false
+
     var body: some View {
         List {
             Section {
-                Menu {
-                    Button {
-                        selectedSection = .profile
-                    } label: {
-                        Label("设置", systemImage: "gearshape")
-                    }
+                Button {
+                    isProfilePopoverPresented.toggle()
                 } label: {
                     HStack(spacing: 10) {
                         ResourceImage(name: "avatar", contentMode: .fill)
@@ -291,13 +289,19 @@ private struct NativeSidebarView: View {
                             .font(.system(size: 13.5, weight: .semibold))
                             .foregroundStyle(.primary)
                         Spacer(minLength: 0)
-                        Image(systemName: "chevron.down")
+                        Image(systemName: isProfilePopoverPresented ? "chevron.up" : "chevron.down")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(Color(hex: 0x777777))
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .popover(isPresented: $isProfilePopoverPresented, arrowEdge: .top) {
+                    ProfileSettingsPopover {
+                        selectedSection = .profile
+                        isProfilePopoverPresented = false
+                    }
+                }
                 .padding(.vertical, 8)
                 .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
                 .listRowBackground(NomiColor.sidebar)
@@ -321,6 +325,47 @@ private struct NativeSidebarView: View {
         .scrollContentBackground(.hidden)
         .background(NomiColor.sidebar)
         .accessibilityIdentifier("mac-native-sidebar")
+    }
+}
+
+private struct ProfileSettingsPopover: View {
+    let onSettings: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button(action: onSettings) {
+                HStack(spacing: 12) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(NomiColor.ink)
+                        .frame(width: 30, height: 30)
+                        .background(NomiColor.softFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("设置")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(NomiColor.ink)
+                        Text("偏好设置")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(NomiColor.muted)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .frame(width: 220, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color(hex: 0xf0f0f0), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.10), radius: 18, y: 8)
+        .padding(8)
+        .accessibilityIdentifier("mac-profile-settings-popover")
     }
 }
 
