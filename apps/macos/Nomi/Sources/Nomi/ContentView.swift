@@ -152,7 +152,10 @@ struct ContentView: View {
 
     private var appShell: some View {
         NavigationSplitView(preferredCompactColumn: $preferredColumn) {
-            NativeSidebarView(selectedSection: $selectedSection)
+            NativeSidebarView(
+                selectedSection: selectedSection,
+                onSelectSection: selectSection
+            )
                 .navigationSplitViewColumnWidth(min: 150, ideal: 188, max: 220)
         } detail: {
             NavigationStack {
@@ -161,7 +164,7 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar {
-            if expandedRecord != nil {
+            if selectedSection == .records, expandedRecord != nil {
                 ToolbarItem(placement: .navigation) {
                     Button {
                         withAnimation(.smooth(duration: 0.22)) {
@@ -189,6 +192,14 @@ struct ContentView: View {
                 .accessibilityIdentifier("mac-add-button")
             }
         }
+    }
+
+    private func selectSection(_ section: SidebarSection) {
+        if section != .records {
+            expandedRecordID = nil
+            selectedRecordID = nil
+        }
+        selectedSection = section
     }
 
     private func detailColumn(for section: SidebarSection) -> some View {
@@ -279,14 +290,15 @@ struct ContentView: View {
 }
 
 private struct NativeSidebarView: View {
-    @Binding var selectedSection: SidebarSection
+    let selectedSection: SidebarSection
+    let onSelectSection: (SidebarSection) -> Void
 
     var body: some View {
         List {
             Section {
                 Menu {
                     Button {
-                        selectedSection = .profile
+                        onSelectSection(.profile)
                     } label: {
                         Label("设置", systemImage: "gearshape")
                     }
@@ -317,7 +329,7 @@ private struct NativeSidebarView: View {
                     SidebarNavigationRow(
                         section: section,
                         isSelected: selectedSection == section,
-                        action: { selectedSection = section }
+                        action: { onSelectSection(section) }
                     )
                     .listRowInsets(EdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4))
                     .listRowBackground(NomiColor.sidebar)
