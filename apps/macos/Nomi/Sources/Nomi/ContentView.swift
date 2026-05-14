@@ -161,18 +161,6 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                ToolbarBreadcrumbTitle(
-                    section: selectedSection,
-                    expandedRecord: expandedRecord,
-                    onBackToRecords: {
-                        withAnimation(.smooth(duration: 0.22)) {
-                            expandedRecordID = nil
-                        }
-                    }
-                )
-            }
-
             ToolbarItem(placement: .automatic) {
                 Button {
                     withAnimation(.smooth(duration: 0.22)) {
@@ -201,7 +189,12 @@ struct ContentView: View {
                         .transition(.opacity)
                 } else if section == .records, let expandedRecord {
                     RecordExpandedPage(
-                        record: expandedRecord
+                        record: expandedRecord,
+                        onBack: {
+                            withAnimation(.smooth(duration: 0.22)) {
+                                expandedRecordID = nil
+                            }
+                        }
                     )
                     .transition(.opacity)
                 } else if section == .records {
@@ -220,6 +213,11 @@ struct ContentView: View {
                         },
                         onDelete: { record in
                             Task { await deleteRecord(record) }
+                        },
+                        onDismissPreview: {
+                            withAnimation(.smooth(duration: 0.18)) {
+                                selectedRecordID = nil
+                            }
                         }
                     )
                     .transition(.opacity)
@@ -227,7 +225,7 @@ struct ContentView: View {
                     PlaceholderPage(section: section)
                 }
             }
-            .navigationTitle("")
+            .navigationTitle(section == .records && expandedRecord != nil ? "" : section.rawValue)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(NomiColor.content)
         }
@@ -321,42 +319,6 @@ private struct NativeSidebarView: View {
         .scrollContentBackground(.hidden)
         .background(NomiColor.sidebar)
         .accessibilityIdentifier("mac-native-sidebar")
-    }
-}
-
-private struct ToolbarBreadcrumbTitle: View {
-    let section: SidebarSection
-    let expandedRecord: NomiRecord?
-    let onBackToRecords: () -> Void
-
-    var body: some View {
-        if section == .records, let expandedRecord {
-            HStack(spacing: 7) {
-                Button(action: onBackToRecords) {
-                    Text("记录")
-                        .font(NomiType.breadcrumb)
-                        .foregroundStyle(Color(hex: 0x4a4a4a))
-                }
-                .buttonStyle(.plain)
-                .help("返回记录")
-                .accessibilityIdentifier("mac-titlebar-records-breadcrumb-button")
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color(hex: 0xa0a0a0))
-
-                Text(expandedRecord.title)
-                    .font(NomiType.breadcrumb)
-                    .foregroundStyle(NomiColor.ink)
-                    .lineLimit(1)
-            }
-            .accessibilityIdentifier("mac-titlebar-record-breadcrumb")
-        } else {
-            Text(section.rawValue)
-                .font(NomiType.breadcrumb)
-                .foregroundStyle(NomiColor.ink)
-                .accessibilityIdentifier("mac-titlebar-section-title")
-        }
     }
 }
 
@@ -768,6 +730,7 @@ private struct RecordsPage: View {
     let onRetry: () -> Void
     let onPreview: (NomiRecord) -> Void
     let onDelete: (NomiRecord) -> Void
+    let onDismissPreview: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -816,6 +779,15 @@ private struct RecordsPage: View {
                 }
             }
             .frame(minWidth: 500, maxWidth: .infinity, alignment: .topLeading)
+            .background {
+                Color.black.opacity(0.001)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if selectedRecord != nil {
+                            onDismissPreview()
+                        }
+                    }
+                }
 
             if let selectedRecord {
                 DetailPanel(
@@ -1478,10 +1450,13 @@ private extension View {
 
 private struct RecordExpandedPage: View {
     let record: NomiRecord
+    let onBack: () -> Void
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 22) {
+                RecordBreadcrumbBar(recordTitle: record.title, onBack: onBack)
+
                 VStack(alignment: .leading, spacing: 18) {
                     RecordThumb(visual: record.visual)
                         .frame(maxWidth: .infinity)
@@ -1533,6 +1508,44 @@ private struct RecordExpandedPage: View {
             .padding(.vertical, 24)
         }
         .accessibilityIdentifier("mac-record-expanded-page")
+    }
+}
+
+private struct RecordBreadcrumbBar: View {
+    let recordTitle: String
+    let onBack: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: onBack) {
+                Text("记录")
+                    .font(NomiType.breadcrumb)
+                    .foregroundStyle(Color(hex: 0x4a4a4a))
+            }
+            .buttonStyle(.plain)
+            .help("返回记录")
+            .accessibilityIdentifier("mac-record-breadcrumb-back")
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color(hex: 0xa0a0a0))
+
+            Text(recordTitle)
+                .font(NomiType.breadcrumb)
+                .foregroundStyle(NomiColor.ink)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 34)
+        .background(Color.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(Color(hex: 0xf0f0f0), lineWidth: 1)
+        }
+        .accessibilityIdentifier("mac-record-breadcrumb-bar")
     }
 }
 
