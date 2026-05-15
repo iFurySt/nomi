@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
 
-const seedXImageExtractionSchemaVersion = "2026-05-08.seedx-codex-image.v1"
+const seedXImageExtractionSchemaVersion = "2026-05-15.seedx-codex-document.v2"
 
 var (
 	ErrSeedXUnavailable     = errors.New("seedx_unavailable")
@@ -75,9 +76,9 @@ func (a *SeedXImageAnalyzer) AnalyzeImage(ctx context.Context, image StoredImage
 }
 
 func BuildImageAnalysisPrompt(image StoredImage) string {
-	return fmt.Sprintf(`You are analyzing one user-uploaded image for Nomi, a personal body and life record app.
+	return fmt.Sprintf(`You are analyzing one user-uploaded image or document preview for Nomi, a personal body and life record app.
 
-The image is provided to you as a localImage input item. Use that image content as the primary source.
+The content is provided to you as a localImage input item. For PDFs, the localImage is a generated JPEG preview of the uploaded document. Use the visible image/document content as the primary source.
 
 Upload context:
 - asset_name: %s
@@ -113,6 +114,11 @@ Return exactly one JSON object and no markdown. The JSON object must match this 
     "micronutrients": ["optional"],
     "minerals": ["optional"],
     "vitamins": ["optional"],
+    "document_kind": "optional: medical_report | lab_result | checkup_report | invoice | receipt | prescription_or_medication | other_document",
+    "document_date": "optional visible date only",
+    "issuer": "optional visible institution/vendor category, without private identifiers",
+    "currency": "optional visible currency",
+    "total_amount": "optional visible total amount",
     "estimated_from": ["image_content"],
     "review_needed": ["optional"],
     "original_mime_type": "%s"
@@ -120,10 +126,12 @@ Return exactly one JSON object and no markdown. The JSON object must match this 
 }
 
 Rules:
-- Pick exactly one input_category. Use "information" for screenshots, documents, receipts, labels, lab reports, medication boxes, or other non-lifestyle context.
+- Pick exactly one input_category. Use "information" for screenshots, PDFs, documents, receipts, invoices, labels, lab reports, checkup reports, exam reports, medication boxes, or other non-lifestyle context.
+- For medical, checkup, lab, and exam reports, set document_kind to "medical_report", "lab_result", or "checkup_report" when supported by visible content. Summarize what the document appears to be and that it was saved for review; do not interpret whether values are normal or abnormal.
+- For invoices, receipts, or payment slips, set document_kind to "invoice" or "receipt" when supported by visible content. Summarize vendor/category and total/date only if visible; do not transcribe private identifiers.
 - For food, drinks, caffeine, alcohol, and nicotine, estimate nutrition or substance amounts only when visually supported; otherwise omit numeric fields and add review_needed entries.
 - For exercise, sunlight, and social scenes, estimate duration only if visible context supports it; otherwise omit it and add review_needed.
-- Never diagnose, treat, estimate disease risk, interpret abnormal results, recommend medication, or make urgent medical claims. If the image is medical, classify it as "information" and summarize it as a saved document that needs user review.
+- Never diagnose, treat, estimate disease risk, interpret abnormal results, recommend medication, or make urgent medical claims. If the file is medical, classify it as "information" and summarize it as a saved document that needs user review.
 - Do not transcribe private identifiers, account numbers, exact addresses, or other sensitive text. Summarize their presence instead.
 - Use confidence between 0.30 and 0.90. Lower confidence when the image is ambiguous, cropped, blurry, or not accessible.
 - Include only valid JSON. Omit unknown optional fields instead of setting them to null.`, image.AssetName, image.Source, image.MimeType, image.SizeBytes, seedXImageExtractionSchemaVersion, image.MimeType)
@@ -132,7 +140,7 @@ Rules:
 func BuildImageAnalysisInput(image StoredImage) []SeedXInputItem {
 	return []SeedXInputItem{
 		{Type: "text", Text: BuildImageAnalysisPrompt(image)},
-		{Type: "localImage", Path: image.Path, Name: image.AssetName},
+		{Type: "localImage", Path: image.Path, Name: filepath.Base(image.Path)},
 	}
 }
 
@@ -176,6 +184,14 @@ func ImageExtractionOutputSchema() json.RawMessage {
         "micronutrients": { "type": "array", "items": { "type": "string" } },
         "minerals": { "type": "array", "items": { "type": "string" } },
         "vitamins": { "type": "array", "items": { "type": "string" } },
+        "document_kind": {
+          "type": "string",
+          "enum": ["medical_report", "lab_result", "checkup_report", "invoice", "receipt", "prescription_or_medication", "other_document"]
+        },
+        "document_date": { "type": "string" },
+        "issuer": { "type": "string" },
+        "currency": { "type": "string" },
+        "total_amount": { "type": "string" },
         "estimated_from": { "type": "array", "items": { "type": "string" } },
         "review_needed": { "type": "array", "items": { "type": "string" } },
         "original_mime_type": { "type": "string" }
@@ -233,9 +249,19 @@ func NormalizeImageExtraction(extraction ImageExtraction, image StoredImage) Ima
 	extraction.OutputImpacts = normalizeOutputImpacts(extraction.OutputImpacts, extraction.InputCategory)
 	extraction.Confidence = clampConfidence(extraction.Confidence)
 	extraction.Metadata.OriginalMimeType = image.MimeType
+	extraction.Metadata.DocumentKind = normalizeDocumentKind(extraction.Metadata.DocumentKind)
 	extraction.Metadata.EstimatedFrom = ensureString(extraction.Metadata.EstimatedFrom, "image_content")
 	extraction.Metadata.ReviewNeeded = dedupeStrings(extraction.Metadata.ReviewNeeded)
 	return extraction
+}
+
+func normalizeDocumentKind(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "medical_report", "lab_result", "checkup_report", "invoice", "receipt", "prescription_or_medication", "other_document":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return ""
+	}
 }
 
 func normalizeInputCategory(value string) string {
@@ -368,6 +394,11 @@ func extractionRecordMetadata(extraction ImageExtraction, image StoredImage) map
 	}
 	addString("food_category", extraction.Metadata.FoodCategory)
 	addString("portion_estimate", extraction.Metadata.PortionEstimate)
+	addString("document_kind", extraction.Metadata.DocumentKind)
+	addString("document_date", extraction.Metadata.DocumentDate)
+	addString("issuer", extraction.Metadata.Issuer)
+	addString("currency", extraction.Metadata.Currency)
+	addString("total_amount", extraction.Metadata.TotalAmount)
 	addInt("weight_g", extraction.Metadata.WeightG)
 	addInt("calories_kcal", extraction.Metadata.CaloriesKcal)
 	addInt("protein_g", extraction.Metadata.ProteinG)
@@ -393,7 +424,7 @@ func pendingImageRecordMetadata(image StoredImage) map[string]string {
 		"source":             image.Source,
 		"mime_type":          image.MimeType,
 		"image_uri":          image.URI,
-		"detail":             "等待 SeedX 识别图片内容",
+		"detail":             "等待 SeedX 识别文件内容",
 		"analysis_provider":  "seedx.codex",
 		"analysis_transport": "seedx.daemon.command.run",
 	}

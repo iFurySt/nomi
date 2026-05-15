@@ -222,7 +222,7 @@ func (h *Handler) createPendingImageRecord(ctx context.Context, image StoredImag
 		Type:     "document",
 		Status:   RecordStatusPending,
 		Source:   image.Source,
-		Title:    "图片识别中",
+		Title:    "文件识别中",
 		Summary:  "已上传，等待 Nomi server 通过 SeedX 识别。",
 		ImageURI: image.URI,
 		Metadata: pendingImageRecordMetadata(image),

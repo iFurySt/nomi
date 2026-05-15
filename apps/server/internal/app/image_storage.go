@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	maxDecodedImageBytes     = 12 * 1024 * 1024
-	maxImageRequestBodyBytes = 18 * 1024 * 1024
+	maxDecodedImageBytes     = 32 * 1024 * 1024
+	maxImageRequestBodyBytes = 44 * 1024 * 1024
 )
 
 var (
@@ -71,7 +71,7 @@ func (s *FileImageStore) ResolveDisplayImagePath(relativePath string) (string, e
 	if err != nil {
 		return "", err
 	}
-	if strings.EqualFold(filepath.Ext(path), ".heic") {
+	if isSidecarPreviewExt(filepath.Ext(path)) {
 		convertedPath := strings.TrimSuffix(path, filepath.Ext(path)) + "-seedx.jpg"
 		if _, err := os.Stat(convertedPath); err == nil {
 			return convertedPath, nil
@@ -111,7 +111,7 @@ func (s *FileImageStore) Save(_ context.Context, input ImageExtractionRequest) (
 		absPath = path
 	}
 	analysisPath := absPath
-	if convertedPath, err := convertHEICForAnalysis(input.MimeType, absPath); err == nil && convertedPath != "" {
+	if convertedPath, err := convertFileForAnalysis(input.MimeType, absPath); err == nil && convertedPath != "" {
 		analysisPath = convertedPath
 	}
 
@@ -141,21 +141,32 @@ func storedImageFileName(assetName string, mimeType string) string {
 	return fmt.Sprintf("%s-%s-%s%s", time.Now().UTC().Format("20060102T150405.000000000"), randomSuffix(), stem, ext)
 }
 
-func convertHEICForAnalysis(mimeType string, sourcePath string) (string, error) {
-	if strings.ToLower(mimeType) != "image/heic" && strings.ToLower(filepath.Ext(sourcePath)) != ".heic" {
+func convertFileForAnalysis(mimeType string, sourcePath string) (string, error) {
+	normalizedMime := strings.ToLower(mimeType)
+	ext := strings.ToLower(filepath.Ext(sourcePath))
+	if normalizedMime != "image/heic" && normalizedMime != "application/pdf" && ext != ".heic" && ext != ".pdf" {
 		return "", nil
 	}
 
 	outputPath := strings.TrimSuffix(sourcePath, filepath.Ext(sourcePath)) + "-seedx.jpg"
 	cmd := exec.Command("sips", "-s", "format", "jpeg", sourcePath, "--out", outputPath)
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("heic_convert_failed: %w: %s", err, strings.TrimSpace(string(output)))
+		return "", fmt.Errorf("preview_convert_failed: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 	absPath, err := filepath.Abs(outputPath)
 	if err != nil {
 		return outputPath, nil
 	}
 	return absPath, nil
+}
+
+func isSidecarPreviewExt(ext string) bool {
+	switch strings.ToLower(ext) {
+	case ".heic", ".pdf":
+		return true
+	default:
+		return false
+	}
 }
 
 func sanitizeAssetName(name string) string {

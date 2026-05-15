@@ -122,6 +122,13 @@ struct ContentView: View {
         return displayRecords.first { $0.id == expandedRecordID }
     }
 
+    private var detailRouteKey: String {
+        if selectedSection == .records, let expandedRecordID {
+            return "records-expanded-\(expandedRecordID)"
+        }
+        return "section-\(selectedSection.id)"
+    }
+
     var body: some View {
         ZStack {
             appShell
@@ -160,25 +167,11 @@ struct ContentView: View {
         } detail: {
             NavigationStack {
                 detailColumn(for: selectedSection)
+                    .id(detailRouteKey)
             }
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar {
-            if selectedSection == .records, expandedRecord != nil {
-                ToolbarItem(placement: .navigation) {
-                    Button {
-                        withAnimation(.smooth(duration: 0.22)) {
-                            expandedRecordID = nil
-                        }
-                    } label: {
-                        Image(systemName: "chevron.left")
-                    }
-                    .accessibilityLabel("返回记录")
-                    .help("返回记录")
-                    .accessibilityIdentifier("mac-record-back-button")
-                }
-            }
-
             ToolbarItem(placement: .automatic) {
                 Button {
                     withAnimation(.smooth(duration: 0.22)) {
@@ -195,11 +188,19 @@ struct ContentView: View {
     }
 
     private func selectSection(_ section: SidebarSection) {
-        if section != .records {
+        withAnimation(.smooth(duration: 0.18)) {
+            selectedSection = section
             expandedRecordID = nil
             selectedRecordID = nil
         }
-        selectedSection = section
+    }
+
+    private func returnToRecordsList() {
+        withAnimation(.smooth(duration: 0.22)) {
+            selectedSection = .records
+            expandedRecordID = nil
+            selectedRecordID = nil
+        }
     }
 
     private func detailColumn(for section: SidebarSection) -> some View {
@@ -215,7 +216,8 @@ struct ContentView: View {
                         .transition(.opacity)
                 } else if section == .records, let expandedRecord {
                     RecordExpandedPage(
-                        record: expandedRecord
+                        record: expandedRecord,
+                        onBack: returnToRecordsList
                     )
                     .transition(.opacity)
                 } else if section == .records {
@@ -1228,10 +1230,10 @@ private struct AddRecordOverlay: View {
                         Image(systemName: "photo")
                             .font(.system(size: 38, weight: .regular))
                             .foregroundStyle(Color(hex: 0x999999))
-                        Text(isSaving ? "正在分析图片..." : "拖拽图片到这里，或点击上传")
+                        Text(isSaving ? "正在分析文件..." : "拖拽图片或 PDF 到这里，或点击上传")
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(Color(hex: 0x7f7f7f))
-                        Text("支持 JPG、PNG、HEIC")
+                        Text("支持 JPG、PNG、HEIC、PDF")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Color(hex: 0x9b9b9b))
                     }
@@ -1318,10 +1320,10 @@ private struct AddRecordOverlay: View {
             .shadow(color: .black.opacity(0.09), radius: 27, y: 12)
             .fileImporter(
                 isPresented: $isImportingImage,
-                allowedContentTypes: [.image],
+                allowedContentTypes: [.image, .pdf],
                 allowsMultipleSelection: false
             ) { result in
-                handleImageImport(result)
+                handleFileImport(result)
             }
             .onDrop(of: [.fileURL], isTargeted: nil) { providers in
                 guard let provider = providers.first else { return false }
@@ -1329,7 +1331,7 @@ private struct AddRecordOverlay: View {
                     guard let data = item as? Data,
                           let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
                     Task { @MainActor in
-                        importImage(url)
+                        importFile(url)
                     }
                 }
                 return true
@@ -1368,17 +1370,17 @@ private struct AddRecordOverlay: View {
         }
     }
 
-    private func handleImageImport(_ result: Result<[URL], Error>) {
+    private func handleFileImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
             guard let fileURL = urls.first else { return }
-            importImage(fileURL)
+            importFile(fileURL)
         case .failure:
-            errorMessage = "无法打开这张图片。"
+            errorMessage = "无法打开这个文件。"
         }
     }
 
-    private func importImage(_ fileURL: URL) {
+    private func importFile(_ fileURL: URL) {
         isSaving = true
         errorMessage = nil
 
@@ -1390,7 +1392,7 @@ private struct AddRecordOverlay: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "图片分析失败，请确认 Nomi server 和 SeedX 正在运行。"
+                    errorMessage = "文件分析失败，请确认 Nomi server 和 SeedX 正在运行。"
                     isSaving = false
                 }
             }
@@ -1472,6 +1474,7 @@ private extension View {
 
 private struct RecordExpandedPage: View {
     let record: NomiRecord
+    let onBack: () -> Void
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -1525,6 +1528,16 @@ private struct RecordExpandedPage: View {
             }
             .padding(.horizontal, 28)
             .padding(.vertical, 24)
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                }
+                .accessibilityLabel("返回记录")
+                .help("返回记录")
+                .accessibilityIdentifier("mac-record-back-button")
+            }
         }
         .accessibilityIdentifier("mac-record-expanded-page")
     }
@@ -1721,7 +1734,7 @@ private extension NomiRecord {
             dateLabel: savedRecord.dateLabel,
             title: savedRecord.title.isEmpty ? "健康记录" : savedRecord.title,
             summary: savedRecord.detailLine.isEmpty ? savedRecord.summary : savedRecord.detailLine,
-            source: savedRecord.source == "macos-file" ? "来自本机图片" : nil,
+            source: savedRecord.source == "macos-file" ? "来自本机文件" : nil,
             tag: tag,
             visual: savedRecord.imageURL.map(NomiRecord.Visual.image) ?? .symbol(savedRecord.symbolName, Color(hex: 0xf2f2f1)),
             status: savedRecord.status,

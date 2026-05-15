@@ -10,6 +10,8 @@
 - 切换到非记录 section 时清空 `expandedRecordID` 和 `selectedRecordID`。
 - toolbar 返回 icon 只在当前 section 是记录且存在放大记录时显示。
 - 头像菜单里的设置入口也复用同一个 section 切换路径。
+- 后续补强：sidebar 任意切换都会清空记录内页与右侧预览状态，点击“记录”也回到记录列表。
+- 后续补强：返回 icon 从全局 `NavigationSplitView` toolbar 挪到记录内页自身 toolbar，并为 detail 页面增加 route identity，避免 SwiftUI 复用旧 toolbar。
 
 ## 验证
 

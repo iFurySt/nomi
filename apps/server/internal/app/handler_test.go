@@ -80,6 +80,18 @@ func TestStoredImageFileNameNormalizesUppercaseExtension(t *testing.T) {
 	}
 }
 
+func TestStoredFileNameKeepsPDFExtension(t *testing.T) {
+	t.Parallel()
+
+	name := storedImageFileName("Lab Report.PDF", "application/pdf")
+	if !strings.HasSuffix(name, ".pdf") {
+		t.Fatalf("expected pdf extension: %s", name)
+	}
+	if strings.Contains(name, " ") || strings.Contains(name, ".PDF") {
+		t.Fatalf("expected sanitized lowercase pdf name: %s", name)
+	}
+}
+
 func TestServeImageHandler(t *testing.T) {
 	t.Parallel()
 
@@ -157,6 +169,45 @@ func TestServeImageHandlerUsesHEICDisplayJPEG(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(body) != "jpeg-bytes" {
+		t.Fatalf("body = %q", string(body))
+	}
+}
+
+func TestServeImageHandlerUsesPDFDisplayJPEG(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := os.MkdirAll(dir+"/2026-05", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir+"/2026-05/report.pdf", []byte("pdf-bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir+"/2026-05/report-seedx.jpg", []byte("jpeg-preview-bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	handler := NewHandler(
+		&fakeStore{},
+		zap.NewNop(),
+		"",
+		WithImageStorageDir(dir),
+		WithImageAnalyzer(fakeImageAnalyzer{}),
+	)
+	server := httptest.NewServer(handler.Routes())
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/images/2026-05/report.pdf")
+	if err != nil {
+		t.Fatalf("get image: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "jpeg-preview-bytes" {
 		t.Fatalf("body = %q", string(body))
 	}
 }
@@ -302,6 +353,32 @@ func TestParseImageExtractionJSONAllowsNormalizableFields(t *testing.T) {
 	}
 }
 
+func TestParseImageExtractionJSONAllowsDocumentMetadata(t *testing.T) {
+	t.Parallel()
+
+	extraction, err := ParseImageExtractionJSON(`{
+		"title": "体检报告",
+		"summary": "一份可见的体检报告，已保存供用户复核。",
+		"input_category": "information",
+		"output_impacts": ["health"],
+		"confidence": 0.72,
+		"metadata": {
+			"document_kind": "checkup_report",
+			"document_date": "2026-05-10",
+			"issuer": "体检机构",
+			"estimated_from": ["image_content"],
+			"review_needed": ["user_review"]
+		}
+	}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	normalized := NormalizeImageExtraction(extraction, StoredImage{MimeType: "application/pdf"})
+	if normalized.Metadata.DocumentKind != "checkup_report" || normalized.Metadata.DocumentDate != "2026-05-10" {
+		t.Fatalf("metadata = %#v", normalized.Metadata)
+	}
+}
+
 func TestParseImageExtractionJSONRequiresTitle(t *testing.T) {
 	t.Parallel()
 
@@ -339,6 +416,9 @@ func TestBuildImageAnalysisInputUsesSeedXLocalImageItem(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "Never diagnose") {
 		t.Fatal("expected non-medical boundary")
+	}
+	if !strings.Contains(prompt, "receipts, invoices") || !strings.Contains(prompt, "checkup reports") {
+		t.Fatal("expected document classification instructions")
 	}
 	if !json.Valid(ImageExtractionOutputSchema()) {
 		t.Fatal("expected valid output schema")
@@ -423,7 +503,7 @@ func (fakeStore) UpdateRecordStatus(_ context.Context, id string, status string,
 		OccurredAt: now,
 		CreatedAt:  now,
 		Source:     "macos-file",
-		Title:      "图片识别中",
+		Title:      "文件识别中",
 		Summary:    "已上传，等待 Nomi server 通过 SeedX 识别。",
 		ImageURI:   "local://images/test.jpg",
 		Metadata:   metadata,

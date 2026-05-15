@@ -25,9 +25,9 @@ go test ./...
 NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088
 ```
 
-Image uploads are stored under `.nomi/uploads` by default. Override with `NOMI_IMAGE_STORAGE_DIR=/path/to/uploads` when needed.
-On macOS local development, HEIC uploads are also converted to a sibling JPEG with `sips` before SeedX/Codex analysis so Codex receives a readable image while the original upload remains stored.
-Stored images are available through `GET /images/<yyyy-mm>/<file>` for local client preview surfaces. HEIC preview requests return the converted JPEG sidecar when one exists.
+Image and PDF uploads are stored under `.nomi/uploads` by default. Override with `NOMI_IMAGE_STORAGE_DIR=/path/to/uploads` when needed.
+On macOS local development, HEIC uploads and PDF uploads are also converted to a sibling JPEG with `sips` before SeedX/Codex analysis so Codex receives a readable image preview while the original upload remains stored.
+Stored uploads are available through `GET /images/<yyyy-mm>/<file>` for local client preview surfaces. HEIC and PDF preview requests return the converted JPEG sidecar when one exists.
 
 ## Docker
 
@@ -60,8 +60,8 @@ Current SeedX flow:
 1. SeedX sends `daemon:hello`.
 2. Server accepts `Authorization: Bearer ...` when `NOMI_SEEDX_API_KEY` is configured.
 3. Server sends `daemon:ping`; long-running SeedX daemon responds with `daemon:pong`.
-4. Image extraction sends `daemon:command` with `method:"run"` and `runtime:"codex"`; `params.input` contains a strict JSON text prompt plus a Codex v2 `{ "type": "localImage", "path": "..." }` item for the stored upload.
-5. `POST /ai/extract-image` stores the image and immediately creates a `pending` record, then returns `202 Accepted` with that record.
+4. Image / document extraction sends `daemon:command` with `method:"run"` and `runtime:"codex"`; `params.input` contains a strict JSON text prompt plus a Codex v2 `{ "type": "localImage", "path": "..." }` item for the stored upload or generated preview.
+5. `POST /ai/extract-image` stores the image or PDF and immediately creates a `pending` record, then returns `202 Accepted` with that record.
 6. A background worker marks the record `processing`, waits for SeedX `daemon:result`, parses the Codex text, and updates the same record to `completed`.
 7. If SeedX or parsing fails, the record becomes `failed`; no nutrition fallback is generated.
 

@@ -37,6 +37,11 @@ type ExtractionMetadata struct {
 	Micronutrients   []string `json:"micronutrients,omitempty"`
 	Minerals         []string `json:"minerals,omitempty"`
 	Vitamins         []string `json:"vitamins,omitempty"`
+	DocumentKind     string   `json:"document_kind,omitempty"`
+	DocumentDate     string   `json:"document_date,omitempty"`
+	Issuer           string   `json:"issuer,omitempty"`
+	Currency         string   `json:"currency,omitempty"`
+	TotalAmount      string   `json:"total_amount,omitempty"`
 	EstimatedFrom    []string `json:"estimated_from,omitempty"`
 	ReviewNeeded     []string `json:"review_needed,omitempty"`
 	OriginalMimeType string   `json:"original_mime_type,omitempty"`
