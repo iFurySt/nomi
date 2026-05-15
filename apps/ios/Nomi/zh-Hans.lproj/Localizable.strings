@@ -4,7 +4,6 @@
 "language.chinese.simplified" = "简体中文";
 "language.chinese.traditional" = "繁體中文";
 "language.current" = "当前语言";
-"language.english" = "English";
 "me.section.mine" = "我的";
 "metric.calories" = "热量";
 "metric.calories.left %lld" = "剩余 %lld";

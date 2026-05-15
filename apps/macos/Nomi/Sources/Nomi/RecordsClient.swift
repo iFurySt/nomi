@@ -51,14 +51,15 @@ struct SavedRecord: Identifiable, Decodable, Equatable {
 
     var displayTime: String {
         guard let date = Self.parseDate(occurredAt) else {
-            return "Saved"
+            return "已保存"
         }
 
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_Hans")
         if Calendar.current.isDateInToday(date) {
             formatter.dateFormat = "HH:mm"
         } else {
-            formatter.dateFormat = "MMM d"
+            formatter.dateFormat = "M月d日"
         }
         return formatter.string(from: date)
     }

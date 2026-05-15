@@ -25,8 +25,8 @@ final class NomiUploadFlowUITests: XCTestCase {
         XCTAssertTrue(primaryButton.waitForExistence(timeout: 8), app.debugDescription)
         primaryButton.tap()
 
-        XCTAssertTrue(app.staticTexts["Food input"].waitForExistence(timeout: uploadTimeout))
-        XCTAssertTrue(app.staticTexts["1 item"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["饮食"].waitForExistence(timeout: uploadTimeout))
+        XCTAssertTrue(app.staticTexts["1 条记录"].waitForExistence(timeout: 2))
         saveScreenshot(named: "nomi-native-real-upload-photos-2026-05-07.png")
     }
 
@@ -48,8 +48,8 @@ final class NomiUploadFlowUITests: XCTestCase {
         XCTAssertTrue(primaryButton.waitForExistence(timeout: 8), app.debugDescription)
         primaryButton.tap()
 
-        XCTAssertTrue(app.staticTexts["Food input"].waitForExistence(timeout: uploadTimeout))
-        XCTAssertTrue(app.staticTexts["1 item"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["饮食"].waitForExistence(timeout: uploadTimeout))
+        XCTAssertTrue(app.staticTexts["1 条记录"].waitForExistence(timeout: 2))
         saveScreenshot(named: "nomi-native-real-upload-files-2026-05-07.png")
     }
 
@@ -73,11 +73,12 @@ final class NomiUploadFlowUITests: XCTestCase {
 
         app.buttons.matching(identifier: "my-language-row").firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "language-sheet").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(app.buttons.matching(identifier: "language-english").firstMatch.waitForExistence(timeout: 2), app.debugDescription)
+        XCTAssertTrue(app.buttons.matching(identifier: "language-simplifiedChinese").firstMatch.waitForExistence(timeout: 2), app.debugDescription)
+        XCTAssertFalse(app.buttons.matching(identifier: "language-english").firstMatch.waitForExistence(timeout: 1), app.debugDescription)
         saveScreenshot(named: "nomi-native-gray-language-sheet-2026-05-08.png")
     }
 
-    func testMyLanguageSheetSwitchesBetweenChineseAndEnglish() throws {
+    func testMyLanguageSheetOnlyOffersChineseLanguages() throws {
         let app = XCUIApplication()
         app.launchEnvironment["NOMI_DISABLE_RECORD_SYNC"] = "1"
         app.launchEnvironment["NOMI_RESET_LANGUAGE_PREFERENCE"] = "1"
@@ -87,14 +88,12 @@ final class NomiUploadFlowUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "my-view").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         app.buttons.matching(identifier: "my-language-row").firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "language-sheet").firstMatch.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["Current language"].waitForExistence(timeout: 2))
-
-        app.buttons.matching(identifier: "language-simplifiedChinese").firstMatch.tap()
         XCTAssertTrue(app.staticTexts["当前语言"].waitForExistence(timeout: 2))
-        saveScreenshot(named: "nomi-native-my-language-zh-2026-05-08.png")
+        XCTAssertFalse(app.buttons.matching(identifier: "language-english").firstMatch.waitForExistence(timeout: 1), app.debugDescription)
 
-        app.buttons.matching(identifier: "language-english").firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Current language"].waitForExistence(timeout: 2))
+        app.buttons.matching(identifier: "language-traditionalChinese").firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["目前語言"].waitForExistence(timeout: 2))
+        saveScreenshot(named: "nomi-native-my-language-zh-2026-05-08.png")
     }
 
     private func selectFirstPhoto() {

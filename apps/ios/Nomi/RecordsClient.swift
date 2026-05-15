@@ -101,7 +101,7 @@ private struct SavedRecord: Decodable {
         return TimelineItem(
             time: timeText,
             title: title,
-            subtitle: inputCategory.capitalized,
+            subtitle: Self.categoryTitle(for: inputCategory),
             detail: detail,
             symbol: symbol,
             tint: tint(for: inputCategory),
@@ -114,23 +114,24 @@ private struct SavedRecord: Decodable {
 
     private var statusBadge: String {
         switch status {
-        case "pending": "Queued"
-        case "processing": "AI"
-        case "failed": "Failed"
+        case "pending": "等待"
+        case "processing": "识别中"
+        case "failed": "失败"
         default: status
         }
     }
 
     private var timeText: String {
         guard let date = Self.parseDate(occurredAt) else {
-            return "Saved"
+            return "已保存"
         }
 
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_Hans")
         if Calendar.current.isDateInToday(date) {
             formatter.dateFormat = "HH:mm"
         } else {
-            formatter.dateFormat = "MMM d"
+            formatter.dateFormat = "M月d日"
         }
         return formatter.string(from: date)
     }
@@ -145,6 +146,31 @@ private struct SavedRecord: Decodable {
         let standard = ISO8601DateFormatter()
         standard.formatOptions = [.withInternetDateTime]
         return standard.date(from: value)
+    }
+
+    private static func categoryTitle(for inputCategory: String) -> String {
+        switch inputCategory {
+        case "food":
+            "饮食"
+        case "beverage":
+            "饮品"
+        case "caffeine":
+            "咖啡因"
+        case "alcohol":
+            "酒精"
+        case "nicotine":
+            "尼古丁"
+        case "exercise":
+            "运动"
+        case "sunlight":
+            "日照"
+        case "social":
+            "社交"
+        case "information", "document":
+            "资料"
+        default:
+            "记录"
+        }
     }
 }
 

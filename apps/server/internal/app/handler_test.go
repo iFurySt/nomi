@@ -317,8 +317,8 @@ func TestParseImageExtractionJSONAllowsMarkdownFence(t *testing.T) {
 		"direction": "input",
 		"input_category": "food",
 		"output_impacts": ["energy", "health"],
-		"title": "Lunch bowl",
-		"summary": "A mixed meal with visible rice and protein.",
+		"title": "午餐碗",
+		"summary": "画面中可见米饭和蛋白质食物的混合餐。",
 		"confidence": 0.78,
 		"metadata": {
 			"estimated_from": ["image_content"],
@@ -328,7 +328,7 @@ func TestParseImageExtractionJSONAllowsMarkdownFence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if extraction.Title != "Lunch bowl" || extraction.Metadata.CaloriesKcal != 520 {
+	if extraction.Title != "午餐碗" || extraction.Metadata.CaloriesKcal != 520 {
 		t.Fatalf("extraction = %#v", extraction)
 	}
 }
@@ -337,12 +337,12 @@ func TestParseImageExtractionJSONAllowsNormalizableFields(t *testing.T) {
 	t.Parallel()
 
 	extraction, err := ParseImageExtractionJSON(`{
-		"title": "Visible receipt"
+		"title": "可见收据"
 	}`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if extraction.Title != "Visible receipt" || extraction.Summary != "Visible receipt" {
+	if extraction.Title != "可见收据" || extraction.Summary != "可见收据" {
 		t.Fatalf("extraction = %#v", extraction)
 	}
 	if extraction.InputCategory != "information" {
@@ -411,14 +411,17 @@ func TestBuildImageAnalysisInputUsesSeedXLocalImageItem(t *testing.T) {
 	if strings.Contains(prompt, "/tmp/nomi/receipt.jpg") {
 		t.Fatal("expected prompt to omit local image path")
 	}
-	if !strings.Contains(prompt, "Return exactly one JSON object and no markdown") {
-		t.Fatal("expected strict JSON output instruction")
+	if !strings.Contains(prompt, "返回内容必须是严格 JSON 对象") {
+		t.Fatal("expected strict JSON output instruction in Chinese")
 	}
-	if !strings.Contains(prompt, "Never diagnose") {
-		t.Fatal("expected non-medical boundary")
+	if !strings.Contains(prompt, "暂时不支持英文输出") {
+		t.Fatal("expected Chinese-only output instruction")
 	}
-	if !strings.Contains(prompt, "receipts, invoices") || !strings.Contains(prompt, "checkup reports") {
-		t.Fatal("expected document classification instructions")
+	if !strings.Contains(prompt, "绝不诊断") {
+		t.Fatal("expected non-medical boundary in Chinese")
+	}
+	if !strings.Contains(prompt, "发票") || !strings.Contains(prompt, "体检报告") {
+		t.Fatal("expected document classification instructions in Chinese")
 	}
 	if !json.Valid(ImageExtractionOutputSchema()) {
 		t.Fatal("expected valid output schema")
@@ -432,11 +435,11 @@ func (fakeImageAnalyzer) AnalyzeImage(_ context.Context, image StoredImage) (Ima
 		Direction:     "input",
 		InputCategory: "caffeine",
 		OutputImpacts: []string{"energy", "focus", "sleep"},
-		Title:         "Coffee",
-		Summary:       "A visible cup of coffee.",
+		Title:         "咖啡",
+		Summary:       "画面中可见一杯咖啡。",
 		Confidence:    0.74,
 		Metadata: ExtractionMetadata{
-			PortionEstimate: "one cup",
+			PortionEstimate: "一杯",
 			CaloriesKcal:    30,
 			CaffeineMg:      95,
 			EstimatedFrom:   []string{"image_content"},

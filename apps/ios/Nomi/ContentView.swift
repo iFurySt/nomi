@@ -5,7 +5,6 @@ import UniformTypeIdentifiers
 import UIKit
 
 enum AppLanguage: String, CaseIterable, Identifiable {
-    case english
     case simplifiedChinese
     case traditionalChinese
 
@@ -19,13 +18,11 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         if normalized.contains("hant") || normalized.contains("tw") || normalized.contains("hk") || normalized.contains("mo") {
             return .traditionalChinese
         }
-        return normalized.hasPrefix("zh") ? .simplifiedChinese : .english
+        return .simplifiedChinese
     }
 
     static func value(for rawValue: String) -> AppLanguage {
         switch rawValue {
-        case Self.english.rawValue:
-            .english
         case Self.simplifiedChinese.rawValue:
             .simplifiedChinese
         case Self.traditionalChinese.rawValue:
@@ -37,8 +34,6 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
     var resolvedLocale: Locale {
         switch self {
-        case .english:
-            Locale(identifier: "en")
         case .simplifiedChinese:
             Locale(identifier: "zh-Hans")
         case .traditionalChinese:
@@ -48,7 +43,6 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .english: "English"
         case .simplifiedChinese: "简体中文"
         case .traditionalChinese: "繁體中文"
         }
@@ -56,7 +50,6 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
     var currentLanguageTitle: String {
         switch self {
-        case .english: "Current language"
         case .simplifiedChinese: "当前语言"
         case .traditionalChinese: "目前語言"
         }
@@ -1228,7 +1221,7 @@ struct UploadSheet: View {
     }
 
     private func startUpload() {
-        guard let importedImage, let importedImageData else { return }
+        guard importedImage != nil, let importedImageData else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let assetName = importedName
         let imageData = importedImageData
@@ -1312,15 +1305,15 @@ extension UploadSource {
 
 private extension TimelineItem {
     var caloriesKcal: Int {
-        value(before: "kcal")
+        value(before: "千卡") + value(before: "kcal")
     }
 
     var proteinG: Int {
-        value(before: "g protein")
+        value(before: "g 蛋白质") + value(before: "g protein")
     }
 
     var durationMin: Int {
-        value(before: " min") + value(before: "m /")
+        value(before: " 分钟") + value(before: " min") + value(before: "m /")
     }
 
     func value(before marker: String) -> Int {

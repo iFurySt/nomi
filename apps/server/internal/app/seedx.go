@@ -308,7 +308,7 @@ func (h *Handler) replyUnsupportedSeedXServerRequest(session *seedXSession, raw 
 		"commandId": request.CommandID,
 		"error": map[string]any{
 			"code":    int64(-32000),
-			"message": "nomi image extraction does not support interactive Codex server requests",
+			"message": "Nomi 文件识别暂不支持交互式 Codex 服务请求",
 		},
 	})
 }
@@ -335,7 +335,7 @@ func (h *Handler) handleLegacySeedXSmoke(conn *websocket.Conn) error {
 		Type:      "seedx.request",
 		CreatedAt: time.Now(),
 		Payload: map[string]any{
-			"prompt": "Summarize the latest saved body log without medical advice.",
+			"prompt": "请用中文总结最近保存的身体记录，不要提供医疗建议。",
 			"mode":   "smoke",
 		},
 	}
@@ -398,7 +398,7 @@ func seedXSmokeExchange(ctx context.Context, url string, apiKey string) error {
 		CreatedAt: time.Now(),
 		Payload: map[string]any{
 			"request_id": request.ID,
-			"text":       "SeedX smoke response.",
+			"text":       "SeedX smoke 中文响应。",
 		},
 	}
 	return conn.WriteJSON(response)

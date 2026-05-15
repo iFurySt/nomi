@@ -329,15 +329,15 @@ func BuildAskAnswer(question string, records []Record) AskAnswer {
 		referenced = append(referenced, record.ID)
 	}
 
-	recordRange := "no saved records yet"
+	recordRange := "暂无已保存记录"
 	if len(records) > 0 {
-		recordRange = records[len(records)-1].OccurredAt.Format(time.RFC3339) + " to " + records[0].OccurredAt.Format(time.RFC3339)
+		recordRange = records[len(records)-1].OccurredAt.Format(time.RFC3339) + " 至 " + records[0].OccurredAt.Format(time.RFC3339)
 	}
 
 	if HasMedicalIntent(question) {
 		return AskAnswer{
 			Blocked:             true,
-			Answer:              "I can help organize and review your saved records, but I cannot provide diagnosis or medical advice. For medical decisions, please consult a qualified professional.",
+			Answer:              "我可以帮你整理和回看已保存的记录，但不能提供诊断或医疗建议。涉及医疗决策时，请咨询有资质的专业人士。",
 			ReferencedRecordIDs: referenced,
 			Range:               recordRange,
 		}
@@ -345,7 +345,7 @@ func BuildAskAnswer(question string, records []Record) AskAnswer {
 
 	return AskAnswer{
 		Blocked:             false,
-		Answer:              "Ask is not connected to an LLM yet. Saved records are available through the records API for timeline and review surfaces.",
+		Answer:              "Ask 暂未连接大模型。已保存记录可以通过记录接口用于时间线和回看界面。",
 		ReferencedRecordIDs: referenced,
 		Range:               recordRange,
 	}

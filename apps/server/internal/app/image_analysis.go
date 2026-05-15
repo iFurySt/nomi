@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const seedXImageExtractionSchemaVersion = "2026-05-15.seedx-codex-document.v2"
+const seedXImageExtractionSchemaVersion = "2026-05-15.seedx-codex-zh.v3"
 
 var (
 	ErrSeedXUnavailable     = errors.New("seedx_unavailable")
@@ -76,30 +76,30 @@ func (a *SeedXImageAnalyzer) AnalyzeImage(ctx context.Context, image StoredImage
 }
 
 func BuildImageAnalysisPrompt(image StoredImage) string {
-	return fmt.Sprintf(`You are analyzing one user-uploaded image or document preview for Nomi, a personal body and life record app.
+	return fmt.Sprintf(`你正在为 Nomi（知己，一个个人身体与生活记录应用）分析用户上传的一张图片或一份文档预览。
 
-The content is provided to you as a localImage input item. For PDFs, the localImage is a generated JPEG preview of the uploaded document. Use the visible image/document content as the primary source.
+内容会以 localImage input item 提供。PDF 会先转成上传文档首页的 JPEG 预览。请只根据可见图片或文档内容判断，不要只根据文件名推断，也不要修改或写入任何文件。
 
-Upload context:
+上传上下文：
 - asset_name: %s
 - source: %s
 - mime_type: %s
 - size_bytes: %d
 
-Do not infer from filename alone. Do not modify files or write anything to disk.
+返回内容必须是严格 JSON 对象，不要输出 markdown。JSON key 和枚举值必须保持下方英文 contract；但所有用户可见的自由文本字段必须使用简体中文，包括 title、summary、food_category、portion_estimate、issuer、micronutrients、minerals、vitamins、review_needed 等。暂时不支持英文输出。
 
-Return exactly one JSON object and no markdown. The JSON object must match this schema:
+JSON 对象必须匹配这个结构：
 {
   "schema_version": "%s",
   "direction": "input",
   "input_category": "food | beverage | caffeine | alcohol | nicotine | information | exercise | sunlight | social",
   "output_impacts": ["energy | mood | sleep | recovery | focus | health"],
-  "title": "short human-readable title",
-  "summary": "one concise sentence with uncertainty where relevant",
+  "title": "简短中文标题",
+  "summary": "一句中文摘要，必要时说明不确定性",
   "confidence": 0.0,
   "metadata": {
-    "food_category": "optional",
-    "portion_estimate": "optional",
+    "food_category": "可选，中文",
+    "portion_estimate": "可选，中文",
     "weight_g": 0,
     "calories_kcal": 0,
     "protein_g": 0,
@@ -111,30 +111,30 @@ Return exactly one JSON object and no markdown. The JSON object must match this 
     "alcohol_g": 0,
     "nicotine_mg": 0,
     "duration_min": 0,
-    "micronutrients": ["optional"],
-    "minerals": ["optional"],
-    "vitamins": ["optional"],
+    "micronutrients": ["可选，中文"],
+    "minerals": ["可选，中文"],
+    "vitamins": ["可选，中文"],
     "document_kind": "optional: medical_report | lab_result | checkup_report | invoice | receipt | prescription_or_medication | other_document",
-    "document_date": "optional visible date only",
-    "issuer": "optional visible institution/vendor category, without private identifiers",
+    "document_date": "可选，仅填写可见日期",
+    "issuer": "可选，中文机构或商户类别，不要包含隐私标识",
     "currency": "optional visible currency",
     "total_amount": "optional visible total amount",
     "estimated_from": ["image_content"],
-    "review_needed": ["optional"],
+    "review_needed": ["可选，中文"],
     "original_mime_type": "%s"
   }
 }
 
-Rules:
-- Pick exactly one input_category. Use "information" for screenshots, PDFs, documents, receipts, invoices, labels, lab reports, checkup reports, exam reports, medication boxes, or other non-lifestyle context.
-- For medical, checkup, lab, and exam reports, set document_kind to "medical_report", "lab_result", or "checkup_report" when supported by visible content. Summarize what the document appears to be and that it was saved for review; do not interpret whether values are normal or abnormal.
-- For invoices, receipts, or payment slips, set document_kind to "invoice" or "receipt" when supported by visible content. Summarize vendor/category and total/date only if visible; do not transcribe private identifiers.
-- For food, drinks, caffeine, alcohol, and nicotine, estimate nutrition or substance amounts only when visually supported; otherwise omit numeric fields and add review_needed entries.
-- For exercise, sunlight, and social scenes, estimate duration only if visible context supports it; otherwise omit it and add review_needed.
-- Never diagnose, treat, estimate disease risk, interpret abnormal results, recommend medication, or make urgent medical claims. If the file is medical, classify it as "information" and summarize it as a saved document that needs user review.
-- Do not transcribe private identifiers, account numbers, exact addresses, or other sensitive text. Summarize their presence instead.
-- Use confidence between 0.30 and 0.90. Lower confidence when the image is ambiguous, cropped, blurry, or not accessible.
-- Include only valid JSON. Omit unknown optional fields instead of setting them to null.`, image.AssetName, image.Source, image.MimeType, image.SizeBytes, seedXImageExtractionSchemaVersion, image.MimeType)
+规则：
+- 只选择一个 input_category。截图、PDF、文档、收据、发票、标签、检验报告、体检报告、检查报告、药品盒等非生活行为内容使用 "information"。
+- 医疗、体检、检验、检查类报告在可见内容支持时，将 document_kind 设为 "medical_report"、"lab_result" 或 "checkup_report"。只用中文总结“这是什么文件、已保存供用户复核”，不要判断指标是否正常或异常。
+- 发票、收据、付款凭证在可见内容支持时，将 document_kind 设为 "invoice" 或 "receipt"。只在可见时用中文概括商户/类别、金额和日期，不要转写隐私编号。
+- 食物、饮料、咖啡因、酒精、尼古丁只在视觉信息支持时估算营养或摄入量；不确定时省略数值字段，并在 review_needed 中用中文说明需要用户复核。
+- 运动、日照、社交场景只在可见内容支持时估算时长；不确定时省略时长，并在 review_needed 中用中文说明。
+- 绝不诊断、治疗、评估疾病风险、解读异常、推荐药物或给出紧急医疗判断。医疗文件只能归类为 "information"，并用中文描述为已保存待用户复核的资料。
+- 不要转写身份证号、账号、精确地址、票据号码等隐私标识；只用中文概括存在这类信息。
+- confidence 必须在 0.30 到 0.90 之间。图片含糊、裁切、模糊或不可读时降低置信度。
+- 只输出合法 JSON。未知可选字段直接省略，不要设为 null。`, image.AssetName, image.Source, image.MimeType, image.SizeBytes, seedXImageExtractionSchemaVersion, image.MimeType)
 }
 
 func BuildImageAnalysisInput(image StoredImage) []SeedXInputItem {
@@ -340,15 +340,15 @@ func extractionSummary(extraction ImageExtraction) string {
 			values = append(values, strconv.Itoa(value)+suffix)
 		}
 	}
-	appendInt(extraction.Metadata.CaloriesKcal, " kcal")
-	appendInt(extraction.Metadata.ProteinG, "g protein")
-	appendInt(extraction.Metadata.CarbsG, "g carbs")
-	appendInt(extraction.Metadata.FatG, "g fat")
-	appendInt(extraction.Metadata.FiberG, "g fiber")
-	appendInt(extraction.Metadata.WaterMl, "ml water")
-	appendInt(extraction.Metadata.CaffeineMg, "mg caffeine")
-	appendInt(extraction.Metadata.NicotineMg, "mg nicotine")
-	appendInt(extraction.Metadata.DurationMin, " min")
+	appendInt(extraction.Metadata.CaloriesKcal, " 千卡")
+	appendInt(extraction.Metadata.ProteinG, "g 蛋白质")
+	appendInt(extraction.Metadata.CarbsG, "g 碳水")
+	appendInt(extraction.Metadata.FatG, "g 脂肪")
+	appendInt(extraction.Metadata.FiberG, "g 膳食纤维")
+	appendInt(extraction.Metadata.WaterMl, "ml 水")
+	appendInt(extraction.Metadata.CaffeineMg, "mg 咖啡因")
+	appendInt(extraction.Metadata.NicotineMg, "mg 尼古丁")
+	appendInt(extraction.Metadata.DurationMin, " 分钟")
 	if len(values) > 0 {
 		return strings.Join(values, " / ")
 	}

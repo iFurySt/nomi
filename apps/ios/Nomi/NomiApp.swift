@@ -8,7 +8,8 @@ struct NomiApp: App {
         if ProcessInfo.processInfo.environment["NOMI_RESET_LANGUAGE_PREFERENCE"] == "1" {
             UserDefaults.standard.removeObject(forKey: AppLanguage.storageKey)
         }
-        if UserDefaults.standard.object(forKey: AppLanguage.storageKey) == nil {
+        let storedLanguage = UserDefaults.standard.string(forKey: AppLanguage.storageKey)
+        if storedLanguage == nil || AppLanguage(rawValue: storedLanguage ?? "") == nil {
             UserDefaults.standard.set(AppLanguage.detected.rawValue, forKey: AppLanguage.storageKey)
         }
     }
