@@ -223,6 +223,7 @@ struct ContentView: View {
                 } else if section == .records {
                     RecordsPage(
                         records: filteredRecords,
+                        hasAnyRecords: !displayRecords.isEmpty,
                         selectedRecordID: $selectedRecordID,
                         selectedFilter: $selectedFilter,
                         selectedRecord: selectedRecord,
@@ -746,6 +747,7 @@ private struct DataSourceItem: View {
 
 private struct RecordsPage: View {
     let records: [NomiRecord]
+    let hasAnyRecords: Bool
     @Binding var selectedRecordID: String?
     @Binding var selectedFilter: RecordFilter
     let selectedRecord: NomiRecord?
@@ -757,52 +759,11 @@ private struct RecordsPage: View {
     let onDismissPreview: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 18) {
-                FilterPills(selectedFilter: $selectedFilter)
-
-                if let errorMessage, records.isEmpty {
-                    ServerStatePanel(message: errorMessage, action: onRetry)
-                }
-
-                if isLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                        .accessibilityIdentifier("mac-records-loading")
-                }
-
-                if records.isEmpty && !isLoading && errorMessage == nil {
-                    EmptyRecordsView()
-                } else {
-                    ScrollView(.vertical, showsIndicators: false) {
-                        LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(groupedRecords, id: \.key) { group in
-                                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                    Text(group.key)
-                                        .font(NomiType.section)
-                                        .foregroundStyle(NomiColor.ink)
-                                    Text(group.value.first?.dateLabel ?? "")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(Color(hex: 0x777777))
-                                }
-                                .padding(.top, group.key == groupedRecords.first?.key ? 10 : 24)
-                                .padding(.bottom, 10)
-
-                                ForEach(group.value) { record in
-                                    FullRecordRow(
-                                        record: record,
-                                        isSelected: record.id == selectedRecordID,
-                                        action: { selectedRecordID = record.id },
-                                        onDelete: { onDelete(record) }
-                                    )
-                                }
-                            }
-                        }
-                        .padding(.bottom, 24)
-                    }
-                }
+                content
             }
-            .frame(minWidth: 500, maxWidth: .infinity, alignment: .topLeading)
+            .frame(minWidth: 500, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 Color.black.opacity(0.001)
                     .contentShape(Rectangle())
@@ -825,8 +786,58 @@ private struct RecordsPage: View {
             }
         }
         .padding(.horizontal, 24)
-        .padding(.top, 28)
+        .padding(.top, hasAnyRecords || errorMessage != nil ? 28 : 0)
+        .padding(.bottom, hasAnyRecords || errorMessage != nil ? 0 : 42)
         .accessibilityIdentifier("mac-records-page")
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if let errorMessage, records.isEmpty {
+            ServerStatePanel(message: errorMessage, action: onRetry)
+        } else if isLoading {
+            ProgressView()
+                .controlSize(.small)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityIdentifier("mac-records-loading")
+        } else if !hasAnyRecords {
+            EmptyRecordsView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            FilterPills(selectedFilter: $selectedFilter)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                if records.isEmpty {
+                    EmptyFilteredRecordsView()
+                        .frame(maxWidth: .infinity, minHeight: 220, alignment: .center)
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(groupedRecords, id: \.key) { group in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(group.key)
+                                    .font(NomiType.section)
+                                    .foregroundStyle(NomiColor.ink)
+                                Text(group.value.first?.dateLabel ?? "")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Color(hex: 0x777777))
+                            }
+                            .padding(.top, group.key == groupedRecords.first?.key ? 10 : 24)
+                            .padding(.bottom, 10)
+
+                            ForEach(group.value) { record in
+                                FullRecordRow(
+                                    record: record,
+                                    isSelected: record.id == selectedRecordID,
+                                    action: { selectedRecordID = record.id },
+                                    onDelete: { onDelete(record) }
+                                )
+                            }
+                        }
+                    }
+                    .padding(.bottom, 24)
+                }
+            }
+        }
     }
 
     private var groupedRecords: [(key: String, value: [NomiRecord])] {
@@ -841,25 +852,37 @@ private struct RecordsPage: View {
 
 private struct EmptyRecordsView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 12) {
             Image(systemName: "tray")
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(NomiColor.secondaryInk)
+                .font(.system(size: 42, weight: .medium))
+                .foregroundStyle(Color(hex: 0x8f8f8f))
             Text("还没有记录")
-                .font(NomiType.section)
+                .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(NomiColor.ink)
-            Text("点击工具栏的 + 添加图片或文字记录。")
-                .font(NomiType.body)
+            VStack(spacing: 8) {
+                Text("添加你的第一条健康记录")
+                Text("拖入图片、文件，或点击右上角 + 开始。")
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Color(hex: 0x8b8b8b))
+            .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .accessibilityIdentifier("mac-records-empty")
+    }
+}
+
+private struct EmptyFilteredRecordsView: View {
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(Color(hex: 0xa0a0a0))
+            Text("这个分类还没有记录")
+                .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(NomiColor.secondaryInk)
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 180, alignment: .leading)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(NomiColor.hairline, lineWidth: 1)
-        }
-        .accessibilityIdentifier("mac-records-empty")
+        .accessibilityIdentifier("mac-records-filter-empty")
     }
 }
 
