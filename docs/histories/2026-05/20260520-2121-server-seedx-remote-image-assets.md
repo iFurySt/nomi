@@ -50,3 +50,12 @@ amoylab 上的 Nomi server 和用户机器上的 SeedX daemon 不共享文件系
 - `make check-docs`
 - `docker compose --env-file infra/amoylab/env.example -f infra/amoylab/docker-compose.yml config >/dev/null`
 - `git diff --check`
+- `server-v0.1.5` GitHub Actions server release completed successfully and deployed to amoylab.
+- `ssh amoylab 'sudo /usr/local/sbin/nomi-deploy-root health'` returned `{"database":"ok","status":"ok"}`.
+- amoylab `nomi-server` container reported `NOMI_PUBLIC_BASE_URL=https://nomi.ifuryst.com`, `NOMI_IMAGE_STORAGE_DIR=/var/lib/nomi/uploads`, and writable upload storage.
+- `POST https://nomi.ifuryst.com/ai/extract-image` with `/Users/bytedance/Downloads/IMG_7753.JPG` returned `202 Accepted`; record `f1d007b4-1936-4026-85df-69bc27cb8605` completed with title `一碗拌面配虾和青菜`.
+- `HEAD https://nomi.ifuryst.com/images/2026-05/20260520T134155.198542229-b362d5d6-IMG_7753.jpg` returned `200 OK`, `Content-Type: image/jpeg`, `Content-Length: 431562`.
+
+### ⚠️ Notes
+
+- Local `docker build -f apps/server/Dockerfile apps/server` was attempted, but `go mod download` timed out against `proxy.golang.org`; GitHub Actions built and deployed the same Dockerfile successfully.
