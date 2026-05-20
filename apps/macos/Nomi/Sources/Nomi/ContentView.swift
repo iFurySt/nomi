@@ -14,10 +14,7 @@ private enum NomiType {
 }
 
 private enum NomiColor {
-    static let appBackground = Color(hex: 0xfafaf8)
-    static let sidebar = Color(hex: 0xe2e2dc)
-    static let sidebarSelection = Color(hex: 0x5f6059)
-    static let sidebarHover = Color(hex: 0xd2d2cc)
+    static let appBackground = Color(nsColor: .windowBackgroundColor)
     static let content = Color(hex: 0xfafaf8)
     static let surface = Color.white
     static let ink = Color(hex: 0x111111)
@@ -91,12 +88,13 @@ struct ContentView: View {
     @State private var records: [SavedRecord] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var selectedSection: SidebarSection = .overview
+    @State private var selectedSection: SidebarSection = .records
     @State private var selectedFilter: RecordFilter = .all
     @State private var selectedRecordID: String?
     @State private var searchText = ""
     @State private var showingAddOverlay = false
     @State private var expandedRecordID: String?
+    @State private var isImportingDroppedFiles = false
 
     private static let recordsSyncInterval: Duration = .seconds(15)
 
@@ -194,20 +192,7 @@ struct ContentView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    withAnimation(.smooth(duration: 0.22)) {
-                        showingAddOverlay.toggle()
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel("添加记录")
-                .help("添加记录")
-                .accessibilityIdentifier("mac-add-button")
-            }
-        }
+        .toolbarBackground(.hidden, for: .windowToolbar)
     }
 
     private func selectSection(_ section: SidebarSection) {
@@ -252,6 +237,7 @@ struct ContentView: View {
                         selectedRecord: selectedRecord,
                         isLoading: isLoading,
                         errorMessage: errorMessage,
+                        isImportingDroppedFiles: isImportingDroppedFiles,
                         onRetry: { Task { await loadRecords(showLoading: true) } },
                         onPreview: { record in
                             withAnimation(.smooth(duration: 0.22)) {
@@ -265,6 +251,11 @@ struct ContentView: View {
                             withAnimation(.smooth(duration: 0.18)) {
                                 selectedRecordID = nil
                             }
+                        },
+                        onDropFiles: { fileURLs in
+                            Task {
+                                await importDroppedFiles(fileURLs)
+                            }
                         }
                     )
                     .transition(.opacity)
@@ -275,6 +266,20 @@ struct ContentView: View {
             .navigationTitle(section == .records && expandedRecord != nil ? "" : section.rawValue)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(NomiColor.content)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button {
+                        withAnimation(.smooth(duration: 0.22)) {
+                            showingAddOverlay.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("添加记录")
+                    .help("添加记录")
+                    .accessibilityIdentifier("mac-add-button")
+                }
+            }
         }
     }
 
@@ -331,115 +336,62 @@ struct ContentView: View {
             errorMessage = "删除记录失败，请稍后重试。"
         }
     }
+
+    @MainActor
+    private func importDroppedFiles(_ fileURLs: [URL]) async {
+        guard !fileURLs.isEmpty, !isImportingDroppedFiles else { return }
+
+        isImportingDroppedFiles = true
+        errorMessage = nil
+
+        var failedCount = 0
+        for fileURL in fileURLs {
+            do {
+                _ = try await RecordsClient.extractImage(fileURL: fileURL)
+            } catch {
+                failedCount += 1
+            }
+        }
+
+        await loadRecords(showLoading: false)
+
+        if failedCount > 0 {
+            errorMessage = failedCount == fileURLs.count
+                ? "文件分析失败，请确认 Nomi server 和 SeedX 正在运行。"
+                : "部分文件分析失败，请稍后重试。"
+        }
+
+        isImportingDroppedFiles = false
+    }
 }
 
 private struct NativeSidebarView: View {
     let selectedSection: SidebarSection
     let onSelectSection: (SidebarSection) -> Void
 
-    var body: some View {
-        List {
-            Section {
-                Menu {
-                    Button {
-                        onSelectSection(.profile)
-                    } label: {
-                        Label("设置", systemImage: "gearshape")
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        ResourceImage(name: "avatar", contentMode: .fill)
-                            .frame(width: 28, height: 28)
-                            .clipShape(Circle())
-                        Text("Leo")
-                            .font(.system(size: 13.5, weight: .semibold))
-                            .foregroundStyle(.primary)
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color(hex: 0x777777))
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .padding(.vertical, 8)
-                .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
-                .listRowBackground(NomiColor.sidebar)
-                .accessibilityIdentifier("mac-sidebar-profile")
+    private var selection: Binding<SidebarSection?> {
+        Binding(
+            get: { selectedSection },
+            set: { section in
+                guard let section else { return }
+                onSelectSection(section)
             }
+        )
+    }
 
+    var body: some View {
+        List(selection: selection) {
             Section {
                 ForEach(SidebarSection.allCases) { section in
-                    SidebarNavigationRow(
-                        section: section,
-                        isSelected: selectedSection == section,
-                        action: { onSelectSection(section) }
-                    )
-                    .listRowInsets(EdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4))
-                    .listRowBackground(NomiColor.sidebar)
-                    .accessibilityIdentifier("mac-sidebar-\(section.rawValue)")
+                    Label(section.rawValue, systemImage: section.symbolName)
+                        .tag(section)
+                        .accessibilityIdentifier("mac-sidebar-\(section.rawValue)")
                 }
             }
         }
         .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
-        .background(NomiColor.sidebar)
+        .frame(minWidth: 150)
         .accessibilityIdentifier("mac-native-sidebar")
-    }
-}
-
-private struct SidebarNavigationRow: View {
-    let section: SidebarSection
-    let isSelected: Bool
-    let action: () -> Void
-
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: action) {
-            SidebarItemLabel(
-                title: section.rawValue,
-                symbolName: section.symbolName,
-                foreground: isSelected ? Color.white : NomiColor.ink
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 32)
-            .background(rowBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private var rowBackground: Color {
-        if isSelected {
-            NomiColor.sidebarSelection
-        } else if isHovered {
-            NomiColor.sidebarHover
-        } else {
-            .clear
-        }
-    }
-}
-
-private struct SidebarItemLabel: View {
-    let title: String
-    let symbolName: String
-    let foreground: Color
-
-    var body: some View {
-        HStack(spacing: 9) {
-            Image(systemName: symbolName)
-                .font(.system(size: 13.5, weight: .semibold))
-                .frame(width: 16)
-            Text(title)
-                .font(.system(size: 13.5, weight: .semibold))
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(foreground)
-        .padding(.horizontal, 6)
-        .frame(height: 28)
     }
 }
 
@@ -794,10 +746,12 @@ private struct RecordsPage: View {
     let selectedRecord: NomiRecord?
     let isLoading: Bool
     let errorMessage: String?
+    let isImportingDroppedFiles: Bool
     let onRetry: () -> Void
     let onPreview: (NomiRecord) -> Void
     let onDelete: (NomiRecord) -> Void
     let onDismissPreview: () -> Void
+    let onDropFiles: ([URL]) -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
@@ -842,7 +796,10 @@ private struct RecordsPage: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier("mac-records-loading")
         } else if !hasAnyRecords {
-            EmptyRecordsView()
+            EmptyRecordsView(
+                isImporting: isImportingDroppedFiles,
+                onDropFiles: onDropFiles
+            )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             FilterPills(selectedFilter: $selectedFilter)
@@ -892,24 +849,91 @@ private struct RecordsPage: View {
 }
 
 private struct EmptyRecordsView: View {
+    let isImporting: Bool
+    let onDropFiles: ([URL]) -> Void
+
+    @State private var isDropTargeted = false
+
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "tray")
-                .font(.system(size: 42, weight: .medium))
-                .foregroundStyle(Color(hex: 0x8f8f8f))
-            Text("还没有记录")
+            if isImporting {
+                ProgressView()
+                    .controlSize(.regular)
+            } else {
+                Image(systemName: isDropTargeted ? "tray.and.arrow.down.fill" : "tray")
+                    .font(.system(size: 42, weight: .medium))
+                    .foregroundStyle(Color(hex: 0x8f8f8f))
+            }
+            Text(isImporting ? "正在导入文件" : "还没有记录")
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(NomiColor.ink)
             VStack(spacing: 8) {
-                Text("添加你的第一条健康记录")
-                Text("拖入图片、文件，或点击右上角 + 开始。")
+                Text(isImporting ? "Nomi 正在分析拖入的图片和文件" : "拖入图片或 PDF，自动生成第一条健康记录")
+                Text(isImporting ? "完成后会出现在记录列表里。" : "支持一次拖入多个文件，也可以点击右上角 +。")
             }
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(Color(hex: 0x8b8b8b))
             .multilineTextAlignment(.center)
         }
+        .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .contentShape(Rectangle())
+        .background {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.55))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color(hex: 0xc7c7c2), style: StrokeStyle(lineWidth: 1.5, dash: [5, 5]))
+                    }
+                    .padding(34)
+            }
+        }
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            guard !isImporting else { return false }
+
+            Task {
+                let fileURLs = await loadDroppedFileURLs(from: providers)
+                guard !fileURLs.isEmpty else { return }
+                await MainActor.run {
+                    onDropFiles(fileURLs)
+                }
+            }
+
+            return true
+        }
         .accessibilityIdentifier("mac-records-empty")
+    }
+}
+
+private func loadDroppedFileURLs(from providers: [NSItemProvider]) async -> [URL] {
+    var fileURLs: [URL] = []
+
+    for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+        if let fileURL = await loadDroppedFileURL(from: provider) {
+            fileURLs.append(fileURL)
+        }
+    }
+
+    return fileURLs
+}
+
+private func loadDroppedFileURL(from provider: NSItemProvider) async -> URL? {
+    await withCheckedContinuation { (continuation: CheckedContinuation<URL?, Never>) in
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            if let data = item as? Data,
+               let fileURL = URL(dataRepresentation: data, relativeTo: nil) {
+                continuation.resume(returning: fileURL)
+                return
+            }
+
+            if let fileURL = item as? URL {
+                continuation.resume(returning: fileURL)
+                return
+            }
+
+            continuation.resume(returning: nil)
+        }
     }
 }
 
