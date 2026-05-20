@@ -16,17 +16,18 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
 
 FROM alpine:3.22
 
-RUN apk add --no-cache ca-certificates wget \
+RUN apk add --no-cache ca-certificates su-exec wget \
     && adduser -D -H -u 10001 nomi \
     && mkdir -p /var/lib/nomi/uploads \
     && chown -R nomi:nomi /var/lib/nomi
 
 COPY --from=build /out/nomi-server /usr/local/bin/nomi-server
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-USER nomi
 EXPOSE 8088
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD wget -qO- http://127.0.0.1:8088/health >/dev/null || exit 1
 
-ENTRYPOINT ["/usr/local/bin/nomi-server"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

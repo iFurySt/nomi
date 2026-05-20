@@ -20,7 +20,7 @@
 - **[Asset metadata]**: server 基于实际分析文件计算 `sizeBytes` 和 `sha256`，让 SeedX 0.2.1 下载后可校验。
 - **[Local fallback]**: 未配置 public base URL 的同机本地开发继续发送 `localImage.path`，避免打断已有本地调试流程。
 - **[Deploy config]**: amoylab Compose 和 env 示例增加 `NOMI_PUBLIC_BASE_URL=https://nomi.ifuryst.com`。
-- **[Writable uploads]**: server 镜像预建 `/var/lib/nomi/uploads` 并授权给非 root `nomi` 用户，amoylab Compose 通过命名卷持久化该目录。
+- **[Writable uploads]**: server 镜像预建 `/var/lib/nomi/uploads`，entrypoint 初始化实际挂载目录权限后降权为非 root `nomi` 用户运行，amoylab Compose 通过命名卷持久化该目录。
 
 ### 🧠 Design Intent (Why)
 
@@ -33,6 +33,7 @@ amoylab 上的 Nomi server 和用户机器上的 SeedX daemon 不共享文件系
 - `apps/server/internal/app/command.go`
 - `apps/server/internal/app/handler_test.go`
 - `apps/server/Dockerfile`
+- `apps/server/docker-entrypoint.sh`
 - `apps/server/README.md`
 - `infra/amoylab/docker-compose.yml`
 - `infra/amoylab/env.example`
