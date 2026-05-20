@@ -25,6 +25,7 @@ type Config struct {
 	SeedXCodexModel           string
 	SeedXCodexReasoningEffort string
 	SeedXCommandTimeout       time.Duration
+	PublicBaseURL             string
 }
 
 func NewRootCommand() *cobra.Command {
@@ -36,6 +37,7 @@ func NewRootCommand() *cobra.Command {
 		SeedXCodexModel:           envOrDefault("NOMI_SEEDX_CODEX_MODEL", ""),
 		SeedXCodexReasoningEffort: envOrDefault("NOMI_SEEDX_CODEX_REASONING_EFFORT", "medium"),
 		SeedXCommandTimeout:       envDurationOrDefault("NOMI_SEEDX_COMMAND_TIMEOUT", 2*time.Minute),
+		PublicBaseURL:             envOrDefault("NOMI_PUBLIC_BASE_URL", ""),
 	}
 
 	cmd := &cobra.Command{
@@ -53,6 +55,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cfg.SeedXCodexModel, "seedx-codex-model", cfg.SeedXCodexModel, "Optional Codex model override for SeedX image analysis")
 	cmd.Flags().StringVar(&cfg.SeedXCodexReasoningEffort, "seedx-codex-reasoning-effort", cfg.SeedXCodexReasoningEffort, "Codex reasoning effort for SeedX image analysis")
 	cmd.Flags().DurationVar(&cfg.SeedXCommandTimeout, "seedx-command-timeout", cfg.SeedXCommandTimeout, "Timeout for SeedX image analysis commands")
+	cmd.Flags().StringVar(&cfg.PublicBaseURL, "public-base-url", cfg.PublicBaseURL, "Public HTTPS base URL used for SeedX daemon image asset downloads")
 
 	return cmd
 }
@@ -94,6 +97,7 @@ func run(ctx context.Context, cfg Config) error {
 			Model:           cfg.SeedXCodexModel,
 			ReasoningEffort: cfg.SeedXCodexReasoningEffort,
 			Timeout:         cfg.SeedXCommandTimeout,
+			PublicBaseURL:   cfg.PublicBaseURL,
 		}),
 	)
 	server := &http.Server{

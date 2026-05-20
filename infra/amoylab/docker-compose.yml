@@ -5,6 +5,7 @@ services:
     restart: unless-stopped
     environment:
       NOMI_SERVER_ADDR: ":8088"
+      NOMI_PUBLIC_BASE_URL: ${NOMI_PUBLIC_BASE_URL:-https://nomi.ifuryst.com}
       NOMI_DATABASE_URL: ${NOMI_DATABASE_URL:?set NOMI_DATABASE_URL}
       NOMI_SEEDX_API_KEY: ${NOMI_SEEDX_API_KEY:?set NOMI_SEEDX_API_KEY}
     networks:

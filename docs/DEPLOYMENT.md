@@ -13,6 +13,7 @@ Nomi server 部署在 `amoylab:/opt/nomi`，通过 Docker Compose 启动，镜�
 - 镜像：`ghcr.io/ifuryst/nomi-server:latest`
 - 容器端口：只绑定 `127.0.0.1:8088`
 - 公网入口：`https://nomi.ifuryst.com`，nginx 配置为 `/etc/nginx/conf.d/nomi.ifuryst.com.conf`，仓库模板见 `infra/amoylab/nginx-nomi.ifuryst.com.conf`
+- SeedX 远端图片资产：`NOMI_PUBLIC_BASE_URL=https://nomi.ifuryst.com`，server 会把 `/images/...` 绝对 URL 发给 SeedX daemon，由 SeedX 下载校验后在用户机器本地 materialize。
 - TLS：使用 snap certbot 的 nginx plugin 管理，证书路径是 `/etc/letsencrypt/live/nomi.ifuryst.com/`
 - 数据库：复用 amoylab 现有 Postgres 容器，`nomi-server` 加入 `postgres_default` Docker network，并单独创建 `nomi` database 和 `nomi` role
 

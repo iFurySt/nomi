@@ -16,7 +16,7 @@
 
 - Nomi 不维护独立 daemon，使用本机 `seedx` CLI 的 `seedx daemon connect`。
 - 本地启动命令：先启动 Nomi server，再运行 `seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key`。`--once` 只适合验证 hello，不能处理图片分析。
-- 图片分析使用 SeedX daemon `daemon:command` / `method:"run"`，runtime 为 `codex`；server 发送 Codex v2 `input`，其中包含严格 JSON text prompt 和 `{ "type": "localImage", "path": "..." }`；server 收到 `daemon:result` 后解析并写入 records。
+- 图片分析使用 SeedX daemon `daemon:command` / `method:"run"`，runtime 为 `codex`；server 发送 Codex v2 `input`，其中包含严格 JSON text prompt。生产环境配置 `NOMI_PUBLIC_BASE_URL` 后，图片作为 `{ "type": "image", "url": "https://.../images/..." }` 加 size/hash 元数据发送，让 SeedX 在用户机器本地 materialize；本地同机开发未配置 public base URL 时仍可使用 `{ "type": "localImage", "path": "..." }`。
 - 如果 Nomi smoke 发现 `seedx` CLI 能力缺口或行为问题，记录在当轮 history / issue 里，用于驱动 SeedX 上游修改。
 - SeedX 长运行模式负责断线 backoff 重连；`--once` 用于 hello smoke 和 CI 风格验证。
 

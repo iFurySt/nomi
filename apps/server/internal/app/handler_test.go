@@ -428,6 +428,64 @@ func TestBuildImageAnalysisInputUsesSeedXLocalImageItem(t *testing.T) {
 	}
 }
 
+func TestBuildImageAnalysisInputUsesPublicImageURLWhenConfigured(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := dir + "/receipt.jpg"
+	if err := os.WriteFile(path, []byte("jpeg-preview-bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	input, err := buildImageAnalysisInput(StoredImage{
+		AssetName: "receipt.jpg",
+		Source:    "file",
+		MimeType:  "image/jpeg",
+		Path:      path,
+		URI:       "local://images/2026-05/receipt.jpg",
+		SizeBytes: 42,
+	}, "https://nomi.ifuryst.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(input) != 2 || input[1].Type != "image" {
+		t.Fatalf("input = %#v", input)
+	}
+	if input[1].URL != "https://nomi.ifuryst.com/images/2026-05/receipt.jpg" || input[1].Path != "" {
+		t.Fatalf("image item = %#v", input[1])
+	}
+	if input[1].SizeBytes != int64(len("jpeg-preview-bytes")) || input[1].SHA256 == "" {
+		t.Fatalf("image metadata = %#v", input[1])
+	}
+}
+
+func TestBuildImageAnalysisInputUsesAnalysisMimeTypeForConvertedPreview(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := dir + "/lab-report-seedx.jpg"
+	if err := os.WriteFile(path, []byte("pdf-preview-jpeg-bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	input, err := buildImageAnalysisInput(StoredImage{
+		AssetName: "lab-report.pdf",
+		Source:    "file",
+		MimeType:  "application/pdf",
+		Path:      path,
+		URI:       "local://images/2026-05/lab-report.pdf",
+		SizeBytes: 4096,
+	}, "https://nomi.ifuryst.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if input[1].MimeType != "image/jpeg" {
+		t.Fatalf("mime type = %q", input[1].MimeType)
+	}
+}
+
 type fakeImageAnalyzer struct{}
 
 func (fakeImageAnalyzer) AnalyzeImage(_ context.Context, image StoredImage) (ImageExtraction, error) {

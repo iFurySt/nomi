@@ -15,6 +15,7 @@
 - amoylab 的真实 `NOMI_DATABASE_URL`、数据库密码和 SeedX key 只允许存在于 `/opt/nomi/.env` 或密钥系统，不写入仓库。
 - SeedX daemon API key 通过 `NOMI_SEEDX_API_KEY` 或 `--seedx-api-key` 配置，真实 key 不得写入 README、history、日志或 URL。
 - 上传图片默认落在 `.nomi/uploads` 或 `NOMI_IMAGE_STORAGE_DIR`，不得把真实用户图片、完整本地图片路径或图片中的敏感文本写入 history、截图和普通日志。
+- 生产环境给 SeedX daemon 的图片输入使用 `NOMI_PUBLIC_BASE_URL` 下的 `/images/...` HTTPS 资产 URL，不把 server 容器内本地 path 发送给远端 SeedX。SeedX API key 和图片 URL 不应出现在普通日志里。
 - Apple Developer / App Store Connect 的真实 `.p8`、`.p12`、provisioning profile 和 app-specific password 不得写入仓库；如必须本机留存，只能放到已被 `.gitignore` 忽略的 `.harness/secret/apple/`。
 - 不要把真实数据库 URL、SeedX token、云端 websocket endpoint secret、Apple signing secret 写入仓库。
 

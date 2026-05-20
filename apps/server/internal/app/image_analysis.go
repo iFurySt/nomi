@@ -2,9 +2,13 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,6 +31,7 @@ type SeedXImageAnalyzerOptions struct {
 	Model           string
 	ReasoningEffort string
 	Timeout         time.Duration
+	PublicBaseURL   string
 }
 
 type SeedXImageAnalyzer struct {
@@ -57,10 +62,14 @@ func (a *SeedXImageAnalyzer) AnalyzeImage(ctx context.Context, image StoredImage
 	runCtx, cancel := context.WithTimeout(ctx, a.options.Timeout)
 	defer cancel()
 
+	input, err := buildImageAnalysisInput(image, a.options.PublicBaseURL)
+	if err != nil {
+		return ImageExtraction{}, err
+	}
 	result, err := a.controller.RunCodex(runCtx, SeedXRunParams{
 		Runtime:         "codex",
 		CWD:             a.options.CWD,
-		Input:           BuildImageAnalysisInput(image),
+		Input:           input,
 		Model:           a.options.Model,
 		ReasoningEffort: a.options.ReasoningEffort,
 	})
@@ -78,7 +87,7 @@ func (a *SeedXImageAnalyzer) AnalyzeImage(ctx context.Context, image StoredImage
 func BuildImageAnalysisPrompt(image StoredImage) string {
 	return fmt.Sprintf(`你正在为 Nomi（知己，一个个人身体与生活记录应用）分析用户上传的一张图片或一份文档预览。
 
-内容会以 localImage input item 提供。PDF 会先转成上传文档首页的 JPEG 预览。请只根据可见图片或文档内容判断，不要只根据文件名推断，也不要修改或写入任何文件。
+内容会以图片 input item 提供；生产环境中 SeedX daemon 会从 Nomi server 的短期资产 URL 下载到本机再交给 Codex。PDF 会先转成上传文档首页的 JPEG 预览。请只根据可见图片或文档内容判断，不要只根据文件名推断，也不要修改或写入任何文件。
 
 上传上下文：
 - asset_name: %s
@@ -138,10 +147,73 @@ JSON 对象必须匹配这个结构：
 }
 
 func BuildImageAnalysisInput(image StoredImage) []SeedXInputItem {
+	input, _ := buildImageAnalysisInput(image, "")
+	return input
+}
+
+func buildImageAnalysisInput(image StoredImage, publicBaseURL string) ([]SeedXInputItem, error) {
+	item, err := buildImageInputItem(image, publicBaseURL)
+	if err != nil {
+		return nil, err
+	}
 	return []SeedXInputItem{
 		{Type: "text", Text: BuildImageAnalysisPrompt(image)},
-		{Type: "localImage", Path: image.Path, Name: filepath.Base(image.Path)},
+		item,
+	}, nil
+}
+
+func buildImageInputItem(image StoredImage, publicBaseURL string) (SeedXInputItem, error) {
+	if strings.TrimSpace(publicBaseURL) == "" {
+		return SeedXInputItem{Type: "localImage", Path: image.Path, Name: filepath.Base(image.Path)}, nil
 	}
+	assetURL, err := publicImageAssetURL(publicBaseURL, image.URI)
+	if err != nil {
+		return SeedXInputItem{}, err
+	}
+	sizeBytes, sha256Hex := imageAnalysisFileMetadata(image.Path)
+	return SeedXInputItem{
+		Type:      "image",
+		URL:       assetURL,
+		Name:      filepath.Base(image.Path),
+		MimeType:  imageAnalysisMimeType(image),
+		SizeBytes: sizeBytes,
+		SHA256:    sha256Hex,
+	}, nil
+}
+
+func publicImageAssetURL(publicBaseURL string, imageURI string) (string, error) {
+	baseURL := strings.TrimSpace(publicBaseURL)
+	parsedBase, err := url.Parse(baseURL)
+	if err != nil || parsedBase.Scheme == "" || parsedBase.Host == "" {
+		return "", fmt.Errorf("invalid public base url")
+	}
+	const prefix = "local://images/"
+	if !strings.HasPrefix(imageURI, prefix) {
+		return "", fmt.Errorf("unsupported image uri")
+	}
+	relativePath := strings.TrimPrefix(imageURI, prefix)
+	assetURL, err := url.JoinPath(baseURL, "images", relativePath)
+	if err != nil {
+		return "", err
+	}
+	return assetURL, nil
+}
+
+func imageAnalysisFileMetadata(path string) (int64, string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, ""
+	}
+	sum := sha256.Sum256(data)
+	return int64(len(data)), hex.EncodeToString(sum[:])
+}
+
+func imageAnalysisMimeType(image StoredImage) string {
+	ext := strings.ToLower(filepath.Ext(image.Path))
+	if ext == ".jpg" || ext == ".jpeg" {
+		return "image/jpeg"
+	}
+	return image.MimeType
 }
 
 func ImageExtractionOutputSchema() json.RawMessage {

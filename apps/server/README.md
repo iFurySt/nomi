@@ -26,6 +26,7 @@ NOMI_SEEDX_API_KEY=dev_seedx_key go run ./cmd/nomi-server --addr :8088
 ```
 
 Image and PDF uploads are stored under `.nomi/uploads` by default. Override with `NOMI_IMAGE_STORAGE_DIR=/path/to/uploads` when needed.
+When the SeedX daemon runs on a different machine from the server, set `NOMI_PUBLIC_BASE_URL` or `--public-base-url` to the public HTTPS origin, for example `https://nomi.ifuryst.com`, so SeedX can download image assets through `/images/...`.
 On macOS local development, HEIC uploads and PDF uploads are also converted to a sibling JPEG with `sips` before SeedX/Codex analysis so Codex receives a readable image preview while the original upload remains stored.
 Stored uploads are available through `GET /images/<yyyy-mm>/<file>` for local client preview surfaces. HEIC and PDF preview requests return the converted JPEG sidecar when one exists.
 
@@ -36,6 +37,7 @@ docker build -t ghcr.io/ifuryst/nomi-server:local .
 docker run --rm -p 127.0.0.1:8088:8088 \
   -e NOMI_DATABASE_URL='postgres://bytedance:bytedance@host.docker.internal:5432/nomi?sslmode=disable' \
   -e NOMI_SEEDX_API_KEY=dev_seedx_key \
+  -e NOMI_PUBLIC_BASE_URL='http://127.0.0.1:8088' \
   ghcr.io/ifuryst/nomi-server:local
 ```
 
@@ -60,7 +62,7 @@ Current SeedX flow:
 1. SeedX sends `daemon:hello`.
 2. Server accepts `Authorization: Bearer ...` when `NOMI_SEEDX_API_KEY` is configured.
 3. Server sends `daemon:ping`; long-running SeedX daemon responds with `daemon:pong`.
-4. Image / document extraction sends `daemon:command` with `method:"run"` and `runtime:"codex"`; `params.input` contains a strict JSON text prompt plus a Codex v2 `{ "type": "localImage", "path": "..." }` item for the stored upload or generated preview.
+4. Image / document extraction sends `daemon:command` with `method:"run"` and `runtime:"codex"`; `params.input` contains a strict JSON text prompt plus a Codex v2 image item. With `NOMI_PUBLIC_BASE_URL` configured, the image item is `{ "type": "image", "url": "https://.../images/..." }` plus size/hash metadata so SeedX can materialize the asset locally. Without a public base URL, local development still uses `{ "type": "localImage", "path": "..." }`.
 5. `POST /ai/extract-image` stores the image or PDF and immediately creates a `pending` record, then returns `202 Accepted` with that record.
 6. A background worker marks the record `processing`, waits for SeedX `daemon:result`, parses the Codex text, and updates the same record to `completed`.
 7. If SeedX or parsing fails, the record becomes `failed`; no nutrition fallback is generated.

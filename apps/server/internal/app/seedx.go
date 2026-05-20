@@ -24,11 +24,14 @@ type SeedXEvent struct {
 }
 
 type SeedXInputItem struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
-	URL  string `json:"url,omitempty"`
-	Path string `json:"path,omitempty"`
-	Name string `json:"name,omitempty"`
+	Type      string `json:"type"`
+	Text      string `json:"text,omitempty"`
+	URL       string `json:"url,omitempty"`
+	Path      string `json:"path,omitempty"`
+	Name      string `json:"name,omitempty"`
+	MimeType  string `json:"mimeType,omitempty"`
+	SizeBytes int64  `json:"sizeBytes,omitempty"`
+	SHA256    string `json:"sha256,omitempty"`
 }
 
 type SeedXRunParams struct {
