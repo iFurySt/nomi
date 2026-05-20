@@ -22,6 +22,100 @@ private enum NomiColor {
     static let muted = Color(hex: 0x8a8a8a)
     static let hairline = Color(hex: 0xeeeeed)
     static let softFill = Color(hex: 0xf3f3f2)
+    static let overlayPanel = Color(hex: 0xfafaf9)
+}
+
+private struct NomiCursorModifier: ViewModifier {
+    let cursor: NSCursor
+    @State private var isHovering = false
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { hovering in
+                guard hovering != isHovering else { return }
+                isHovering = hovering
+                if hovering {
+                    cursor.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+            .onDisappear {
+                if isHovering {
+                    NSCursor.pop()
+                    isHovering = false
+                }
+            }
+    }
+}
+
+private extension View {
+    func nomiCursor(_ cursor: NSCursor) -> some View {
+        modifier(NomiCursorModifier(cursor: cursor))
+    }
+}
+
+private struct NomiMultilineTextInput: NSViewRepresentable {
+    @Binding var text: String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
+
+        let textView = NSTextView()
+        textView.delegate = context.coordinator
+        textView.string = text
+        textView.drawsBackground = false
+        textView.isRichText = false
+        textView.importsGraphics = false
+        textView.allowsUndo = true
+        textView.font = .systemFont(ofSize: 15, weight: .regular)
+        textView.textColor = .labelColor
+        textView.insertionPointColor = .labelColor
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainerInset = NSSize(width: 3, height: 0)
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: scrollView.contentSize.width, height: .greatestFiniteMagnitude)
+
+        scrollView.documentView = textView
+        context.coordinator.textView = textView
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = context.coordinator.textView else { return }
+        if textView.string != text {
+            textView.string = text
+        }
+        textView.font = .systemFont(ofSize: 15, weight: .regular)
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        @Binding private var text: String
+        weak var textView: NSTextView?
+
+        init(text: Binding<String>) {
+            _text = text
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            text = textView.string
+        }
+    }
 }
 
 private enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
@@ -864,16 +958,13 @@ private struct EmptyRecordsView: View {
                     .font(.system(size: 42, weight: .medium))
                     .foregroundStyle(Color(hex: 0x8f8f8f))
             }
-            Text(isImporting ? "正在导入文件" : "还没有记录")
+            Text(isImporting ? "正在导入文件" : "暂无数据")
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(NomiColor.ink)
-            VStack(spacing: 8) {
-                Text(isImporting ? "Nomi 正在分析拖入的图片和文件" : "拖入图片或 PDF，自动生成第一条健康记录")
-                Text(isImporting ? "完成后会出现在记录列表里。" : "支持一次拖入多个文件，也可以点击右上角 +。")
-            }
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(Color(hex: 0x8b8b8b))
-            .multilineTextAlignment(.center)
+            Text(isImporting ? "正在分析" : "拖入图片或 PDF")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color(hex: 0x8b8b8b))
+                .multilineTextAlignment(.center)
         }
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -1317,20 +1408,20 @@ private struct AddRecordOverlay: View {
                     VStack(spacing: 12) {
                         Image(systemName: "photo")
                             .font(.system(size: 38, weight: .regular))
-                            .foregroundStyle(Color(hex: 0x999999))
+                            .foregroundStyle(Color(hex: 0x7f7f7f))
                         Text(isSaving ? "正在分析文件..." : "拖拽图片或 PDF 到这里，或点击上传")
                             .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Color(hex: 0x7f7f7f))
+                            .foregroundStyle(Color(hex: 0x626262))
                         Text("支持 JPG、PNG、HEIC、PDF")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color(hex: 0x9b9b9b))
+                            .foregroundStyle(Color(hex: 0x8d8d8d))
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 166)
-                    .background(Color.white.opacity(0.24), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(NomiColor.surface.opacity(0.66), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Color(hex: 0xd9d9d9), style: StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
+                            .stroke(NomiColor.hairline.opacity(0.82), style: StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
                     }
                 }
                 .buttonStyle(.plain)
@@ -1338,12 +1429,22 @@ private struct AddRecordOverlay: View {
                 .accessibilityIdentifier("mac-add-image-button")
 
                 VStack(alignment: .leading, spacing: 0) {
-                    TextField("说些什么（可选）", text: $draft.summary, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 14, weight: .medium))
-                        .lineLimit(4, reservesSpace: true)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 14)
+                    ZStack(alignment: .topLeading) {
+                        NomiMultilineTextInput(text: $draft.summary)
+                            .padding(.horizontal, 11)
+                            .padding(.top, 14)
+                            .padding(.bottom, 4)
+
+                        if draft.summary.isEmpty {
+                            Text("说些什么（可选）")
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundStyle(Color(hex: 0x8b8b8b))
+                                .padding(.horizontal, 14)
+                                .padding(.top, 14)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
                     Spacer(minLength: 8)
 
@@ -1385,12 +1486,13 @@ private struct AddRecordOverlay: View {
                     .padding(.bottom, 12)
                 }
                 .frame(height: 126)
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .nomiCursor(.iBeam)
                 .background(Color.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color(hex: 0xe4e4e4), lineWidth: 1)
+                        .stroke(NomiColor.hairline, lineWidth: 1)
                 }
-                .shadow(color: .black.opacity(0.03), radius: 9, y: 4)
 
                 if let errorMessage {
                     Text(errorMessage)
@@ -1400,12 +1502,15 @@ private struct AddRecordOverlay: View {
             }
             .padding(26)
             .frame(width: 522)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(NomiColor.overlayPanel)
+                    .shadow(color: .black.opacity(0.07), radius: 24, y: 10)
+            }
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color(hex: 0xf0f0f0), lineWidth: 1)
+                    .stroke(Color.white.opacity(0.68), lineWidth: 1)
             }
-            .shadow(color: .black.opacity(0.09), radius: 27, y: 12)
             .fileImporter(
                 isPresented: $isImportingImage,
                 allowedContentTypes: [.image, .pdf],
@@ -1426,7 +1531,7 @@ private struct AddRecordOverlay: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .dismissOnEscapeAndFocusLoss(isEnabled: !isSaving && !isImportingImage, perform: dismissIfAllowed)
+        .dismissOnEscape(isEnabled: !isSaving && !isImportingImage, perform: dismissIfAllowed)
         .accessibilityIdentifier("mac-add-overlay")
     }
 
@@ -1488,12 +1593,11 @@ private struct AddRecordOverlay: View {
     }
 }
 
-private struct EscapeAndFocusLossDismissModifier: ViewModifier {
+private struct EscapeDismissModifier: ViewModifier {
     let isEnabled: Bool
     let onDismiss: () -> Void
 
     @State private var keyMonitor: Any?
-    @State private var resignActiveObserver: NSObjectProtocol?
 
     func body(content: Content) -> some View {
         content
@@ -1527,18 +1631,6 @@ private struct EscapeAndFocusLossDismissModifier: ViewModifier {
                 return event
             }
         }
-
-        if resignActiveObserver == nil {
-            resignActiveObserver = NotificationCenter.default.addObserver(
-                forName: NSApplication.didResignActiveNotification,
-                object: NSApp,
-                queue: .main
-            ) { _ in
-                Task { @MainActor in
-                    onDismiss()
-                }
-            }
-        }
     }
 
     private func uninstall() {
@@ -1546,17 +1638,12 @@ private struct EscapeAndFocusLossDismissModifier: ViewModifier {
             NSEvent.removeMonitor(keyMonitor)
             self.keyMonitor = nil
         }
-
-        if let resignActiveObserver {
-            NotificationCenter.default.removeObserver(resignActiveObserver)
-            self.resignActiveObserver = nil
-        }
     }
 }
 
 private extension View {
-    func dismissOnEscapeAndFocusLoss(isEnabled: Bool, perform action: @escaping () -> Void) -> some View {
-        modifier(EscapeAndFocusLossDismissModifier(isEnabled: isEnabled, onDismiss: action))
+    func dismissOnEscape(isEnabled: Bool, perform action: @escaping () -> Void) -> some View {
+        modifier(EscapeDismissModifier(isEnabled: isEnabled, onDismiss: action))
     }
 }
 
