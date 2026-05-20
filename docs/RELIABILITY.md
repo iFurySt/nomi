@@ -9,7 +9,7 @@
 - 本地启动命令：`cd apps/server && go run ./cmd/nomi-server --addr :8088`。
 - 本地测试命令：`cd apps/server && go test ./...`。
 - 默认读取 `NOMI_SERVER_ADDR`、`NOMI_DATABASE_URL` 和 `NOMI_SEEDX_API_KEY`，命令行 flag 可覆盖。
-- 图片上传读取 `NOMI_IMAGE_STORAGE_DIR`、`NOMI_SEEDX_COMMAND_TIMEOUT`、`NOMI_SEEDX_CODEX_MODEL` 和 `NOMI_SEEDX_CODEX_REASONING_EFFORT`；默认把图片落到 `.nomi/uploads`，SeedX/Codex command 超时 2 分钟。
+- 图片上传读取 `NOMI_IMAGE_STORAGE_DIR`、`NOMI_SEEDX_COMMAND_TIMEOUT`、`NOMI_SEEDX_CODEX_MODEL` 和 `NOMI_SEEDX_CODEX_REASONING_EFFORT`；本地默认把图片落到 `.nomi/uploads`，amoylab 生产环境通过 Compose 命名卷挂载 `/var/lib/nomi/uploads`，SeedX/Codex command 超时 2 分钟。
 - SeedX websocket endpoint：`GET /daemon/connect`；`GET /seedx/ws` 仅保留为旧 smoke 兼容路径。
 
 ## SeedX

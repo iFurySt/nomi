@@ -17,7 +17,9 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
 FROM alpine:3.22
 
 RUN apk add --no-cache ca-certificates wget \
-    && adduser -D -H -u 10001 nomi
+    && adduser -D -H -u 10001 nomi \
+    && mkdir -p /var/lib/nomi/uploads \
+    && chown -R nomi:nomi /var/lib/nomi
 
 COPY --from=build /out/nomi-server /usr/local/bin/nomi-server
 
