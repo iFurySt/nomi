@@ -23,6 +23,8 @@
 - **[Add overlay background]**: 保留原来的大上传 drop zone、尺寸和信息层级；将 overlay 外层改为略亮于 `#F8F8F7` 的实体 panel 背景以视觉对齐系统 sidebar material，并把阴影限制在外层圆角背景 shape 上，避免整组内容投影把 panel 内部染灰。
 - **[Text input polish]**: 手动文本区域改用原生 `NSTextView` 承载多行输入和鼠标滚动；给 text container 保留小 inset 避免 caret 在左边缘被裁，并在 SwiftUI 外层保留 compose box 风格 placeholder、I-beam hover 和 14px 视觉 inset。
 - **[Dismiss behavior]**: 移除应用失焦自动关闭 Add overlay 的 observer，仅保留关闭按钮、Escape、再次点击 Add 和点击 app 内 overlay 外区域关闭。
+- **[Add overlay typography and hover]**: 将 Add overlay 标题、上传说明、占位符和输入文字降到更克制的 macOS panel 字号；给关闭 `x` 增加轻量圆形 hover 底色，给上传区增加 hover / drag-target 提亮和描边反馈。
+- **[Text placeholder fix]**: 将手动输入区 placeholder 从 SwiftUI overlay 移入 AppKit `NSTextView` 绘制，并在输入框聚焦或输入法 marked text 期间隐藏，避免中文输入时和 placeholder 叠在一起。
 - **[Docs sync]**: 更新架构、前端和质量评分文档，记录 Landmarks-style sidebar / toolbar 约束。
 
 ### Design Intent (Why)
@@ -35,6 +37,12 @@ Landmarks 示例让系统负责 sidebar 选中态、背景、行密度和 toolba
 - `docs/ARCHITECTURE.md`
 - `docs/FRONTEND.md`
 - `docs/QUALITY_SCORE.md`
+
+### Follow-up Verification
+
+- `cd apps/macos/Nomi && ./scripts/build-app.sh`
+- Computer Use smoke: 重启 Debug app，打开记录页，点击 toolbar `+`，确认 Add overlay 可进入，标题缩小、上传区和输入区排版仍正常。
+- Computer Use smoke: 聚焦手动输入区后 placeholder 立即隐藏；通过 accessibility set value 写入“测试”后，输入文本显示且不与 placeholder 叠层。
 
 ### Verification
 

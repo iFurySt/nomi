@@ -55,8 +55,41 @@ private extension View {
     }
 }
 
+private final class NomiPlaceholderTextView: NSTextView {
+    var placeholder = "" {
+        didSet { needsDisplay = true }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        guard string.isEmpty, !hasMarkedText(), !placeholder.isEmpty, window?.firstResponder !== self else { return }
+
+        let textFont = font ?? .systemFont(ofSize: 14, weight: .regular)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: textFont,
+            .foregroundColor: NSColor(calibratedWhite: 0.55, alpha: 1)
+        ]
+        let point = NSPoint(x: textContainerOrigin.x, y: textContainerOrigin.y)
+        NSString(string: placeholder).draw(at: point, withAttributes: attributes)
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let result = super.becomeFirstResponder()
+        needsDisplay = true
+        return result
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let result = super.resignFirstResponder()
+        needsDisplay = true
+        return result
+    }
+}
+
 private struct NomiMultilineTextInput: NSViewRepresentable {
     @Binding var text: String
+    let placeholder: String
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
@@ -70,14 +103,15 @@ private struct NomiMultilineTextInput: NSViewRepresentable {
         scrollView.autohidesScrollers = true
         scrollView.scrollerStyle = .overlay
 
-        let textView = NSTextView()
+        let textView = NomiPlaceholderTextView()
         textView.delegate = context.coordinator
         textView.string = text
+        textView.placeholder = placeholder
         textView.drawsBackground = false
         textView.isRichText = false
         textView.importsGraphics = false
         textView.allowsUndo = true
-        textView.font = .systemFont(ofSize: 15, weight: .regular)
+        textView.font = .systemFont(ofSize: 14, weight: .regular)
         textView.textColor = .labelColor
         textView.insertionPointColor = .labelColor
         textView.isEditable = true
@@ -100,7 +134,11 @@ private struct NomiMultilineTextInput: NSViewRepresentable {
         if textView.string != text {
             textView.string = text
         }
-        textView.font = .systemFont(ofSize: 15, weight: .regular)
+        if let textView = textView as? NomiPlaceholderTextView {
+            textView.placeholder = placeholder
+            textView.needsDisplay = true
+        }
+        textView.font = .systemFont(ofSize: 14, weight: .regular)
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
@@ -114,6 +152,7 @@ private struct NomiMultilineTextInput: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             text = textView.string
+            textView.needsDisplay = true
         }
     }
 }
@@ -1374,7 +1413,14 @@ private struct AddRecordOverlay: View {
     @State private var draft = CreateRecordDraft()
     @State private var isSaving = false
     @State private var isImportingImage = false
+    @State private var isCloseHovering = false
+    @State private var isUploadHovering = false
+    @State private var isUploadDropTargeted = false
     @State private var errorMessage: String?
+
+    private var isUploadActive: Bool {
+        isUploadHovering || isUploadDropTargeted
+    }
 
     var body: some View {
         ZStack {
@@ -1388,18 +1434,30 @@ private struct AddRecordOverlay: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text("添加记录")
-                        .font(.system(size: 22, weight: .bold))
+                        .font(.system(size: 19, weight: .bold))
                         .foregroundStyle(NomiColor.ink)
                     Spacer()
                     Button {
                         dismissIfAllowed()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color(hex: 0x8a8a8a))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(isCloseHovering ? Color(hex: 0x333333) : Color(hex: 0x8a8a8a))
+                            .frame(width: 30, height: 30)
+                            .background(
+                                isCloseHovering ? Color.black.opacity(0.055) : Color.clear,
+                                in: Circle()
+                            )
                     }
                     .buttonStyle(.plain)
                     .disabled(isSaving)
+                    .contentShape(Circle())
+                    .nomiCursor(.pointingHand)
+                    .onHover { hovering in
+                        withAnimation(.smooth(duration: 0.12)) {
+                            isCloseHovering = hovering
+                        }
+                    }
                 }
 
                 Button {
@@ -1407,43 +1465,44 @@ private struct AddRecordOverlay: View {
                 } label: {
                     VStack(spacing: 12) {
                         Image(systemName: "photo")
-                            .font(.system(size: 38, weight: .regular))
-                            .foregroundStyle(Color(hex: 0x7f7f7f))
+                            .font(.system(size: 36, weight: .regular))
+                            .foregroundStyle(isUploadActive ? Color(hex: 0x5f5f5f) : Color(hex: 0x7f7f7f))
                         Text(isSaving ? "正在分析文件..." : "拖拽图片或 PDF 到这里，或点击上传")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Color(hex: 0x626262))
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(isUploadActive ? Color(hex: 0x4d4d4d) : Color(hex: 0x626262))
                         Text("支持 JPG、PNG、HEIC、PDF")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Color(hex: 0x8d8d8d))
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 166)
-                    .background(NomiColor.surface.opacity(0.66), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(
+                        (isUploadActive ? Color.white.opacity(0.9) : NomiColor.surface.opacity(0.66)),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
                     .overlay {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(NomiColor.hairline.opacity(0.82), style: StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
+                            .stroke(
+                                isUploadActive ? Color(hex: 0xc7c7c4) : NomiColor.hairline.opacity(0.82),
+                                style: StrokeStyle(lineWidth: 1.2, dash: [4, 4])
+                            )
                     }
                 }
                 .buttonStyle(.plain)
                 .disabled(isSaving)
+                .nomiCursor(.pointingHand)
+                .onHover { hovering in
+                    withAnimation(.smooth(duration: 0.12)) {
+                        isUploadHovering = hovering
+                    }
+                }
                 .accessibilityIdentifier("mac-add-image-button")
 
                 VStack(alignment: .leading, spacing: 0) {
-                    ZStack(alignment: .topLeading) {
-                        NomiMultilineTextInput(text: $draft.summary)
-                            .padding(.horizontal, 11)
-                            .padding(.top, 14)
-                            .padding(.bottom, 4)
-
-                        if draft.summary.isEmpty {
-                            Text("说些什么（可选）")
-                                .font(.system(size: 15, weight: .regular))
-                                .foregroundStyle(Color(hex: 0x8b8b8b))
-                                .padding(.horizontal, 14)
-                                .padding(.top, 14)
-                                .allowsHitTesting(false)
-                        }
-                    }
+                    NomiMultilineTextInput(text: $draft.summary, placeholder: "说些什么（可选）")
+                        .padding(.horizontal, 14)
+                        .padding(.top, 14)
+                        .padding(.bottom, 4)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
                     Spacer(minLength: 8)
@@ -1518,7 +1577,7 @@ private struct AddRecordOverlay: View {
             ) { result in
                 handleFileImport(result)
             }
-            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            .onDrop(of: [.fileURL], isTargeted: $isUploadDropTargeted) { providers in
                 guard let provider = providers.first else { return false }
                 provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
                     guard let data = item as? Data,
