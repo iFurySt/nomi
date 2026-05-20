@@ -6,6 +6,34 @@ APP_DIR="$ROOT_DIR/.build/Nomi.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
+ICON_STYLE="${NOMI_MACOS_ICON_STYLE:-auto}"
+
+macos_major_version() {
+  sw_vers -productVersion | cut -d. -f1
+}
+
+resolve_icon_path() {
+  case "$ICON_STYLE" in
+    auto)
+      if [ "$(macos_major_version)" -ge 26 ]; then
+        echo "$ROOT_DIR/Sources/Nomi/Resources/AppIcon-macos26.icns"
+      else
+        echo "$ROOT_DIR/Sources/Nomi/Resources/AppIcon.icns"
+      fi
+      ;;
+    macos26)
+      echo "$ROOT_DIR/Sources/Nomi/Resources/AppIcon-macos26.icns"
+      ;;
+    traditional)
+      echo "$ROOT_DIR/Sources/Nomi/Resources/AppIcon.icns"
+      ;;
+    *)
+      echo "Unsupported NOMI_MACOS_ICON_STYLE: $ICON_STYLE" >&2
+      echo "Expected auto, macos26, or traditional." >&2
+      exit 2
+      ;;
+  esac
+}
 
 cd "$ROOT_DIR"
 swift build
@@ -16,7 +44,9 @@ cp "$ROOT_DIR/.build/debug/Nomi" "$MACOS_DIR/Nomi"
 if [ -d "$ROOT_DIR/.build/debug/Nomi_Nomi.bundle" ]; then
   cp -R "$ROOT_DIR/.build/debug/Nomi_Nomi.bundle" "$APP_DIR/Nomi_Nomi.bundle"
 fi
-cp "$ROOT_DIR/Sources/Nomi/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+ICON_PATH="$(resolve_icon_path)"
+cp "$ICON_PATH" "$RESOURCES_DIR/AppIcon.icns"
+echo "Using macOS app icon: $(basename "$ICON_PATH")" >&2
 
 cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

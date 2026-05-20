@@ -85,6 +85,8 @@ private struct NomiRecord: Identifiable, Equatable {
 }
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var preferredColumn: NavigationSplitViewColumn = .detail
     @State private var records: [SavedRecord] = []
     @State private var isLoading = false
@@ -95,6 +97,8 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var showingAddOverlay = false
     @State private var expandedRecordID: String?
+
+    private static let recordsSyncInterval: Duration = .seconds(15)
 
     private var displayRecords: [NomiRecord] {
         records.map(NomiRecord.init(savedRecord:))
@@ -129,6 +133,10 @@ struct ContentView: View {
         return "section-\(selectedSection.id)"
     }
 
+    private var isRecordsBackedSectionVisible: Bool {
+        selectedSection == .overview || selectedSection == .records
+    }
+
     var body: some View {
         ZStack {
             appShell
@@ -152,7 +160,22 @@ struct ContentView: View {
         .tint(.primary)
         .background(NomiColor.appBackground)
         .task {
-            await loadRecords()
+            await loadRecords(showLoading: true)
+        }
+        .task {
+            await runRecordsSyncLoop()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await loadRecords(showLoading: false)
+            }
+        }
+        .onChange(of: selectedSection) { _, _ in
+            guard isRecordsBackedSectionVisible else { return }
+            Task {
+                await loadRecords(showLoading: false)
+            }
         }
         .accessibilityIdentifier("mac-health-record-app")
     }
@@ -229,7 +252,7 @@ struct ContentView: View {
                         selectedRecord: selectedRecord,
                         isLoading: isLoading,
                         errorMessage: errorMessage,
-                        onRetry: { Task { await loadRecords() } },
+                        onRetry: { Task { await loadRecords(showLoading: true) } },
                         onPreview: { record in
                             withAnimation(.smooth(duration: 0.22)) {
                                 expandedRecordID = record.id
@@ -256,8 +279,10 @@ struct ContentView: View {
     }
 
     @MainActor
-    private func loadRecords() async {
-        isLoading = true
+    private func loadRecords(showLoading: Bool = false) async {
+        if showLoading {
+            isLoading = true
+        }
         errorMessage = nil
 
         do {
@@ -272,7 +297,23 @@ struct ContentView: View {
             errorMessage = "无法连接 \(NomiAPI.baseURL.absoluteString)"
         }
 
-        isLoading = false
+        if showLoading {
+            isLoading = false
+        }
+    }
+
+    @MainActor
+    private func runRecordsSyncLoop() async {
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(for: Self.recordsSyncInterval)
+            } catch {
+                return
+            }
+
+            guard isRecordsBackedSectionVisible else { continue }
+            await loadRecords(showLoading: false)
+        }
     }
 
     @MainActor
