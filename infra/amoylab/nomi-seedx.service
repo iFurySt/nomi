@@ -1,0 +1,18 @@
+[Unit]
+Description=Nomi SeedX daemon bridge
+Documentation=https://github.com/iFurySt/nomi
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/opt/nomi/.env
+WorkingDirectory=/opt/nomi
+ExecStart=/usr/bin/seedx daemon connect --server-url http://127.0.0.1:8088 --api-key ${NOMI_SEEDX_API_KEY} --asset-host https://nomi.ifuryst.com
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
