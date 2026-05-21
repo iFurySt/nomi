@@ -1817,23 +1817,18 @@ private struct RecordThumb: View {
     private var thumbContent: some View {
         switch visual {
         case .image(let url):
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                case .failure:
-                    imageFallback
-                case .empty:
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(hex: 0xf2f2f1))
-                @unknown default:
-                    imageFallback
-                }
+            CachedRemoteImage(url: url) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } loading: {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(hex: 0xf2f2f1))
+            } failure: {
+                imageFallback
             }
         case .symbol(let symbol, let background):
             ZStack {
