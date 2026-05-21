@@ -204,7 +204,6 @@ private struct NomiRecord: Identifiable, Equatable {
     let dateLabel: String
     let title: String
     let summary: String
-    let source: String?
     let tag: RecordFilter
     let visual: Visual
     let status: String
@@ -1134,13 +1133,6 @@ private struct FullRecordRow: View {
 
             Spacer(minLength: 8)
 
-            if let source = record.source {
-                Text(source)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(Color(hex: 0x9a9a9a))
-                    .lineLimit(1)
-            }
-
             RecordStatusBadge(status: record.status)
 
             TagPill(record.tag)
@@ -1968,7 +1960,6 @@ private extension NomiRecord {
             dateLabel: savedRecord.dateLabel,
             title: savedRecord.title.isEmpty ? "健康记录" : savedRecord.title,
             summary: savedRecord.detailLine.isEmpty ? savedRecord.summary : savedRecord.detailLine,
-            source: savedRecord.source == "macos-file" ? "来自本机文件" : nil,
             tag: tag,
             visual: savedRecord.imageURL.map(NomiRecord.Visual.image) ?? .symbol(savedRecord.symbolName, Color(hex: 0xf2f2f1)),
             status: savedRecord.status,
