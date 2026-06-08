@@ -23,7 +23,7 @@
 - `docs/PRODUCT_SENSE.md`：产品价值、取舍方式和优先级判断。
 - `docs/RELIABILITY.md`：运行稳定性、观测性和上线前的基本要求。
 - `docs/SECURITY.md`：认证、数据处理、外部集成等安全默认约束。
-- `docs/SUPPLY_CHAIN_SECURITY.md`：依赖、SBOM、制品 provenance 和仓库级供应链安全默认做法。
+- `docs/SUPPLY_CHAIN_SECURITY.md`：依赖、SBOM、制品 provenance 和仓库级供应链安全约束。
 - `docs/CICD.md`：仓库的 CI/CD 骨架以及后续如何接入真实项目。
 - `docs/DEPLOYMENT.md`：server 发版、GHCR 镜像和 amoylab `/opt/nomi` 部署流程。
 - `docs/IOS_TESTFLIGHT_RELEASE.md`：iOS TestFlight 手动发布、Apple signing、App Store Connect 和本机 secret 存放流程。

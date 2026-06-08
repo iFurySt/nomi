@@ -1,6 +1,6 @@
 # 安全默认约束
 
-这份文档用于把安全默认值讲清楚，避免实现逐步演进时越走越散。仓库级的依赖、SBOM 和 provenance 默认能力，统一写在 `docs/SUPPLY_CHAIN_SECURITY.md`。
+这份文档用于把安全默认值讲清楚，避免实现逐步演进时越走越散。仓库级的依赖、SBOM 和 provenance 要求统一写在 `docs/SUPPLY_CHAIN_SECURITY.md`。
 
 ## 数据分级
 
