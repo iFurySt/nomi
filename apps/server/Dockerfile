@@ -16,9 +16,9 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
 
 FROM alpine:3.22
 
-RUN apk add --no-cache ca-certificates su-exec wget \
+RUN apk add --no-cache ca-certificates git poppler-utils su-exec wget \
     && adduser -D -H -u 10001 nomi \
-    && mkdir -p /var/lib/nomi/uploads \
+    && mkdir -p /var/lib/nomi/assets /var/lib/nomi/workspaces \
     && chown -R nomi:nomi /var/lib/nomi
 
 COPY --from=build /out/nomi-server /usr/local/bin/nomi-server

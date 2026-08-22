@@ -4,6 +4,7 @@
 
 ## 当前规格
 
+- [Nomi 家庭健康资料 Private Beta](./family-private-beta.md)：当前最高优先级，定义家庭身份、资料归属、文件系统 Agent 工作流、mobile 上传与聊天闭环。
 - [Nomi / 知己 MVP 产品规格](./nomi-mvp.md)：定义个人身体与生活记录 App 的品牌定位、非医疗边界、MVP 功能、核心屏幕、数据模型、AI 行为和隐私要求。
 
 ## 编写约定

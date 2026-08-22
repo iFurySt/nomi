@@ -44,7 +44,7 @@ PRODUCT_BUNDLE_IDENTIFIER = com.ifuryst.nomi
 
 ```sh
 curl --noproxy '*' -fsS https://nomi.ifuryst.com/health
-curl --noproxy '*' -fsS https://nomi.ifuryst.com/records
+test "$(curl --noproxy '*' -sS -o /dev/null -w '%{http_code}' https://nomi.ifuryst.com/v1/people)" = 401
 ```
 
 1. 更新 iOS build number。

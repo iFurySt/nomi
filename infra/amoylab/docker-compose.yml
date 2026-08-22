@@ -5,20 +5,23 @@ services:
     restart: unless-stopped
     environment:
       NOMI_SERVER_ADDR: ":8088"
-      NOMI_IMAGE_STORAGE_DIR: ${NOMI_IMAGE_STORAGE_DIR:-/var/lib/nomi/uploads}
-      NOMI_PUBLIC_BASE_URL: ${NOMI_PUBLIC_BASE_URL:-https://nomi.ifuryst.com}
+      NOMI_DATA_ROOT: /var/lib/nomi
+      NOMI_AGENT_WORKSPACE_ROOT: /opt/nomi/data/workspaces
       NOMI_DATABASE_URL: ${NOMI_DATABASE_URL:?set NOMI_DATABASE_URL}
       NOMI_SEEDX_API_KEY: ${NOMI_SEEDX_API_KEY:?set NOMI_SEEDX_API_KEY}
+      NOMI_BOOTSTRAP_INVITE_CODE: ${NOMI_BOOTSTRAP_INVITE_CODE:?set NOMI_BOOTSTRAP_INVITE_CODE}
+      NOMI_ASSET_SIGNING_KEY: ${NOMI_ASSET_SIGNING_KEY:?set NOMI_ASSET_SIGNING_KEY}
+      NOMI_SESSION_DURATION: ${NOMI_SESSION_DURATION:-720h}
+      NOMI_SEEDX_CODEX_MODEL: ${NOMI_SEEDX_CODEX_MODEL:-}
+      NOMI_SEEDX_CODEX_REASONING_EFFORT: ${NOMI_SEEDX_CODEX_REASONING_EFFORT:-low}
+      NOMI_SEEDX_COMMAND_TIMEOUT: ${NOMI_SEEDX_COMMAND_TIMEOUT:-5m}
     networks:
       - default
       - postgres
     ports:
       - "127.0.0.1:${NOMI_SERVER_PORT:-8088}:8088"
     volumes:
-      - uploads:${NOMI_IMAGE_STORAGE_DIR:-/var/lib/nomi/uploads}
-
-volumes:
-  uploads:
+      - /opt/nomi/data:/var/lib/nomi
 
 networks:
   postgres:

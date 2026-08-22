@@ -1,23 +1,15 @@
 # 质量评分
 
-用这份文档按产品区域和架构层次记录当前质量水位，方便持续知道最薄弱的地方在哪。
+评分：A=完整稳定；B=可用但有明确短板；C=能跑但需补强；D=脆弱或未定义。
 
-## 建议的评分标准
-
-- `A`：覆盖完整、行为稳定、文档清楚、运行风险低。
-- `B`：整体可接受，但还有明确短板。
-- `C`：能用，但需要针对性补强。
-- `D`：脆弱、缺少规范，或很多行为尚未定义。
-
-## 当前评分
-
-| 区域 | 评分 | 原因 | 下一步 |
+| 区域 | 评分 | 当前证据 | 主要短板 |
 | --- | --- | --- | --- |
-| 产品面 | B | 已有 Nomi MVP spec、非医疗边界、设计原则和原生 iOS skeleton，capture 结果会写入 server records 并在下次启动恢复；图片文件已由 server 落盘，并提供本地预览读取入口；macOS 默认进入记录页，记录列表已提供删除入口，空态支持多图片 / PDF 拖入导入识别，并会在前台恢复、切回概览 / 记录页和停留相关页面时静默同步 records。 | 下一步补图片文件级删除能力和用户可见隐私说明。 |
-| 架构文档 | B | 已替换为 Nomi 的 mobile / server / Postgres 目标结构，明确复用本机 `seedx` CLI daemon，并记录 SeedX/Codex 图片 AI extraction contract；生产环境通过 public image URL 让 SeedX 本机 materialize，避免 server 容器 path 泄漏到远端 daemon。 | 继续把 SeedX run / remote image asset 的验证入口沉淀成更稳定的回归脚本，并在 SeedX daemon 能稳定回传 structured output 后再接回 `outputSchema`。 |
-| 前端 | B | 原生 SwiftUI iOS app skeleton 已成为唯一移动端实现，覆盖 home-only 首页真实空态、从真实 timeline items 派生的今日健康数据总览、黑白灰语义色、统一 Dynamic Type 字体 token、低装饰紧凑 timeline、原生 `TabView` / `TabRole.search` Liquid Glass 双分组底栏、Add 上拉系统 sheet、My 页中文语言切换、Photos / Files 选择边界、server image extraction adapter、Debug 本地 API / Release 线上 API 切换和 Liquid Glass 风格动画；macOS 已按 Figma MVP 还原健康看板、记录列表详情、添加记录 overlay 和保留 sidebar 的记录放大页，sidebar 收敛为 Landmarks-style 系统 `List(selection:)`，并继续复用 server records / image extraction API；桌面端默认进入 records，空态支持多文件拖拽导入，records 具备基础前台 / 切页 / 周期同步刷新，record 图片预览会落到 app 专属本地缓存，避免重复网络加载。 | 继续补桌面端自动化 UI 测试、真实图片资源读取、真实 camera、真实模型更多异常态和更细的 UI 自动化测试。 |
-| 测试 | B | Server image extraction 单测、SeedX daemon command 单测和本地多图 Photos / Files endpoint smoke 已覆盖；原生 iOS 已通过 iPhone 17 Pro simulator build / install / launch、首页 / 上传 sheet / 底部双分组截图 smoke、真实 PhotosPicker / fileImporter XCUITest 上传到 Today timeline、底部 Add / My / 语言 sheet 入口 XCUITest，以及 simulator-only `NOMI_E2E_AUTO_UPLOADS` AI path smoke。 | 增加 camera capture 真机链路、Postgres 集成测试、真实 Codex 多图回归集和仓库级 mobile check 命令。 |
-| 后端 | B | Go server 可启动，health、records、Ask boundary、`POST /ai/extract-image` 图片 / PDF 落盘、`GET /images/...` 本地预览读取、`DELETE /records/{id}` 记录删除、SeedX/Codex `method:"run"` 调度、本地开发 localImage fallback、生产 public image URL + size/hash 资产输入、Postgres record persistence 和 SeedX `/daemon/connect` endpoint 已落地；SeedX websocket 支持 Bearer API key。 | 补 records / Ask 用户认证、Postgres 集成测试、上传文件删除、CORS 和更完整请求审计。 |
-| 部署 | B | Server 已有 Dockerfile、amoylab Compose 模板、`server-v*` tag 触发的 GHCR 镜像发布和受限 SSH 自动部署链路；amoylab 宿主机已通过 `nomi-seedx.service` 常驻运行 SeedX 0.2.1 + Codex，并直接连接容器暴露到 loopback 的 Nomi server websocket；iOS 已有手动 TestFlight archive/upload 流程和 App Store Connect 记录；amoylab 默认只本机暴露未认证 API。 | 补公开访问前的认证 / 反向代理 / TLS，把部署健康检查继续沉淀到更完整的 smoke；后续需要时再把 iOS TestFlight 从本机手动流程升级为 CI secret 驱动。 |
-| 可观测性 | C | Server 已使用 Zap 日志，websocket smoke 能看到 connected / sent / received。 | 补 metrics / traces、websocket 指标和结构化 request id。 |
-| 安全 | C | 已明确敏感数据、本地凭据、AI 阻断、未认证 API 限制，并给 SeedX websocket 补了 API key header 认证。 | 接入真实 API 前补用户认证、请求大小限制、CORS、删除实现和第三方 AI 同意流程。 |
+| 产品 | B | 家庭账号、成员 scope、上传分析和连续对话形成 mobile 闭环。 | 还没有密码找回、导出/彻底删除和用户隐私说明。 |
+| 架构 | B | FS 原件/上下文与 PG 权限/队列/projection 边界明确，StorageProvider 可替换。 | schema migration 仍是启动式，缺正式迁移工具。 |
+| iOS | B | 登录、邀请注册、家庭成员、Photos/Files 上传、job 结果和 chat 已编译并有 auth UI test。 | 需要更多异常态、真实 picker 与远端 authenticated UI 自动化。 |
+| 后端 | B | `/v1` 默认鉴权、tenant scoped CRUD、持久 job queue、workspace git 和 SeedX/Codex 均已实现。 | 缺速率限制、审计表、retry API 与完整删除语义。 |
+| Agent | B | 真实 ingest 37.8 秒、chat 45.8 秒完成，归档/摘要/commit/citations 均有实证。 | SeedX 0.2.1 daemon 的 60 秒硬上限需上游配置化。 |
+| 测试 | B | Go 单测、鉴权默认拒绝、storage traversal、workspace finalization、Swift build 与 auth UI test。 | 缺自动 Postgres 集成测试和 CI 中的真实 SeedX smoke。 |
+| 部署 | B | Docker、bind data、GHCR tag release、nginx、systemd 模板齐全。 | 需要完成本版本远端部署、备份与恢复演练。 |
+| 安全 | B- | bcrypt、hashed opaque sessions、single household bootstrap、一次性邀请、tenant isolation、Keychain。 | 缺 rate limit、邮箱验证、密码重置、设备会话和彻底删除。 |
+| 可观测性 | C | 结构化 job 日志包含 id/kind/household/duration/error。 | 缺 metrics、traces、队列告警和 request id。 |

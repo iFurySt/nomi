@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,576 +16,188 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestHasMedicalIntent(t *testing.T) {
+func TestAllV1RoutesRequireSession(t *testing.T) {
 	t.Parallel()
-
-	if !HasMedicalIntent("Can you diagnose this abnormal result?") {
-		t.Fatal("expected medical intent to be detected")
+	handler := NewHandler(nil, zap.NewNop(), "dev-key")
+	routes := []struct{ method, path string }{
+		{http.MethodPost, "/v1/auth/logout"}, {http.MethodPost, "/v1/household/invites"},
+		{http.MethodGet, "/v1/people"}, {http.MethodPost, "/v1/people"}, {http.MethodPatch, "/v1/people/p1"}, {http.MethodDelete, "/v1/people/p1"},
+		{http.MethodGet, "/v1/assets"}, {http.MethodPost, "/v1/assets"}, {http.MethodGet, "/v1/assets/a1"}, {http.MethodGet, "/v1/assets/a1/content"}, {http.MethodDelete, "/v1/assets/a1"},
+		{http.MethodGet, "/v1/jobs"}, {http.MethodGet, "/v1/jobs/j1"},
+		{http.MethodGet, "/v1/threads"}, {http.MethodPost, "/v1/threads"}, {http.MethodGet, "/v1/threads/t1"}, {http.MethodDelete, "/v1/threads/t1"}, {http.MethodGet, "/v1/threads/t1/messages"}, {http.MethodPost, "/v1/threads/t1/messages"},
+		{http.MethodGet, "/v1/future-route"},
 	}
-
-	if HasMedicalIntent("How much protein did I save this week?") {
-		t.Fatal("did not expect lifestyle record question to be blocked")
+	for _, route := range routes {
+		route := route
+		t.Run(route.method+" "+route.path, func(t *testing.T) {
+			request := httptest.NewRequest(route.method, route.path, nil)
+			response := httptest.NewRecorder()
+			handler.Routes().ServeHTTP(response, request)
+			if response.Code != http.StatusUnauthorized {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+		})
 	}
 }
 
-func TestBuildAskAnswer(t *testing.T) {
+func TestPublicHealthDoesNotRequireUserSession(t *testing.T) {
 	t.Parallel()
-
-	records := []Record{
-		{ID: "rec-1", Type: "food", OccurredAt: time.Date(2026, 5, 6, 8, 0, 0, 0, time.UTC)},
+	handler := NewHandler(nil, zap.NewNop(), "dev-key")
+	request := httptest.NewRequest(http.MethodGet, "/health", nil)
+	response := httptest.NewRecorder()
+	handler.Routes().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d", response.Code)
 	}
-
-	answer := BuildAskAnswer("Should I take medicine?", records)
-	if !answer.Blocked {
-		t.Fatal("expected medical question to be blocked")
+}
+func TestPasswordHashRoundTrip(t *testing.T) {
+	t.Parallel()
+	hash, err := hashPassword("a-strong-family-password")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if len(answer.ReferencedRecordIDs) != 1 || answer.ReferencedRecordIDs[0] != "rec-1" {
-		t.Fatalf("unexpected references: %#v", answer.ReferencedRecordIDs)
+	if !verifyPassword(hash, "a-strong-family-password") {
+		t.Fatal("password did not verify")
 	}
-
-	answer = BuildAskAnswer("What food records did I save?", records)
-	if answer.Blocked {
-		t.Fatal("did not expect normal record question to be blocked")
+	if verifyPassword(hash, "wrong-password-value") {
+		t.Fatal("wrong password verified")
+	}
+}
+func TestParseAgentResult(t *testing.T) {
+	t.Parallel()
+	input := "```json\n" + `{"title":"化验单","answer":"","summary":"已归档","changes":"新增一次检查","current_assessment":"需要继续观察","open_questions":["复查时间？"],"citations":["raw-data/a.pdf"]}` + "\n```"
+	result, err := parseAgentResult(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Title != "化验单" || len(result.Citations) != 1 {
+		t.Fatalf("result=%#v", result)
+	}
+	if err = result.Validate(JobKindIngest); err != nil {
+		t.Fatal(err)
 	}
 }
 
-func TestCreateRecordInputValidate(t *testing.T) {
+func TestParseAgentResultAcceptsTrailingSeedXText(t *testing.T) {
 	t.Parallel()
-
-	input := CreateRecordInput{
-		Type:    "food",
-		Source:  "manual",
-		Title:   "Lunch",
-		Summary: "Rice bowl",
+	input := `{"title":"回答","answer":"第一份完整结果","summary":"","changes":"","current_assessment":"","open_questions":[],"citations":[]}` + "\n" + `{"event":"duplicate transport text"}`
+	result, err := parseAgentResult(input)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := input.Validate(); err != nil {
-		t.Fatalf("expected valid input: %v", err)
-	}
-
-	input.Type = "diagnosis"
-	if err := input.Validate(); err == nil {
-		t.Fatal("expected invalid record type")
+	if result.Answer != "第一份完整结果" {
+		t.Fatalf("result=%#v", result)
 	}
 }
 
-func TestStoredImageFileNameNormalizesUppercaseExtension(t *testing.T) {
+func TestParseAgentResultUsesLatestCompleteSeedXResult(t *testing.T) {
 	t.Parallel()
-
-	name := storedImageFileName("IMG_7605.JPG", "image/jpeg")
-	if strings.Contains(name, ".JPG.jpg") {
-		t.Fatalf("expected uppercase extension to be normalized once: %s", name)
+	input := `{"title":"","answer":"我会先读取资料。","summary":"","changes":"","current_assessment":"","open_questions":[],"citations":[]}` + "\n" + `{"title":"回答","answer":"最终答案","summary":"","changes":"","current_assessment":"","open_questions":[],"citations":["ai-vault/person/index.md"]}`
+	result, err := parseAgentResult(input)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.HasSuffix(name, ".jpg") {
-		t.Fatalf("expected jpg extension: %s", name)
+	if result.Answer != "最终答案" || len(result.Citations) != 1 {
+		t.Fatalf("result=%#v", result)
 	}
 }
 
-func TestStoredFileNameKeepsPDFExtension(t *testing.T) {
+func TestFSStorageRoundTripAndTraversalProtection(t *testing.T) {
 	t.Parallel()
-
-	name := storedImageFileName("Lab Report.PDF", "application/pdf")
-	if !strings.HasSuffix(name, ".pdf") {
-		t.Fatalf("expected pdf extension: %s", name)
+	storage := NewFSStorage(t.TempDir())
+	ctx := context.Background()
+	stored, err := storage.Put(ctx, "households/h1/assets/a.txt", strings.NewReader("sensitive"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if strings.Contains(name, " ") || strings.Contains(name, ".PDF") {
-		t.Fatalf("expected sanitized lowercase pdf name: %s", name)
+	if stored.SizeBytes != 9 {
+		t.Fatalf("size=%d", stored.SizeBytes)
+	}
+	file, err := storage.Open(ctx, stored.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := io.ReadAll(file)
+	file.Close()
+	if string(data) != "sensitive" {
+		t.Fatalf("data=%q", data)
+	}
+	if _, err = storage.Put(ctx, "../escape", bytes.NewReader(nil)); err == nil {
+		t.Fatal("traversal accepted")
+	}
+	if err = storage.Delete(ctx, stored.Key); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = storage.Open(ctx, stored.Key); !os.IsNotExist(err) {
+		t.Fatalf("open deleted err=%v", err)
 	}
 }
 
-func TestServeImageHandler(t *testing.T) {
+func TestWorkspaceInitializesVersionedRulesAndGit(t *testing.T) {
 	t.Parallel()
-
-	dir := t.TempDir()
-	if err := os.MkdirAll(dir+"/2026-05", 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(dir+"/2026-05/sample.jpg", []byte("image-bytes"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	handler := NewHandler(
-		&fakeStore{},
-		zap.NewNop(),
-		"",
-		WithImageStorageDir(dir),
-		WithImageAnalyzer(fakeImageAnalyzer{}),
-	)
-	server := httptest.NewServer(handler.Routes())
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/images/2026-05/sample.jpg")
-	if err != nil {
-		t.Fatalf("get image: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d", resp.StatusCode)
-	}
-	if strings.Contains(resp.Header.Get("Content-Type"), "application/json") {
-		t.Fatalf("unexpected json content type: %s", resp.Header.Get("Content-Type"))
-	}
-	body, err := io.ReadAll(resp.Body)
+	root := t.TempDir()
+	storage := NewFSStorage(filepath.Join(root, "assets"))
+	manager := NewWorkspaceManager(filepath.Join(root, "workspaces"), filepath.Join(root, "workspaces"), storage)
+	workspace, agent, err := manager.Ensure("11111111-1111-4111-8111-111111111111")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(body) != "image-bytes" {
-		t.Fatalf("body = %q", string(body))
+	if workspace != agent {
+		t.Fatalf("paths differ: %q %q", workspace, agent)
 	}
-}
-
-func TestServeImageHandlerUsesHEICDisplayJPEG(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	if err := os.MkdirAll(dir+"/2026-05", 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(dir+"/2026-05/sample.heic", []byte("heic-bytes"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(dir+"/2026-05/sample-seedx.jpg", []byte("jpeg-bytes"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	handler := NewHandler(
-		&fakeStore{},
-		zap.NewNop(),
-		"",
-		WithImageStorageDir(dir),
-		WithImageAnalyzer(fakeImageAnalyzer{}),
-	)
-	server := httptest.NewServer(handler.Routes())
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/images/2026-05/sample.heic")
-	if err != nil {
-		t.Fatalf("get image: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(body) != "jpeg-bytes" {
-		t.Fatalf("body = %q", string(body))
-	}
-}
-
-func TestServeImageHandlerUsesPDFDisplayJPEG(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	if err := os.MkdirAll(dir+"/2026-05", 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(dir+"/2026-05/report.pdf", []byte("pdf-bytes"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(dir+"/2026-05/report-seedx.jpg", []byte("jpeg-preview-bytes"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	handler := NewHandler(
-		&fakeStore{},
-		zap.NewNop(),
-		"",
-		WithImageStorageDir(dir),
-		WithImageAnalyzer(fakeImageAnalyzer{}),
-	)
-	server := httptest.NewServer(handler.Routes())
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/images/2026-05/report.pdf")
-	if err != nil {
-		t.Fatalf("get image: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(body) != "jpeg-preview-bytes" {
-		t.Fatalf("body = %q", string(body))
-	}
-}
-
-func TestExtractImageHandler(t *testing.T) {
-	t.Parallel()
-
-	handler := NewHandler(
-		&fakeStore{},
-		zap.NewNop(),
-		"",
-		WithImageStorageDir(t.TempDir()),
-		WithImageAnalyzer(fakeImageAnalyzer{}),
-	)
-	server := httptest.NewServer(handler.Routes())
-	defer server.Close()
-
-	payload := bytes.NewBufferString(`{"asset_name":"coffee.jpg","source":"library","mime_type":"image/jpeg","image_base64":"aGVsbG8="}`)
-	resp, err := http.Post(server.URL+"/ai/extract-image", "application/json", payload)
-	if err != nil {
-		t.Fatalf("post: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusAccepted {
-		t.Fatalf("status = %d", resp.StatusCode)
-	}
-	var output struct {
-		Record Record `json:"record"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&output); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if output.Record.ID == "" || output.Record.Status != RecordStatusPending || output.Record.ImageURI == "" {
-		t.Fatalf("expected pending uploaded record: %#v", output.Record)
-	}
-	if output.Record.Metadata["analysis_provider"] != "seedx.codex" {
-		t.Fatalf("metadata = %#v", output.Record.Metadata)
-	}
-}
-
-func TestDeleteRecordHandler(t *testing.T) {
-	t.Parallel()
-
-	store := &deleteTrackingStore{}
-	handler := NewHandler(
-		store,
-		zap.NewNop(),
-		"",
-		WithImageStorageDir(t.TempDir()),
-		WithImageAnalyzer(fakeImageAnalyzer{}),
-	)
-	server := httptest.NewServer(handler.Routes())
-	defer server.Close()
-
-	request, err := http.NewRequest(http.MethodDelete, server.URL+"/records/rec-test", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatalf("delete: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("status = %d", resp.StatusCode)
-	}
-	if len(store.deletedIDs) != 1 || store.deletedIDs[0] != "rec-test" {
-		t.Fatalf("deleted ids = %#v", store.deletedIDs)
-	}
-}
-
-func TestDeleteRecordHandlerNotFound(t *testing.T) {
-	t.Parallel()
-
-	handler := NewHandler(
-		&fakeStore{},
-		zap.NewNop(),
-		"",
-		WithImageStorageDir(t.TempDir()),
-		WithImageAnalyzer(fakeImageAnalyzer{}),
-	)
-	server := httptest.NewServer(handler.Routes())
-	defer server.Close()
-
-	request, err := http.NewRequest(http.MethodDelete, server.URL+"/records/missing", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatalf("delete: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("status = %d", resp.StatusCode)
-	}
-}
-
-func TestParseImageExtractionJSONAllowsMarkdownFence(t *testing.T) {
-	t.Parallel()
-
-	extraction, err := ParseImageExtractionJSON("```json\n" + `{
-		"schema_version": "ignored",
-		"direction": "input",
-		"input_category": "food",
-		"output_impacts": ["energy", "health"],
-		"title": "午餐碗",
-		"summary": "画面中可见米饭和蛋白质食物的混合餐。",
-		"confidence": 0.78,
-		"metadata": {
-			"estimated_from": ["image_content"],
-			"calories_kcal": 520
+	for _, relative := range []string{"AGENTS.md", ".gitignore", "docs/ARCHITECTURE.md", "raw-data/_incoming/family", "ai-vault/family", ".git"} {
+		if _, err = os.Stat(filepath.Join(workspace, relative)); err != nil {
+			t.Fatalf("%s: %v", relative, err)
 		}
-	}` + "\n```")
+	}
+	if err = manager.Commit(context.Background(), workspace, "initialize household workspace"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWorkspaceFinalizesIngestWithTraceableContext(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	storage := NewFSStorage(filepath.Join(root, "assets"))
+	stored, err := storage.Put(context.Background(), "households/h1/assets/a1", strings.NewReader("lab result"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if extraction.Title != "午餐碗" || extraction.Metadata.CaloriesKcal != 520 {
-		t.Fatalf("extraction = %#v", extraction)
-	}
-}
-
-func TestParseImageExtractionJSONAllowsNormalizableFields(t *testing.T) {
-	t.Parallel()
-
-	extraction, err := ParseImageExtractionJSON(`{
-		"title": "可见收据"
-	}`)
+	manager := NewWorkspaceManager(filepath.Join(root, "workspaces"), filepath.Join(root, "workspaces"), storage)
+	workspace, _, err := manager.Ensure("11111111-1111-4111-8111-111111111111")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if extraction.Title != "可见收据" || extraction.Summary != "可见收据" {
-		t.Fatalf("extraction = %#v", extraction)
-	}
-	if extraction.InputCategory != "information" {
-		t.Fatalf("input category = %q", extraction.InputCategory)
-	}
-	if got := extraction.Metadata.EstimatedFrom; len(got) != 1 || got[0] != "image_content" {
-		t.Fatalf("estimated_from = %#v", got)
-	}
-}
-
-func TestParseImageExtractionJSONAllowsDocumentMetadata(t *testing.T) {
-	t.Parallel()
-
-	extraction, err := ParseImageExtractionJSON(`{
-		"title": "体检报告",
-		"summary": "一份可见的体检报告，已保存供用户复核。",
-		"input_category": "information",
-		"output_impacts": ["health"],
-		"confidence": 0.72,
-		"metadata": {
-			"document_kind": "checkup_report",
-			"document_date": "2026-05-10",
-			"issuer": "体检机构",
-			"estimated_from": ["image_content"],
-			"review_needed": ["user_review"]
-		}
-	}`)
+	personID := "22222222-2222-4222-8222-222222222222"
+	asset := Asset{ID: "33333333-3333-4333-8333-333333333333", PersonID: &personID, StorageKey: stored.Key, OriginalName: "lab.pdf", MimeType: "application/pdf", SHA256: stored.SHA256, CreatedAt: time.Date(2026, 8, 23, 9, 30, 0, 0, time.FixedZone("CST", 8*60*60))}
+	incoming, err := manager.MaterializeAsset(context.Background(), workspace, asset)
 	if err != nil {
 		t.Fatal(err)
 	}
-	normalized := NormalizeImageExtraction(extraction, StoredImage{MimeType: "application/pdf"})
-	if normalized.Metadata.DocumentKind != "checkup_report" || normalized.Metadata.DocumentDate != "2026-05-10" {
-		t.Fatalf("metadata = %#v", normalized.Metadata)
-	}
-}
-
-func TestParseImageExtractionJSONRequiresTitle(t *testing.T) {
-	t.Parallel()
-
-	if _, err := ParseImageExtractionJSON(`{"summary":"missing title"}`); !errors.Is(err, ErrSeedXInvalidResponse) {
-		t.Fatalf("err = %v", err)
-	}
-}
-
-func TestBuildImageAnalysisInputUsesSeedXLocalImageItem(t *testing.T) {
-	t.Parallel()
-
-	input := BuildImageAnalysisInput(StoredImage{
-		AssetName: "receipt.jpg",
-		Source:    "file",
-		MimeType:  "image/jpeg",
-		Path:      "/tmp/nomi/receipt.jpg",
-		SizeBytes: 42,
-	})
-
-	if len(input) != 2 {
-		t.Fatalf("input = %#v", input)
-	}
-	prompt := input[0].Text
-	if input[0].Type != "text" || input[1].Type != "localImage" {
-		t.Fatalf("input = %#v", input)
-	}
-	if input[1].Path != "/tmp/nomi/receipt.jpg" || input[1].Name != "receipt.jpg" {
-		t.Fatalf("local image item = %#v", input[1])
-	}
-	if strings.Contains(prompt, "/tmp/nomi/receipt.jpg") {
-		t.Fatal("expected prompt to omit local image path")
-	}
-	if !strings.Contains(prompt, "返回内容必须是严格 JSON 对象") {
-		t.Fatal("expected strict JSON output instruction in Chinese")
-	}
-	if !strings.Contains(prompt, "暂时不支持英文输出") {
-		t.Fatal("expected Chinese-only output instruction")
-	}
-	if !strings.Contains(prompt, "绝不诊断") {
-		t.Fatal("expected non-medical boundary in Chinese")
-	}
-	if !strings.Contains(prompt, "发票") || !strings.Contains(prompt, "体检报告") {
-		t.Fatal("expected document classification instructions in Chinese")
-	}
-	if !json.Valid(ImageExtractionOutputSchema()) {
-		t.Fatal("expected valid output schema")
-	}
-}
-
-func TestBuildImageAnalysisInputUsesPublicImageURLWhenConfigured(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	path := dir + "/receipt.jpg"
-	if err := os.WriteFile(path, []byte("jpeg-preview-bytes"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	input, err := buildImageAnalysisInput(StoredImage{
-		AssetName: "receipt.jpg",
-		Source:    "file",
-		MimeType:  "image/jpeg",
-		Path:      path,
-		URI:       "local://images/2026-05/receipt.jpg",
-		SizeBytes: 42,
-	}, "https://nomi.ifuryst.com")
+	archived, err := manager.FinalizeIngest(workspace, asset, incoming, "家庭成员", AgentResult{Title: "检查结果", Summary: "新增检查", Changes: "补充证据", CurrentAssessment: "需要随访", OpenQuestions: []string{"复查时间？"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if len(input) != 2 || input[1].Type != "image" {
-		t.Fatalf("input = %#v", input)
+	if archived != "raw-data/people/22222222-2222-4222-8222-222222222222/2026/08/33333333-3333-4333-8333-333333333333-lab.pdf" {
+		t.Fatalf("archived=%q", archived)
 	}
-	if input[1].URL != "https://nomi.ifuryst.com/images/2026-05/receipt.jpg" || input[1].Path != "" {
-		t.Fatalf("image item = %#v", input[1])
+	if _, err = os.Stat(filepath.Join(workspace, filepath.FromSlash(archived))); err != nil {
+		t.Fatal(err)
 	}
-	if input[1].SizeBytes != int64(len("jpeg-preview-bytes")) || input[1].SHA256 == "" {
-		t.Fatalf("image metadata = %#v", input[1])
+	index, err := os.ReadFile(filepath.Join(workspace, "ai-vault", "people", personID, "index.md"))
+	if err != nil || !strings.Contains(string(index), asset.ID+".md") {
+		t.Fatalf("index=%q err=%v", index, err)
 	}
 }
 
-func TestBuildImageAnalysisInputUsesAnalysisMimeTypeForConvertedPreview(t *testing.T) {
+func TestAgentOutputSchemaIsJSON(t *testing.T) {
 	t.Parallel()
-
-	dir := t.TempDir()
-	path := dir + "/lab-report-seedx.jpg"
-	if err := os.WriteFile(path, []byte("pdf-preview-jpeg-bytes"), 0o600); err != nil {
+	var value map[string]any
+	if err := json.Unmarshal(agentOutputSchema(), &value); err != nil {
 		t.Fatal(err)
 	}
-
-	input, err := buildImageAnalysisInput(StoredImage{
-		AssetName: "lab-report.pdf",
-		Source:    "file",
-		MimeType:  "application/pdf",
-		Path:      path,
-		URI:       "local://images/2026-05/lab-report.pdf",
-		SizeBytes: 4096,
-	}, "https://nomi.ifuryst.com")
-	if err != nil {
-		t.Fatal(err)
+	required, ok := value["required"].([]any)
+	if !ok || len(required) != 7 {
+		t.Fatalf("schema required=%#v", value["required"])
 	}
-
-	if input[1].MimeType != "image/jpeg" {
-		t.Fatalf("mime type = %q", input[1].MimeType)
-	}
-}
-
-type fakeImageAnalyzer struct{}
-
-func (fakeImageAnalyzer) AnalyzeImage(_ context.Context, image StoredImage) (ImageExtraction, error) {
-	return NormalizeImageExtraction(ImageExtraction{
-		Direction:     "input",
-		InputCategory: "caffeine",
-		OutputImpacts: []string{"energy", "focus", "sleep"},
-		Title:         "咖啡",
-		Summary:       "画面中可见一杯咖啡。",
-		Confidence:    0.74,
-		Metadata: ExtractionMetadata{
-			PortionEstimate: "一杯",
-			CaloriesKcal:    30,
-			CaffeineMg:      95,
-			EstimatedFrom:   []string{"image_content"},
-		},
-	}, image), nil
-}
-
-type fakeStore struct{}
-
-func (fakeStore) Ping(context.Context) error {
-	return nil
-}
-
-func (fakeStore) EnsureSchema(context.Context) error {
-	return nil
-}
-
-func (fakeStore) ListRecords(context.Context) ([]Record, error) {
-	return nil, nil
-}
-
-func (fakeStore) CreateRecord(_ context.Context, input CreateRecordInput) (Record, error) {
-	now := time.Now()
-	status := input.Status
-	if status == "" {
-		status = RecordStatusCompleted
-	}
-	return Record{
-		ID:         "rec-test",
-		Type:       input.Type,
-		Status:     status,
-		OccurredAt: now,
-		CreatedAt:  now,
-		Source:     input.Source,
-		Title:      input.Title,
-		Summary:    input.Summary,
-		RawText:    input.RawText,
-		ImageURI:   input.ImageURI,
-		Metadata:   input.Metadata,
-		Confidence: input.Confidence,
-	}, nil
-}
-
-func (fakeStore) DeleteRecord(_ context.Context, id string) (bool, error) {
-	return id == "rec-test", nil
-}
-
-type deleteTrackingStore struct {
-	fakeStore
-	deletedIDs []string
-}
-
-func (s *deleteTrackingStore) DeleteRecord(_ context.Context, id string) (bool, error) {
-	s.deletedIDs = append(s.deletedIDs, id)
-	return true, nil
-}
-
-func (fakeStore) UpdateRecordStatus(_ context.Context, id string, status string, metadata map[string]string) (Record, error) {
-	now := time.Now()
-	return Record{
-		ID:         id,
-		Type:       "document",
-		Status:     status,
-		OccurredAt: now,
-		CreatedAt:  now,
-		Source:     "macos-file",
-		Title:      "文件识别中",
-		Summary:    "已上传，等待 Nomi server 通过 SeedX 识别。",
-		ImageURI:   "local://images/test.jpg",
-		Metadata:   metadata,
-	}, nil
-}
-
-func (fakeStore) CompleteRecordWithExtraction(_ context.Context, id string, extraction ImageExtraction, image StoredImage) (Record, error) {
-	now := time.Now()
-	confidence := extraction.Confidence
-	return Record{
-		ID:         id,
-		Type:       recordTypeForInputCategory(extraction.InputCategory),
-		Status:     RecordStatusCompleted,
-		OccurredAt: now,
-		CreatedAt:  now,
-		Source:     image.Source,
-		Title:      extraction.Title,
-		Summary:    extractionSummary(extraction),
-		RawText:    extraction.Summary,
-		ImageURI:   image.URI,
-		Metadata:   extractionRecordMetadata(extraction, image),
-		Confidence: &confidence,
-	}, nil
 }

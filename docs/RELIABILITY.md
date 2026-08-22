@@ -1,40 +1,45 @@
 # 稳定性与可运维性
 
-这里定义 Nomi 当前运行质量底线。CI/CD 流程结构和 release 自动化的默认方案，统一写在 `docs/CICD.md`。
-
 ## Server
 
-- Go server 必须提供 `GET /health`。
-- `GET /health` 返回 server 状态和 Postgres ping 状态。
-- 本地启动命令：`cd apps/server && go run ./cmd/nomi-server --addr :8088`。
-- 本地测试命令：`cd apps/server && go test ./...`。
-- 默认读取 `NOMI_SERVER_ADDR`、`NOMI_DATABASE_URL` 和 `NOMI_SEEDX_API_KEY`，命令行 flag 可覆盖。
-- 图片上传读取 `NOMI_IMAGE_STORAGE_DIR`、`NOMI_SEEDX_COMMAND_TIMEOUT`、`NOMI_SEEDX_CODEX_MODEL` 和 `NOMI_SEEDX_CODEX_REASONING_EFFORT`；本地默认把图片落到 `.nomi/uploads`，amoylab 生产环境通过 Compose 命名卷挂载 `/var/lib/nomi/uploads`，SeedX/Codex command 超时 2 分钟。
-- SeedX websocket endpoint：`GET /daemon/connect`；`GET /seedx/ws` 仅保留为旧 smoke 兼容路径。
+- `GET /health` 同时报告 server 与 Postgres 状态。
+- 启动时自动创建 V1 schema；当前从旧 records 版本升级是有意的破坏性迁移。
+- HTTP 使用 5 秒 header timeout、70 秒 read timeout、10 分钟 write timeout和 10 秒优雅退出。
+- Zap 日志记录 job id、kind、household id、耗时和稳定错误；不得记录 token、原始资料内容或 Codex auth。
 
-## SeedX
+## 持久任务
 
-- Nomi 不维护独立 daemon，使用本机 `seedx` CLI 的 `seedx daemon connect`。
-- 本地启动命令：先启动 Nomi server，再运行 `seedx daemon connect --server-url http://localhost:8088 --api-key dev_seedx_key`。`--once` 只适合验证 hello，不能处理图片分析。
-- 图片分析使用 SeedX daemon `daemon:command` / `method:"run"`，runtime 为 `codex`；server 发送 Codex v2 `input`，其中包含严格 JSON text prompt。生产环境配置 `NOMI_PUBLIC_BASE_URL` 后，图片作为 `{ "type": "image", "url": "https://.../images/..." }` 加 size/hash 元数据发送，让 SeedX 在用户机器本地 materialize；本地同机开发未配置 public base URL 时仍可使用 `{ "type": "localImage", "path": "..." }`。
-- 如果 Nomi smoke 发现 `seedx` CLI 能力缺口或行为问题，记录在当轮 history / issue 里，用于驱动 SeedX 上游修改。
-- SeedX 长运行模式负责断线 backoff 重连；`--once` 用于 hello smoke 和 CI 风格验证。
+- job 状态为 `queued`、`processing`、`completed`、`failed`。
+- worker 用数据库 claim 和 `SKIP LOCKED`，启动时回收超过 10 分钟的 processing job。
+- 原件 materialize 与最终归档按 asset ID 幂等；ai-vault index 不重复追加同一 asset。
+- `raw-data/_incoming` 被 git ignore，失败任务不会被后续无关 commit 带入历史。
+- 当前失败任务不会自动无限重试，用户可看到稳定错误；后续应增加显式 retry API 和退避策略。
 
-## 日志
+## SeedX/Codex
 
-- Server 使用 Zap structured logs。
-- 启动时记录监听地址。
-- healthcheck 数据库失败记录 warn。
-- record / ask 持久化或读取失败记录 error，并向客户端返回稳定错误码。
-- Websocket smoke 只在连接、断开和异常等关键节点记录日志；常规 `daemon:hello`、`daemon:ping`、`daemon:pong` 不逐条打 info，日志不得输出 API key。
+- `seedx daemon connect` 由 systemd 常驻并自动重启。
+- Nomi 默认 `low` reasoning effort；真实 smoke 中 ingest 和 chat 均在 SeedX 0.2.1 的 60 秒 daemon 上限内完成。
+- Nomi 的 `NOMI_SEEDX_COMMAND_TIMEOUT` 是服务端等待上限；SeedX 0.2.1 仍有独立 60 秒内部上限，两者不能混为一谈。
+- daemon 不在线时 job 明确失败为 `seedx_unavailable`，不会伪造分析。
 
-## Timeout
+## 数据与恢复
 
-- HTTP server 设置 `ReadHeaderTimeout` 为 5 秒。
-- 优雅退出使用 5 秒 shutdown timeout。
+- `/opt/nomi/data` bind mount 同时保存 assets 和 household workspaces；Postgres 独立持久化。
+- 发布前后要验证 data bind、workspace cwd 和容器 UID 写权限。
+- 备份必须同时覆盖 Postgres 与 `/opt/nomi/data`，并以同一恢复点为目标。
+
+## 验证
+
+```sh
+cd apps/server && go test ./...
+make ci
+curl -fsS https://nomi.ifuryst.com/health
+ssh amoylab 'systemctl is-active nomi-seedx.service'
+ssh amoylab 'docker logs --since 10m nomi-server'
+```
 
 ## 当前短板
 
-- 还没有 metrics / traces。
-- 还没有 metrics / traces 中的 websocket 指标。
-- 还没有 CI 中的 Postgres 集成测试。
+- 缺 Postgres 自动集成测试、metrics、traces、queue depth/age 指标和告警。
+- 缺生产备份恢复演练与 job 手工 retry 管理面。
+- SeedX daemon command timeout 需要上游配置化。

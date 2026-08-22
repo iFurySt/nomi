@@ -16,6 +16,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var ErrSeedXUnavailable = errors.New("seedx_unavailable")
+
 type SeedXEvent struct {
 	ID        string         `json:"id"`
 	Type      string         `json:"type"`

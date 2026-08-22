@@ -1,40 +1,41 @@
 # 安全默认约束
 
-这份文档用于把安全默认值讲清楚，避免实现逐步演进时越走越散。仓库级的依赖、SBOM 和 provenance 要求统一写在 `docs/SUPPLY_CHAIN_SECURITY.md`。
+Nomi 处理真实家庭健康资料，默认按高敏感个人数据对待。
 
-## 数据分级
+## 身份与授权
 
-- Nomi records、图片、提取文本、Ask 问题和回答都按敏感个人数据处理。
-- 当前本地开发数据只允许保存在本机 Postgres、`NOMI_IMAGE_STORAGE_DIR` 图片目录或 mobile 本地状态里。
-- 提交 history、截图和日志时不得包含真实用户身体数据、体检单、图片原件或身份信息。
+- iOS 不持有服务端共享 secret；用户使用邮箱密码登录，密码以 bcrypt hash 保存。
+- session token 使用 CSPRNG 生成，只把 SHA-256 hash 存入 Postgres；客户端原 token 存入 iOS Keychain。
+- `/v1/*` 在顶层默认鉴权，handler 从服务端 session 取得 `household_id`，不得信任客户端传入 household ID。
+- bootstrap code 只能创建全实例第一个 household，并通过 Postgres advisory lock 防并发重复创建。
+- owner 生成的家庭邀请为随机、七天过期、一次性 token；只有 owner 可创建。
+- SeedX daemon 使用独立 Bearer key；该 key 不等同用户 session。
 
-## 本地凭据
+## 数据隔离与存储
 
-- `postgres://bytedance:bytedance@localhost:5432/nomi?sslmode=disable` 只用于本地开发。
-- 共享、staging、production 环境必须通过环境变量或密钥管理系统提供 `NOMI_DATABASE_URL`。
-- amoylab 的真实 `NOMI_DATABASE_URL`、数据库密码和 SeedX key 只允许存在于 `/opt/nomi/.env` 或密钥系统，不写入仓库。
-- SeedX daemon API key 通过 `NOMI_SEEDX_API_KEY` 或 `--seedx-api-key` 配置，真实 key 不得写入 README、history、日志或 URL。
-- 上传图片默认落在 `.nomi/uploads` 或 `NOMI_IMAGE_STORAGE_DIR`，不得把真实用户图片、完整本地图片路径或图片中的敏感文本写入 history、截图和普通日志。
-- 生产环境给 SeedX daemon 的图片输入使用 `NOMI_PUBLIC_BASE_URL` 下的 `/images/...` HTTPS 资产 URL，不把 server 容器内本地 path 发送给远端 SeedX。SeedX API key 和图片 URL 不应出现在普通日志里。
-- Apple Developer / App Store Connect 的真实 `.p8`、`.p12`、provisioning profile 和 app-specific password 不得写入仓库；如必须本机留存，只能放到已被 `.gitignore` 忽略的 `.harness/secret/apple/`。
-- 不要把真实数据库 URL、SeedX token、云端 websocket endpoint secret、Apple signing secret 写入仓库。
+- Store 的 people、assets、jobs、threads、messages 查询必须带 household scope；跨家庭对象对外表现为 `404`。
+- 每个家庭使用独立 workspace cwd，opaque UUID 作为目录名；路径输入必须阻止 `..`、绝对路径和分隔符穿越。
+- 上传默认上限 64 MiB；nginx 与 server 都必须限制请求体。
+- 原始对象由 `StorageProvider` 保存；当前 `/opt/nomi/data` 只允许 root 与 Nomi 服务账户访问。
+- `raw-data/_incoming` 不进入 git；成功归档后才提交稳定 raw-data 和 ai-vault 文件。
+- 删除 asset 当前会删除 Postgres projection 和 provider 对象，但已经进入版本化 workspace 的归档仍需独立的受审计删除流程；这是 private beta 的已知限制。
+
+## 凭据
+
+- 生产的数据库 URL、SeedX key、bootstrap code、asset signing key 只放 `/opt/nomi/.env` 或 secret manager。
+- Codex auth 只放 amoylab root 的 Codex home，权限必须为 root-only；不得写入镜像、仓库、日志或 history。
+- Apple 签名密钥、profile 与 App Store Connect secret 不写仓库。
+- 外部分享日志、截图或 workspace 前必须另做脱敏副本。
 
 ## AI 边界
 
-- Ask 和 extraction 只能做记录整理、趋势回顾和有来源的回答。
-- 医疗诊断、治疗、药物、剂量、急症、疾病风险和异常判断必须阻断。
-- 当前图片 extraction 会通过 SeedX 调用用户本机 Codex runtime；server 只向 SeedX 发送本机图片路径和结构化 prompt，不把图片 base64 放进日志或 prompt。prompt 必须要求不诊断、不治疗、不输出敏感标识符，并只返回结构化 JSON。若未来改为第三方云端 AI 服务，必须先补用户可见隐私说明和同意流程。
+- Agent 必须区分原始事实、推断和不确定性，并为个人事实提供 workspace 相对路径引用。
+- 不诊断、不处方、不调整药量、不替代急救或医生。
+- Agent cwd 只指向一个 household workspace；prompt 不携带 session、密码或服务端 secret。
+- 当前使用个人 Codex ChatGPT 登录态只适用于受信任家庭 private beta；扩大用户范围前要切换独立 provider、补同意、成本、保留期和审计策略。
 
-## API
+## 当前安全债务
 
-- 当前 records / Ask API 尚未实现用户认证；`nomi.ifuryst.com` 已通过 nginx / TLS 暴露到公网，接入真实用户前必须补 API 认证、授权和审计。
-- amoylab Docker Compose 只把 server 绑定到 `127.0.0.1:8088`，公网流量统一经 nginx 转发。
-- SeedX websocket 在配置 `NOMI_SEEDX_API_KEY` 后要求 WebSocket 握手带 `Authorization: Bearer ...`，兼容 `seedx daemon connect --api-key`；API key 不放在 URL query。
-- 接入真实 mobile client 或云端前必须增加认证、授权、请求大小限制、CORS 策略和审计日志。
-- Websocket origin check 允许非浏览器 daemon client；浏览器来源必须同 host 或本地开发 host。云端模式还需要补租户绑定、短期凭据轮换和审计。
-
-## 部署 SSH
-
-- GitHub Actions 到 amoylab 使用专用 `nomi-deploy` key，不复用个人 root key。
-- amoylab `authorized_keys` 使用 forced command 进入 `/usr/local/bin/nomi-deploy-ssh`，只允许固定的部署和健康检查命令。
-- `nomi-deploy` 用户不加入 docker group；需要 root 的 Docker 操作通过 sudo 限定到固定 `/usr/local/sbin/nomi-deploy-root` 脚本。
+- 还没有登录速率限制、密码重置、邮箱验证、会话设备管理和安全事件审计表。
+- 还没有完整的家庭资料导出/彻底删除工作流。
+- 还没有 KMS/对象存储加密与备份恢复演练。
