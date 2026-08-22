@@ -24,6 +24,7 @@
 - 部署 `server-v0.2.0` 后更新了失效的服务器 Codex auth，并将 Codex CLI 固定到已验证版本；线上 smoke 进一步促成 chat citations 的确定性 workspace index 兜底。
 - `server-v0.2.1` 线上 smoke 验证通过并清理临时家庭；iPhone 17 Pro simulator 的 authenticated XCUITest 验证了资料、对话和家庭三页。
 - iOS `0.1 (4)` Release archive 已完成；首次 TestFlight 上传因本机 Xcode Apple ID 会话过期而停止，重新登录后可复用 archive 继续上传。
+- 收口核验发现 SeedX machine key 会出现在宿主机进程参数中；已立即轮换线上 key 并重建 server、重启 daemon，随后重新验证 HTTPS health、container health 与 daemon connection。后续排障不得直接输出完整进程参数。
 
 ### 🧠 Design Intent (Why)
 
