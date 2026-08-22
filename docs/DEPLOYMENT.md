@@ -12,6 +12,8 @@ Nomi server 部署在 `amoylab:/opt/nomi`，GitHub Actions 在 `server-v*` tag �
 - SeedX：宿主机 root 的 `nomi-seedx.service`
 - Codex：宿主机 root 的 Codex home 与 ChatGPT 登录态
 
+2026-08-23 线上验证版本为 SeedX `0.2.1`、Codex CLI `0.149.0`。Codex 版本固定升级是为了兼容当前模型目录 schema；升级后必须重启 `nomi-seedx.service` 并跑实际 turn，不能只看 `codex login status`。
+
 容器内 workspace 是 `/var/lib/nomi/workspaces/<household>`；发送给宿主机 Codex 的 cwd 是 `/opt/nomi/data/workspaces/<household>`。两者必须指向同一个 bind mount。
 
 ## 必需环境变量

@@ -159,6 +159,11 @@ func (w *JobWorker) processChat(ctx context.Context, job Job, workspace, agentCW
 	if err != nil {
 		return AgentResult{}, err
 	}
+	if len(result.Citations) == 0 {
+		if citation := w.workspace.ExistingContextPath(workspace, thread.PersonID); citation != "" {
+			result.Citations = []string{citation}
+		}
+	}
 	citations, _ := json.Marshal(result.Citations)
 	_, err = w.store.CreateMessage(ctx, Message{HouseholdID: job.HouseholdID, ThreadID: thread.ID, Role: "assistant", Content: result.Answer, Citations: citations, Status: "completed"})
 	return result, err

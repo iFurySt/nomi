@@ -21,6 +21,7 @@
 - 重做 iOS 为登录/邀请、资料、对话、家庭三页 mobile flow，session 存 Keychain，支持照片、PDF、文件上传。
 - 更新生产 data bind、配置和 systemd 边界，并同步架构、安全、稳定性、前端、部署、质量与发布文档。
 - 使用非健康测试图片完成真实 SeedX/Codex ingest 与 chat smoke；未把测试账号、token、密钥或原始运行日志写入仓库。
+- 部署 `server-v0.2.0` 后更新了失效的服务器 Codex auth，并将 Codex CLI 固定到已验证版本；线上 smoke 进一步促成 chat citations 的确定性 workspace index 兜底。
 
 ### 🧠 Design Intent (Why)
 

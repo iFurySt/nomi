@@ -188,6 +188,13 @@ func TestWorkspaceFinalizesIngestWithTraceableContext(t *testing.T) {
 	if err != nil || !strings.Contains(string(index), asset.ID+".md") {
 		t.Fatalf("index=%q err=%v", index, err)
 	}
+	if got := manager.ExistingContextPath(workspace, &personID); got != "ai-vault/people/22222222-2222-4222-8222-222222222222/index.md" {
+		t.Fatalf("context path=%q", got)
+	}
+	missingID := "44444444-4444-4444-8444-444444444444"
+	if got := manager.ExistingContextPath(workspace, &missingID); got != "" {
+		t.Fatalf("missing context path=%q", got)
+	}
 }
 
 func TestAgentOutputSchemaIsJSON(t *testing.T) {

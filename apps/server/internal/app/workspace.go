@@ -129,6 +129,15 @@ func (m *WorkspaceManager) ContextPath(personID *string) string {
 	return filepath.ToSlash(filepath.Join("ai-vault", "people", *personID, "index.md"))
 }
 
+func (m *WorkspaceManager) ExistingContextPath(workspace string, personID *string) string {
+	relative := m.ContextPath(personID)
+	info, err := os.Stat(filepath.Join(workspace, filepath.FromSlash(relative)))
+	if err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	return relative
+}
+
 func (m *WorkspaceManager) FinalizeIngest(workspace string, asset Asset, incoming, personName string, result AgentResult) (string, error) {
 	subject := "family"
 	if asset.PersonID != nil {
