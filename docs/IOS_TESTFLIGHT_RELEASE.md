@@ -53,7 +53,7 @@ test "$(curl --noproxy '*' -sS -o /dev/null -w '%{http_code}' https://nomi.ifury
 
 ```text
 MARKETING_VERSION = 0.1
-CURRENT_PROJECT_VERSION = 3
+CURRENT_PROJECT_VERSION = 4
 ```
 
 1. 先跑本地验证。

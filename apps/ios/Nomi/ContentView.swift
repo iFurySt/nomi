@@ -16,7 +16,14 @@ final class NomiAppModel: ObservableObject {
     @Published var isBusy = false
     @Published var errorMessage: String?
 
-    init() { session=SessionKeychain.load() }
+    init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["NOMI_UI_TEST_RESET_SESSION"] == "1" {
+            SessionKeychain.delete()
+        }
+        #endif
+        session=SessionKeychain.load()
+    }
     var token: String? { session?.token }
 
     func login(email:String,password:String) async { await authenticate { try await NomiAPIClient.login(email:email,password:password) } }

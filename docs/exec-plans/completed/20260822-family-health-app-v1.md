@@ -54,8 +54,8 @@
 - [x] 完成 server domain/schema/auth。
 - [x] 完成 storage/workspace/job/SeedX-Codex ingest/chat。
 - [x] 完成 iOS 核心流程。
-- [ ] 完成 amoylab 部署和 simulator E2E。
-- [ ] 完成文档、history、release、提交和 plan 归档。
+- [x] 完成 amoylab 部署和 simulator E2E。
+- [x] 完成文档、history、release、提交和 plan 归档。
 
 ## 决策记录
 
@@ -67,3 +67,5 @@
 - 2026-08-22：当前 Codex 登录态只服务受信任家庭 private beta；扩大范围前必须切换为可运营的独立模型 provider 配置。
 - 2026-08-23：SeedX 0.2.1 daemon 的内部 command timeout 固定为 60 秒。Nomi 将归档、index 和 git commit 改为 Go 的确定性步骤，Codex 只做结构化分析；默认 effort 改为 low。真实 ingest 37.8 秒、chat 45.8 秒完成。
 - 2026-08-23：bootstrap code 只允许创建全实例第一个家庭；owner 在 iOS 家庭页生成七天过期、一次性的邀请码。
+- 2026-08-23：`server-v0.2.1` 已部署 amoylab；线上非健康 smoke 完成 ingest、chat、answer 和 citations 验证，随后测试家庭已清空并保留 root-only 可恢复快照。
+- 2026-08-23：本地 iPhone 17 Pro simulator 的 authenticated XCUITest 已验证资料、对话和家庭三页导航。

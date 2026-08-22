@@ -22,6 +22,8 @@
 - 更新生产 data bind、配置和 systemd 边界，并同步架构、安全、稳定性、前端、部署、质量与发布文档。
 - 使用非健康测试图片完成真实 SeedX/Codex ingest 与 chat smoke；未把测试账号、token、密钥或原始运行日志写入仓库。
 - 部署 `server-v0.2.0` 后更新了失效的服务器 Codex auth，并将 Codex CLI 固定到已验证版本；线上 smoke 进一步促成 chat citations 的确定性 workspace index 兜底。
+- `server-v0.2.1` 线上 smoke 验证通过并清理临时家庭；iPhone 17 Pro simulator 的 authenticated XCUITest 验证了资料、对话和家庭三页。
+- iOS `0.1 (4)` Release archive 已完成；首次 TestFlight 上传因本机 Xcode Apple ID 会话过期而停止，重新登录后可复用 archive 继续上传。
 
 ### 🧠 Design Intent (Why)
 

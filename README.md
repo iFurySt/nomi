@@ -43,7 +43,7 @@ xcodebuild -project apps/ios/Nomi.xcodeproj \
 - 部署：`docs/DEPLOYMENT.md`
 - iOS：`docs/FRONTEND.md`
 - 安全：`docs/SECURITY.md`
-- 当前执行计划：`docs/exec-plans/active/20260822-family-health-app-v1.md`
+- 已完成执行计划：`docs/exec-plans/completed/20260822-family-health-app-v1.md`
 
 Server 通过 `server-v*` tag 发布到 GHCR 并部署 amoylab。详见 `docs/DEPLOYMENT.md`。
 
