@@ -42,6 +42,7 @@
 - [x] 部署外测 server 能力并验证公开页面。
 - [x] 经用户确认后创建隔离审核家庭，并验证真实/审核 household 完全分离。
 - [x] 配置 `Nomi Family Beta` 外部组、关联 Build 5 并完成 Beta App Review；Apple 状态为 `APPROVED`。
+- [x] 用隔离审核家庭在生产完成合成文本上传、SeedX/Codex ingest 和连续 Chat smoke；两条异步链路均完成并各返回 1 条 workspace citation。
 - [ ] 审核通过并完成家庭成员安装验证。
 
 ## 决策记录

@@ -184,6 +184,8 @@ Nomi is an invitation-only family health record organizer. Use the supplied revi
 
 Public Link 会让持有链接的人都能安装 build，属于新的分发权限变更；创建前需要用户单独确认，并应启用较小的人数上限。
 
+隔离审核家庭已预置一份明确标记为 synthetic、无真实个人或医疗信息的文本记录和一条演示对话。生产 smoke 中 ingest 与 chat 均完成，并各返回 1 条 workspace citation；Apple 审核员登录后可以直接看到来源可追溯的完成态，也仍可自行上传新文件测试异步流程。
+
 ## 常见阻塞
 
 - `missingApp(bundleId: "com.ifuryst.nomi")`：App Store Connect 里还没有创建对应 App 记录。
