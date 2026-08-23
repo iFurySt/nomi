@@ -37,7 +37,9 @@
 - 最终 completion audit 按原始目标重跑 server race/vet、iOS simulator build、登录/邀请码 XCUITest、生产 public/protected HTTP 边界和部署运行态检查；`server-v0.2.3` 容器 healthy、SeedX service active。工程侧要求均有当前证据，计划只保留家庭成员真机安装、注册、上传与对话验收这一项。
 - 为真实家庭接入既有本地知识库：新增受控、幂等且拒绝覆盖的 `import-legacy-workspace` 运维命令，把 legacy 成员 slug 映射为生产 person UUID，并将 `ai-vault` Markdown 投影为 household-scoped `knowledge_entries` 与 `/v1/knowledge`。
 - iOS 资料页开始读取长期知识投影，列表与详情只呈现标题、摘要和有用判断；登录、上传、对话和家庭页删除重复说明与内部路径，Build 号递增到 6。
-- `nomi-codex` 保持只读；稳定资料通过无 `--delete` 的 rsync 同步到生产独立 staging，共 670 个文件、约 92 MiB。正式导入仍需在新版 server 发布、数据库备份和 dry-run 通过后执行。
+- `nomi-codex` 保持只读；稳定资料通过无 `--delete` 的 rsync 同步到生产独立 staging，共 670 个文件、约 92 MiB。发布 `server-v0.2.4` 后生成权限 `0600` 的导入前 Postgres dump，dry-run 唯一命中真实家庭，正式导入新增 565 个文件、1 位成员和 81 条 knowledge。
+- 导入后验证两位成员均使用 UUID scope，空标题/摘要、legacy slug 目录和未改写引用均为 0；审核家庭仍为 0 条 knowledge。重复运行 importer 得到 `files_added=0`、`people_created=0`、knowledge 总数不增长，线上认证 API 返回 81 条且未认证仍为 `401`。
+- iOS `0.1 (6)` 已 archive 并上传 TestFlight，Build 6 同时进入内部与外部测试组；内部状态为 `IN_BETA_TESTING`，外部状态为 `BETA_APPROVED`。真实家庭内容不进入 binary 或审核家庭。
 
 ### 🧠 Design Intent (Why)
 

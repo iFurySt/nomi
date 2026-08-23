@@ -29,24 +29,26 @@
 1. 精简 iOS 文案并新增 knowledge 列表。
 2. 实现 legacy workspace importer 与幂等 projection。
 3. 部署 server、备份并同步真实资料。
-4. 上传新 TestFlight build，完成生产 App 验证。
+4. 上传新 TestFlight build，完成生产 App API 与分发验证。
 
 ## 验证方式
 
 - 命令：`go test -race ./...`、`go vet ./...`、`make ci`、iPhone 17 Pro simulator build/XCUITest。
-- 手工检查：真实家庭出现 Leo/Lin scope；资料列表显示导入条目且文案简洁；审核家庭计数不变。
+- 手工检查：真实家庭出现 Leo/Lin scope；资料 API 返回导入条目；审核家庭计数不变。最终视觉确认由用户更新 Build 6 后完成。
 - 观测检查：生产 health、容器 health、SeedX service；导入前后文件/knowledge/person 计数；重复执行 importer 不新增重复条目。
 
 ## 进度记录
 
 - [x] 盘点原知识库和生产 household/workspace；确认真实家庭与审核家庭隔离。
 - [x] 完成 iOS 精简与 knowledge projection。
-- [ ] 完成 importer、测试和部署（本地实现与验证已完成，待生产发布）。
-- [ ] 备份、rsync staging 并执行生产导入（staging 已完成，待备份与正式导入）。
-- [ ] 验证 App、Agent 对话和幂等性。
+- [x] 完成 importer、测试和 `server-v0.2.4` 部署。
+- [x] 备份、rsync staging 并执行生产导入。
+- [x] 验证 App API、数据隔离、重复导入幂等性和 TestFlight 分发；不为验收在真实家庭中制造测试对话，用户更新后可按需发起。
 
 ## 决策记录
 
 - 2026-08-23：只迁移稳定 `raw-data` 与 `ai-vault`，不复制原仓库 `.git`、`tmp`、`_incoming` 或 `_templates`。
 - 2026-08-23：本机先 rsync 到生产独立 staging，再由 server CLI 按 PG person UUID 导入真实 workspace；CLI 不允许覆盖内容不同的既有目标文件。
 - 2026-08-23：新增 knowledge projection 展示既有 AI 沉淀，不把导入文档伪装成历史异步 jobs。
+- 2026-08-23：生产导入新增 565 个稳定文件和 81 条 knowledge；重复执行新增文件为 0，审核家庭 knowledge 仍为 0。
+- 2026-08-23：Build 6 已进入内部/外部组并获 `BETA_APPROVED`；生产认证 API 返回 81 条，工程计划关闭，真机视觉体验由用户直接验收。

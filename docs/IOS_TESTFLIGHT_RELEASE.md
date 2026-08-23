@@ -140,7 +140,7 @@ https://appstoreconnect.apple.com/apps/6767420142/testflight
 - `*.mobileprovision`，仅当手动 provisioning 时需要。
 - `app-store-connect.env`，保存 key name、role、key ID、issuer ID 和相对私钥路径，不要复制真实值到 docs 或 history。
 
-`0.1 (5)` 已使用 `.apple/` 中的 Admin API key 和 Cloud Managed Apple Distribution 上传成功，并进入现有内部测试组；不需要额外保存 iOS distribution `.p12`。
+`0.1 (6)` 已使用 `.apple/` 中的 Admin API key 和 Cloud Managed Apple Distribution 上传成功，并进入现有内部测试组；不需要额外保存 iOS distribution `.p12`。
 
 ## 家庭成员外部测试
 
@@ -178,6 +178,8 @@ Nomi is an invitation-only family health record organizer. Use the supplied revi
 ```
 
 当前 `0.1 (5)` 已进入 `Nomi Family Beta` external group，Beta Review 状态为 `APPROVED`。审核联系人和 demo credential 已提交 Apple，但敏感值只保留在 App Store Connect 与 git ignored 的本机/生产凭据文件中。
+
+`0.1 (6)` 已进入内部组和同一 external group；内部状态为 `IN_BETA_TESTING`，外部状态为 `BETA_APPROVED`。Build 5 仍保留，家庭成员可从原 TestFlight 入口更新到 Build 6。
 
 经用户单独确认后，`Nomi Family Beta` 已启用人数上限为 10 的 Public Link。实际链接属于分发入口，不写入 git，只通过私密渠道交付给家庭成员。持有链接的人可以安装 build，但不能因此进入真实家庭：注册仍必须提供由家庭 owner 在 App 内生成的一次性邀请码。
 
