@@ -44,6 +44,7 @@
 - [x] 配置 `Nomi Family Beta` 外部组、关联 Build 5 并完成 Beta App Review；Apple 状态为 `APPROVED`。
 - [x] 用隔离审核家庭在生产完成合成文本上传、SeedX/Codex ingest 和连续 Chat smoke；两条异步链路均完成并各返回 1 条 workspace citation。
 - [x] 在生产用一次性邀请码让第二个 synthetic 账号加入审核家庭；owner/member 看到相同的 2 people、1 asset、1 thread，member 创建邀请码返回 `403`。验收后撤销临时 session 并清理 synthetic 成员账号。
+- [x] 经用户确认后为 `Nomi Family Beta` 启用人数上限为 10 的 Public Link；公网直连返回 `200`，App Store Connect UI 显示 `0 of 10`。链接作为分发入口不写入 git。
 - [ ] 审核通过并完成家庭成员安装验证。
 
 ## 决策记录
@@ -52,3 +53,4 @@
 - 2026-08-23：将英文 Beta Description 和 Review Notes 版本化；审核文案明确空白演示家庭、异步处理时延和非诊疗边界。
 - 2026-08-23：审核凭据由生产 CLI 随机生成，生产与本机副本均为 `0600`；App Store Connect API 只提交经用户确认的联系人、审核凭据和说明，敏感值不进入 git 或 history。
 - 2026-08-23：Build 5 加入 `Nomi Family Beta` 后 Apple API 与 App Store Connect UI 均确认外部组已有 1 个 build，Beta Review 状态直接为 `APPROVED`。
+- 2026-08-23：用户确认创建 10 人 Public Link；TestFlight 链接只提供安装资格，真实家庭的账号加入继续由 owner 生成的一次性 Nomi 邀请码控制。

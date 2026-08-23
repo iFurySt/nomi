@@ -177,12 +177,11 @@ Review Notes
 Nomi is an invitation-only family health record organizer. Use the supplied review account, which belongs to an isolated demo household and contains no real family health data. The Records tab accepts photos, PDFs, and text files; processing is asynchronous and may take up to one minute. The Chat tab answers from the demo household workspace and shows source paths when supporting material exists. Nomi organizes user-provided information and does not diagnose, prescribe, adjust medication, or provide emergency services.
 ```
 
-当前 `0.1 (5)` 已进入 `Nomi Family Beta` external group，Beta Review 状态为 `APPROVED`。审核联系人和 demo credential 已提交 Apple，但敏感值只保留在 App Store Connect 与 git ignored 的本机/生产凭据文件中。下一步可选择：
+当前 `0.1 (5)` 已进入 `Nomi Family Beta` external group，Beta Review 状态为 `APPROVED`。审核联系人和 demo credential 已提交 Apple，但敏感值只保留在 App Store Connect 与 git ignored 的本机/生产凭据文件中。
 
-- 直接添加家庭成员邮箱为 external tester；或
-- 创建人数受限的 Public Link，再通过 Nomi 的一次性家庭邀请码控制真正的账号加入。
+经用户单独确认后，`Nomi Family Beta` 已启用人数上限为 10 的 Public Link。实际链接属于分发入口，不写入 git，只通过私密渠道交付给家庭成员。持有链接的人可以安装 build，但不能因此进入真实家庭：注册仍必须提供由家庭 owner 在 App 内生成的一次性邀请码。
 
-Public Link 会让持有链接的人都能安装 build，属于新的分发权限变更；创建前需要用户单独确认，并应启用较小的人数上限。
+下一步是在家庭成员真机上通过该链接安装 Nomi，使用一次性家庭邀请码注册，并完成一次无敏感内容的上传与对话验收。
 
 隔离审核家庭已预置一份明确标记为 synthetic、无真实个人或医疗信息的文本记录和一条演示对话。生产 smoke 中 ingest 与 chat 均完成，并各返回 1 条 workspace citation；Apple 审核员登录后可以直接看到来源可追溯的完成态，也仍可自行上传新文件测试异步流程。
 
