@@ -29,6 +29,7 @@
 - private beta 注册密码下限按家庭使用体验从 10 位调整为 6 位；server、iOS 表单、边界测试和安全文档保持一致。
 - `server-v0.2.2` 已部署至生产，线上 smoke 验证 5 位密码被拒绝、6 位密码通过长度校验且空库状态未被改变；iOS `0.1 (5)` 已完成 TestFlight processing，并自动进入 `nomi-iternal-testing` 内部测试组。
 - 真实家庭初始化成功后开始外部 TestFlight 收口：新增公开隐私/支持页面，以及只可由运维 CLI 创建的独立 App Review household，避免 Apple 审核账号进入真实家庭并接触后续健康资料。
+- `server-v0.2.3` 已部署并验证公开隐私/支持页面，生产真实家庭计数保持不变；补充了可选 Postgres 集成测试来直接证明真实家庭与审核家庭隔离，并版本化 Beta Review 英文说明。
 
 ### 🧠 Design Intent (Why)
 

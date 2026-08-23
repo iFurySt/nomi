@@ -167,6 +167,16 @@ chmod 600 .apple/testflight-review.json
 
 审核凭据不得提交 git。生产与本机副本都应只对 owner 可读；如果后续轮换，应通过受审计的运维流程同步更新 App Store Connect。
 
+建议使用以下英文审核文案，避免把 private beta 描述成诊疗产品：
+
+```text
+Beta App Description
+Nomi helps invited family members organize health records, keep a shared long-term knowledge base, and ask source-linked questions about the information they provide.
+
+Review Notes
+Nomi is an invitation-only family health record organizer. Use the supplied review account, which belongs to an isolated demo household and contains no real family health data. The Records tab accepts photos, PDFs, and text files; processing is asynchronous and may take up to one minute. The Chat tab answers from the demo household workspace and shows source paths when supporting material exists. Nomi organizes user-provided information and does not diagnose, prescribe, adjust medication, or provide emergency services.
+```
+
 ## 常见阻塞
 
 - `missingApp(bundleId: "com.ifuryst.nomi")`：App Store Connect 里还没有创建对应 App 记录。
