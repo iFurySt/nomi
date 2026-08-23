@@ -50,6 +50,25 @@ func TestPublicHealthDoesNotRequireUserSession(t *testing.T) {
 		t.Fatalf("status=%d", response.Code)
 	}
 }
+
+func TestPublicPrivacyAndSupportPages(t *testing.T) {
+	t.Parallel()
+	handler := NewHandler(nil, zap.NewNop(), "dev-key")
+	for _, path := range []string{"/privacy", "/support"} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		response := httptest.NewRecorder()
+		handler.Routes().ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s status=%d", path, response.Code)
+		}
+		if contentType := response.Header().Get("Content-Type"); contentType != "text/html; charset=utf-8" {
+			t.Fatalf("%s content-type=%q", path, contentType)
+		}
+		if !strings.Contains(response.Body.String(), "Nomi") {
+			t.Fatalf("%s body missing product name", path)
+		}
+	}
+}
 func TestPasswordHashRoundTrip(t *testing.T) {
 	t.Parallel()
 	hash, err := hashPassword("a-strong-family-password")
@@ -71,6 +90,30 @@ func TestPasswordMinimumLength(t *testing.T) {
 	}
 	if _, err := hashPassword("123456"); err != nil {
 		t.Fatalf("six-character password rejected: %v", err)
+	}
+}
+
+func TestPrepareReviewCredentialsUsesPrivateTemporaryFile(t *testing.T) {
+	t.Parallel()
+	destination := filepath.Join(t.TempDir(), "nested", "review.json")
+	temporary, err := prepareReviewCredentials(destination, reviewCredentials{Email: "review@example.com", Password: "secret-value"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(temporary) })
+	info, err := os.Stat(temporary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode=%o", info.Mode().Perm())
+	}
+	contents, err := os.ReadFile(temporary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(contents), "household_id") || !strings.Contains(string(contents), "review@example.com") {
+		t.Fatalf("unexpected credentials payload=%s", contents)
 	}
 }
 

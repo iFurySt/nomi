@@ -49,7 +49,7 @@ workspaces/<household-id>/
 
 ## API 边界
 
-- Public：`GET /health`、`POST /auth/register`、`POST /auth/login`。
+- Public：`GET /health`、`GET /privacy`、`GET /support`、`POST /auth/register`、`POST /auth/login`。
 - Machine：`GET /daemon/connect`、带 HMAC 的 `GET /agent/assets/{id}`。
 - User protected：全部 `/v1/*`，包含 logout、invite、people、assets、jobs、threads 和 messages。
 - 新增任何 `/v1` 路由时，即使忘记单独挂 middleware，也会先被顶层认证包拦截。
@@ -57,6 +57,7 @@ workspaces/<household-id>/
 ## 当前约束
 
 - private beta 只允许创建一个 bootstrap household；owner 后续发一次性邀请。
+- Apple Beta App Review 使用运维 CLI 创建的独立演示 household，不加入也不能读取真实家庭。
 - 第一版单 worker 串行执行，避免 workspace 冲突。
 - SeedX 0.2.1 daemon 对单次命令有 60 秒内部上限；生产默认 Codex effort 为 `low`，Nomi 把确定性文件操作移出 Agent 临界区。扩大使用前应由 SeedX 暴露独立 command timeout。
 - 当前 Codex 登录态只允许服务受信任家庭，不作为公开 SaaS 凭据模型。

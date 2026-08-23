@@ -2,12 +2,15 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -62,7 +65,117 @@ func NewRootCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cfg.SeedXCodexReasoningEffort, "seedx-codex-reasoning-effort", cfg.SeedXCodexReasoningEffort, "Codex reasoning effort")
 	cmd.Flags().DurationVar(&cfg.SeedXCommandTimeout, "seedx-command-timeout", cfg.SeedXCommandTimeout, "Agent job timeout")
 	cmd.Flags().DurationVar(&cfg.JobPollInterval, "job-poll-interval", cfg.JobPollInterval, "Persistent job queue poll interval")
+	cmd.AddCommand(newProvisionReviewHouseholdCommand(&cfg))
 	return cmd
+}
+
+type reviewCredentials struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func newProvisionReviewHouseholdCommand(cfg *Config) *cobra.Command {
+	var email, displayName, householdName, credentialsFile string
+	cmd := &cobra.Command{
+		Use:   "provision-review-household",
+		Short: "Create an isolated App Review household and write its generated credentials",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if credentialsFile == "" {
+				return errors.New("credentials-file is required")
+			}
+			email = normalizeEmail(email)
+			displayName = normalizeDisplayName(displayName)
+			householdName = strings.TrimSpace(householdName)
+			if email == "" || !strings.Contains(email, "@") || displayName == "" || householdName == "" {
+				return errors.New("email, display-name and household-name are required")
+			}
+			password, err := randomToken(24)
+			if err != nil {
+				return err
+			}
+			passwordHash, err := hashPassword(password)
+			if err != nil {
+				return err
+			}
+			temporaryCredentials, err := prepareReviewCredentials(credentialsFile, reviewCredentials{Email: email, Password: password})
+			if err != nil {
+				return err
+			}
+			pool, err := pgxpool.New(cmd.Context(), cfg.DatabaseURL)
+			if err != nil {
+				_ = os.Remove(temporaryCredentials)
+				return err
+			}
+			defer pool.Close()
+			if err = pool.Ping(cmd.Context()); err != nil {
+				_ = os.Remove(temporaryCredentials)
+				return err
+			}
+			store := NewPostgresStore(pool)
+			if err = store.EnsureSchema(cmd.Context()); err != nil {
+				_ = os.Remove(temporaryCredentials)
+				return err
+			}
+			identity, err := store.ProvisionIsolatedOwner(cmd.Context(), email, passwordHash, displayName, householdName)
+			if err != nil {
+				_ = os.Remove(temporaryCredentials)
+				return err
+			}
+			if err = os.Rename(temporaryCredentials, credentialsFile); err != nil {
+				return fmt.Errorf("review household created but credential activation failed; recover %s: %w", temporaryCredentials, err)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "created isolated review household %s; credentials written to %s\n", identity.Household.ID, credentialsFile)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&email, "email", "app-review@nomi.ifuryst.com", "Review account email")
+	cmd.Flags().StringVar(&displayName, "display-name", "App Review", "Review account display name")
+	cmd.Flags().StringVar(&householdName, "household-name", "Nomi Review Demo", "Isolated review household name")
+	cmd.Flags().StringVar(&credentialsFile, "credentials-file", "", "Path for generated credentials (created with mode 0600)")
+	return cmd
+}
+
+func prepareReviewCredentials(path string, credentials reviewCredentials) (string, error) {
+	if _, err := os.Stat(path); err == nil {
+		return "", fmt.Errorf("credentials file already exists: %s", path)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	directory := filepath.Dir(path)
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		return "", err
+	}
+	contents, err := json.MarshalIndent(credentials, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	file, err := os.CreateTemp(directory, ".nomi-review-*.tmp")
+	if err != nil {
+		return "", err
+	}
+	temporary := file.Name()
+	cleanup := func() {
+		_ = file.Close()
+		_ = os.Remove(temporary)
+	}
+	if err = file.Chmod(0o600); err != nil {
+		cleanup()
+		return "", err
+	}
+	if _, err = file.Write(append(contents, '\n')); err != nil {
+		cleanup()
+		return "", err
+	}
+	if err = file.Sync(); err != nil {
+		cleanup()
+		return "", err
+	}
+	if err = file.Close(); err != nil {
+		_ = os.Remove(temporary)
+		return "", err
+	}
+	return temporary, nil
 }
 
 func run(ctx context.Context, cfg Config) error {

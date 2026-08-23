@@ -57,6 +57,8 @@ func NewHandler(store Store, logger *zap.Logger, seedXAPIKey string, options ...
 func (h *Handler) Routes() http.Handler {
 	public := http.NewServeMux()
 	public.HandleFunc("GET /health", h.health)
+	public.HandleFunc("GET /privacy", h.privacy)
+	public.HandleFunc("GET /support", h.support)
 	public.HandleFunc("POST /auth/register", h.register)
 	public.HandleFunc("POST /auth/login", h.login)
 	public.HandleFunc("GET /agent/assets/{id}", h.agentAsset)

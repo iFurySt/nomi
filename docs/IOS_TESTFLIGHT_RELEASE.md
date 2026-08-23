@@ -140,7 +140,32 @@ https://appstoreconnect.apple.com/apps/6767420142/testflight
 - `*.mobileprovision`，仅当手动 provisioning 时需要。
 - `app-store-connect.env`，保存 key name、role、key ID、issuer ID 和相对私钥路径，不要复制真实值到 docs 或 history。
 
-`0.1 (4)` 已使用 `.apple/` 中的 Admin API key 和 Cloud Managed Apple Distribution 上传成功，并进入现有内部测试组；不需要额外保存 iOS distribution `.p12`。
+`0.1 (5)` 已使用 `.apple/` 中的 Admin API key 和 Cloud Managed Apple Distribution 上传成功，并进入现有内部测试组；不需要额外保存 iOS distribution `.p12`。
+
+## 家庭成员外部测试
+
+没有 App Store Connect 权限的家庭成员必须使用 External Testing。第一个外部 build 需要 Apple Beta App Review，按以下顺序推进：
+
+1. 确认公开页面可访问：
+
+```sh
+curl --noproxy '*' -fsS https://nomi.ifuryst.com/privacy >/dev/null
+curl --noproxy '*' -fsS https://nomi.ifuryst.com/support >/dev/null
+```
+
+2. 用生产容器内的运维命令创建隔离审核家庭。不要把审核账号加入真实家庭，也不要通过命令参数传密码；命令会自行生成随机密码并写入权限 `0600` 的文件：
+
+```sh
+ssh amoylab 'docker exec nomi-server /usr/local/bin/nomi-server provision-review-household --credentials-file /var/lib/nomi/admin/testflight-review.json'
+scp amoylab:/opt/nomi/data/admin/testflight-review.json .apple/testflight-review.json
+chmod 600 .apple/testflight-review.json
+```
+
+3. 在 TestFlight → Test Information 填写 beta 描述、feedback email、privacy URL、审核联系人和隔离审核账号；review notes 说明这是家庭健康资料 private beta、演示家庭为空、AI 结果仅供资料整理且不是医疗建议。
+4. 建立 External Testing group，把当前 build 加入组并提交 Beta App Review。输入联系人、登录凭据和最终提交都属于对 Apple 的外部传输，执行前必须由用户确认。
+5. 审核通过后，把家庭成员邮箱加入 external group；家庭 owner 在 App 内生成一次性邀请码，家人安装后自行注册加入真实家庭。
+
+审核凭据不得提交 git。生产与本机副本都应只对 owner 可读；如果后续轮换，应通过受审计的运维流程同步更新 App Store Connect。
 
 ## 常见阻塞
 

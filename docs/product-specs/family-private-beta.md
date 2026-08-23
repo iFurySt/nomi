@@ -72,6 +72,7 @@ workspace 是 Agent 长期上下文和可审计资料层；Postgres 是 App 查�
 - 暂不做饮食专用识别、营养 dashboard、趋势图或 Apple Watch。
 - 暂不做公共多租户自助开通、计费或 App Store 正式发布。
 - 暂不导入 `nomi-codex` 中的真实资料。
+- 不把 Apple 审核账号加入真实家庭；外测审核使用运维侧创建的隔离演示家庭。
 
 ## AI 与健康边界
 
@@ -88,4 +89,3 @@ workspace 是 Agent 长期上下文和可审计资料层；Postgres 是 App 查�
 - 用户可以围绕某个 `Person` 建立 thread，发送问题，Codex 读取该家庭 workspace 后生成带引用回答。
 - 原始文件由 FS provider 保存；业务层只依赖 storage provider 接口。
 - server 能部署到 amoylab，真实 Codex 使用服务端受控登录态运行。
-

@@ -122,6 +122,37 @@ func (s *PostgresStore) CreateOwner(ctx context.Context, email, passwordHash, di
 	return out, tx.Commit(ctx)
 }
 
+// ProvisionIsolatedOwner is intentionally available only to the server CLI. It
+// creates a separate household for operational accounts such as App Review and
+// never joins the real bootstrap household.
+func (s *PostgresStore) ProvisionIsolatedOwner(ctx context.Context, email, passwordHash, displayName, householdName string) (AuthIdentity, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return AuthIdentity{}, err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext($1))`, "nomi-provision-isolated-owner:"+email); err != nil {
+		return AuthIdentity{}, err
+	}
+	var out AuthIdentity
+	err = tx.QueryRow(ctx, `insert into users(email,password_hash,display_name) values($1,$2,$3) returning id::text,email,display_name,created_at`, email, passwordHash, displayName).Scan(&out.User.ID, &out.User.Email, &out.User.DisplayName, &out.User.CreatedAt)
+	if err != nil {
+		return AuthIdentity{}, mapPGError(err)
+	}
+	err = tx.QueryRow(ctx, `insert into households(name,created_by) values($1,$2::uuid) returning id::text,name,created_at`, householdName, out.User.ID).Scan(&out.Household.ID, &out.Household.Name, &out.Household.CreatedAt)
+	if err != nil {
+		return AuthIdentity{}, err
+	}
+	out.Household.Role = RoleOwner
+	if _, err = tx.Exec(ctx, `insert into household_memberships(household_id,user_id,role) values($1::uuid,$2::uuid,'owner')`, out.Household.ID, out.User.ID); err != nil {
+		return AuthIdentity{}, err
+	}
+	if _, err = tx.Exec(ctx, `insert into people(household_id,display_name,relationship,created_by) values($1::uuid,$2,'演示账号',$3::uuid)`, out.Household.ID, displayName, out.User.ID); err != nil {
+		return AuthIdentity{}, err
+	}
+	return out, tx.Commit(ctx)
+}
+
 func (s *PostgresStore) JoinHousehold(ctx context.Context, inviteToken, email, passwordHash, displayName string) (AuthIdentity, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

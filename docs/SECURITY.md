@@ -9,6 +9,7 @@ Nomi 处理真实家庭健康资料，默认按高敏感个人数据对待。
 - `/v1/*` 在顶层默认鉴权，handler 从服务端 session 取得 `household_id`，不得信任客户端传入 household ID。
 - bootstrap code 只能创建全实例第一个 household，并通过 Postgres advisory lock 防并发重复创建。
 - owner 生成的家庭邀请为随机、七天过期、一次性 token；只有 owner 可创建。
+- TestFlight 审核账号只能由生产运维 CLI 创建到独立演示 household，不得使用真实家庭邀请码；这个能力不暴露 HTTP 接口。
 - SeedX daemon 使用独立 Bearer key；该 key 不等同用户 session。
 
 ## 数据隔离与存储
@@ -25,6 +26,7 @@ Nomi 处理真实家庭健康资料，默认按高敏感个人数据对待。
 - 生产的数据库 URL、SeedX key、bootstrap code、asset signing key 只放 `/opt/nomi/.env` 或 secret manager。
 - Codex auth 只放 amoylab root 的 Codex home，权限必须为 root-only；不得写入镜像、仓库、日志或 history。
 - Apple 签名密钥、profile 与 App Store Connect secret 不写仓库。
+- Beta App Review 随机登录凭据只保存到权限 `0600` 的生产运维文件和本机 git ignored `.apple/`，不得进入命令参数、日志、文档或 history。
 - 外部分享日志、截图或 workspace 前必须另做脱敏副本。
 
 ## AI 边界

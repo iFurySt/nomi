@@ -28,6 +28,7 @@
 - 首次真实注册发现 Debug App 默认仍指向本机 `127.0.0.1`；已统一改为生产 API，只有 local/UI test 显式覆盖，并让 UI test 结束时 terminate App，避免测试环境残留误导手动调试。截图中出现的 bootstrap code 随后轮换。
 - private beta 注册密码下限按家庭使用体验从 10 位调整为 6 位；server、iOS 表单、边界测试和安全文档保持一致。
 - `server-v0.2.2` 已部署至生产，线上 smoke 验证 5 位密码被拒绝、6 位密码通过长度校验且空库状态未被改变；iOS `0.1 (5)` 已完成 TestFlight processing，并自动进入 `nomi-iternal-testing` 内部测试组。
+- 真实家庭初始化成功后开始外部 TestFlight 收口：新增公开隐私/支持页面，以及只可由运维 CLI 创建的独立 App Review household，避免 Apple 审核账号进入真实家庭并接触后续健康资料。
 
 ### 🧠 Design Intent (Why)
 
