@@ -4,7 +4,7 @@
 
 | 区域 | 评分 | 当前证据 | 主要短板 |
 | --- | --- | --- | --- |
-| 产品 | B | 家庭账号、成员 scope、上传分析和连续对话形成 mobile 闭环。 | 还没有密码找回、导出/彻底删除和用户隐私说明。 |
+| 产品 | B | 家庭账号、成员 scope、上传分析和连续对话形成 mobile 闭环；生产 synthetic 双账号验证共享 people/assets/threads 与 owner-only invite。 | 还没有密码找回、导出/彻底删除；家庭成员真机安装待完成。 |
 | 架构 | B | FS 原件/上下文与 PG 权限/队列/projection 边界明确，StorageProvider 可替换。 | schema migration 仍是启动式，缺正式迁移工具。 |
 | iOS | B | 登录、邀请注册、家庭成员、Photos/Files 上传、job 结果和 chat 已编译并有 auth UI test；`0.1 (5)` 已进入内部组和 `APPROVED` 的 `Nomi Family Beta` 外部组。 | 需要更多异常态、真实 picker、远端 authenticated UI 自动化，以及家庭成员真机安装验收。 |
 | 后端 | B | `/v1` 默认鉴权、tenant scoped CRUD、持久 job queue、workspace git 和 SeedX/Codex 均已实现。 | 缺速率限制、审计表、retry API 与完整删除语义。 |

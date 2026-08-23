@@ -32,6 +32,7 @@
 - `server-v0.2.3` 已部署并验证公开隐私/支持页面，生产真实家庭计数保持不变；补充了可选 Postgres 集成测试来直接证明真实家庭与审核家庭隔离，并版本化 Beta Review 英文说明。
 - 经用户确认后创建独立 `Nomi Review Demo` household，随机凭据仅保存在 `0600` 运维文件；向 Apple 提交审核联系人、demo account 和非诊疗说明，建立 `Nomi Family Beta` 外部组并关联 Build 5。Apple API 和 App Store Connect UI 均确认 Beta Review 为 `APPROVED`、外部组包含 1 个 build。
 - 使用无真实个人/医疗信息的 synthetic 文本在隔离审核家庭完成生产 ingest → workspace citation → chat 全链路；ingest 和 chat job 均完成且各返回 1 条引用，验证外测账号实际可用而不只是能够登录。
+- 生产多账号验收中，owner 生成一次性邀请码、第二个 synthetic 账号加入同一审核家庭，并从双方验证 people/assets/threads 投影一致；member 创建邀请码正确返回 `403`。临时 session 与 synthetic 成员随后精确清理，不触碰真实家庭。
 
 ### 🧠 Design Intent (Why)
 
