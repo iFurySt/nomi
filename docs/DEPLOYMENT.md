@@ -64,6 +64,22 @@ curl -fsS https://nomi.ifuryst.com/health
 4. 上传非敏感测试资料，确认 job 从 queued/processing 到 completed。
 5. 提问并确认 assistant answer 带 workspace relative citations。
 
+## 旧知识库一次性导入
+
+历史 filesystem 知识库先用不带 `--delete` 的 rsync 放入 `/opt/nomi/data/imports/<import-id>`。排除 `.git`、临时收件箱和模板目录，并核对文件数与总字节数。正式导入前备份 Postgres；如果目标 workspace 已存在，也要单独保留其快照。
+
+新版本部署后先 dry-run，再用精确家庭名和显式成员映射执行：
+
+```sh
+docker exec nomi-server /usr/local/bin/nomi-server import-legacy-workspace \
+  --source-root /var/lib/nomi/imports/<import-id> \
+  --household-name '<exact-household-name>' \
+  --person 'legacy-slug=Display Name:Relationship' \
+  --dry-run
+```
+
+去掉 `--dry-run` 才会创建缺失成员、把资料复制到 UUID scope、改写导入副本中的引用、提交 workspace git，并 upsert App 的 knowledge projection。导入不覆盖不同内容；重复执行应报告 `files_added=0` 且条目计数不增长。完成后核对成员数、knowledge 数、workspace git clean、旧 slug 引用为零和审核家庭计数不变。
+
 ## 运维与回滚
 
 ```sh

@@ -130,7 +130,22 @@ func (w *JobWorker) processIngest(ctx context.Context, job Job, workspace, agent
 	if err = w.store.CompleteAssetAnalysis(ctx, job.HouseholdID, asset.ID, data); err != nil {
 		return AgentResult{}, err
 	}
-	if err = w.workspace.Commit(ctx, workspace, "ingest: "+safeCommitTitle(result.Title, asset.OriginalName)); err != nil {
+	occurredOn := time.Date(asset.CreatedAt.Year(), asset.CreatedAt.Month(), asset.CreatedAt.Day(), 0, 0, 0, 0, time.UTC)
+	title := safeCommitTitle(result.Title, asset.OriginalName)
+	if _, err = w.store.UpsertKnowledge(ctx, KnowledgeEntry{
+		HouseholdID: job.HouseholdID,
+		PersonID:    asset.PersonID,
+		Kind:        "record",
+		Title:       title,
+		Summary:     result.Summary,
+		SourcePath:  archived,
+		SourceHash:  asset.SHA256,
+		Result:      data,
+		OccurredOn:  &occurredOn,
+	}); err != nil {
+		return AgentResult{}, err
+	}
+	if err = w.workspace.Commit(ctx, workspace, "ingest: "+title); err != nil {
 		return AgentResult{}, err
 	}
 	return result, nil

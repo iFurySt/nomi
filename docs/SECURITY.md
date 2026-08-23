@@ -14,7 +14,7 @@ Nomi 处理真实家庭健康资料，默认按高敏感个人数据对待。
 
 ## 数据隔离与存储
 
-- Store 的 people、assets、jobs、threads、messages 查询必须带 household scope；跨家庭对象对外表现为 `404`。
+- Store 的 people、assets、jobs、knowledge、threads、messages 查询必须带 household scope；跨家庭对象对外表现为 `404`。
 - 每个家庭使用独立 workspace cwd，opaque UUID 作为目录名；路径输入必须阻止 `..`、绝对路径和分隔符穿越。
 - 上传默认上限 64 MiB；nginx 与 server 都必须限制请求体。
 - 原始对象由 `StorageProvider` 保存；当前 `/opt/nomi/data` 只允许 root 与 Nomi 服务账户访问。
@@ -28,6 +28,13 @@ Nomi 处理真实家庭健康资料，默认按高敏感个人数据对待。
 - Apple 签名密钥、profile 与 App Store Connect secret 不写仓库。
 - Beta App Review 随机登录凭据只保存到权限 `0600` 的生产运维文件和本机 git ignored `.apple/`，不得进入命令参数、日志、文档或 history。
 - 外部分享日志、截图或 workspace 前必须另做脱敏副本。
+
+## 受控资料迁移
+
+- 旧知识库只可先同步到 `/opt/nomi/data/imports/` 下的独立 staging；同步不使用 `--delete`，不得改写源仓库。
+- `import-legacy-workspace` 只作为容器内运维命令使用，必须用精确 household 名称和显式成员映射；它拒绝 symlink 和覆盖内容不同的目标文件。
+- 正式导入前必须备份 Postgres，并确认目标 workspace 状态；命令输出只报告计数，不打印健康资料正文。
+- 导入后的 App projection 继续按 session household scope 查询，审核家庭不会获得真实家庭条目。
 
 ## AI 边界
 

@@ -9,6 +9,7 @@ final class NomiAppModel: ObservableObject {
     @Published var selectedPersonID: String?
     @Published var assets: [AssetModel] = []
     @Published var jobs: [JobModel] = []
+    @Published var knowledge: [KnowledgeEntryModel] = []
     @Published var threads: [ThreadModel] = []
     @Published var activeThread: ThreadModel?
     @Published var messages: [MessageModel] = []
@@ -29,9 +30,9 @@ final class NomiAppModel: ObservableObject {
     func login(email:String,password:String) async { await authenticate { try await NomiAPIClient.login(email:email,password:password) } }
     func register(email:String,password:String,name:String,household:String,invite:String) async { await authenticate { try await NomiAPIClient.register(email:email,password:password,displayName:name,householdName:household,inviteCode:invite) } }
     private func authenticate(_ operation:() async throws->AuthSession) async { isBusy=true;errorMessage=nil;defer{isBusy=false};do{let value=try await operation();try SessionKeychain.save(value);session=value;await refreshAll()}catch{errorMessage=error.localizedDescription} }
-    func logout() async { if let token { try? await NomiAPIClient.logout(token:token) };SessionKeychain.delete();session=nil;people=[];assets=[];jobs=[];threads=[];messages=[] }
+    func logout() async { if let token { try? await NomiAPIClient.logout(token:token) };SessionKeychain.delete();session=nil;people=[];assets=[];jobs=[];knowledge=[];threads=[];messages=[] }
 
-    func refreshAll() async { guard let token else{return};do{async let loadedPeople=NomiAPIClient.people(token:token);async let loadedAssets=NomiAPIClient.assets(token:token,personID:selectedPersonID);async let loadedJobs=NomiAPIClient.jobs(token:token,personID:selectedPersonID);async let loadedThreads=NomiAPIClient.threads(token:token,personID:selectedPersonID);let(p,a,j,t)=try await(loadedPeople,loadedAssets,loadedJobs,loadedThreads);people=p;assets=a;jobs=j;threads=t;if let activeThread, !t.contains(where:{$0.id==activeThread.id}){self.activeThread=nil;messages=[]};if self.activeThread==nil{self.activeThread=t.first};if let thread=self.activeThread{messages=try await NomiAPIClient.messages(token:token,threadID:thread.id)}}catch{errorMessage=error.localizedDescription} }
+    func refreshAll() async { guard let token else{return};do{async let loadedPeople=NomiAPIClient.people(token:token);async let loadedAssets=NomiAPIClient.assets(token:token,personID:selectedPersonID);async let loadedJobs=NomiAPIClient.jobs(token:token,personID:selectedPersonID);async let loadedKnowledge=NomiAPIClient.knowledge(token:token,personID:selectedPersonID);async let loadedThreads=NomiAPIClient.threads(token:token,personID:selectedPersonID);let(p,a,j,k,t)=try await(loadedPeople,loadedAssets,loadedJobs,loadedKnowledge,loadedThreads);people=p;assets=a;jobs=j;knowledge=k;threads=t;if let activeThread, !t.contains(where:{$0.id==activeThread.id}){self.activeThread=nil;messages=[]};if self.activeThread==nil{self.activeThread=t.first};if let thread=self.activeThread{messages=try await NomiAPIClient.messages(token:token,threadID:thread.id)}}catch{errorMessage=error.localizedDescription} }
     func selectPerson(_ id:String?) async { selectedPersonID=id;activeThread=nil;messages=[];await refreshAll() }
     func createPerson(name:String,relationship:String) async { guard let token else{return};do{_ = try await NomiAPIClient.createPerson(token:token,name:name,relationship:relationship);await refreshAll()}catch{errorMessage=error.localizedDescription} }
     func createInvite() async { guard let token else{return};do{householdInvite=try await NomiAPIClient.createInvite(token:token)}catch{errorMessage=error.localizedDescription} }
@@ -49,9 +50,9 @@ struct ContentView: View {
 struct AuthView: View {
     @ObservedObject var model:NomiAppModel
     @State private var isRegister=false;@State private var email="";@State private var password="";@State private var name="";@State private var household="";@State private var invite=""
-    var body: some View { NavigationStack { ScrollView { VStack(alignment:.leading,spacing:20){Spacer().frame(height:36);Image(systemName:"heart.text.clipboard").font(.system(size:48)).symbolRenderingMode(.hierarchical);Text("Nomi").font(.largeTitle.bold());Text("家庭健康资料，由你的 Agent 长期整理。") .foregroundStyle(.secondary);VStack(spacing:12){TextField("邮箱",text:$email).textContentType(.emailAddress).textInputAutocapitalization(.never).keyboardType(.emailAddress).textFieldStyle(.roundedBorder).accessibilityIdentifier("auth-email");SecureField("密码（至少 6 位）",text:$password).textContentType(isRegister ? .newPassword:.password).textFieldStyle(.roundedBorder).accessibilityIdentifier("auth-password");if isRegister{TextField("你的名字",text:$name).textFieldStyle(.roundedBorder);TextField("家庭名称（创建家庭时填写）",text:$household).textFieldStyle(.roundedBorder);TextField("邀请码",text:$invite).textInputAutocapitalization(.never).textFieldStyle(.roundedBorder).accessibilityIdentifier("auth-invite")}}
+    var body: some View { NavigationStack { ScrollView { VStack(alignment:.leading,spacing:20){Spacer().frame(height:36);Image(systemName:"heart.text.clipboard").font(.system(size:48)).symbolRenderingMode(.hierarchical);Text("Nomi").font(.largeTitle.bold());VStack(spacing:12){TextField("邮箱",text:$email).textContentType(.emailAddress).textInputAutocapitalization(.never).keyboardType(.emailAddress).textFieldStyle(.roundedBorder).accessibilityIdentifier("auth-email");SecureField("密码",text:$password).textContentType(isRegister ? .newPassword:.password).textFieldStyle(.roundedBorder).accessibilityIdentifier("auth-password");if isRegister{TextField("名字",text:$name).textFieldStyle(.roundedBorder);TextField("家庭名称（可选）",text:$household).textFieldStyle(.roundedBorder);TextField("邀请码",text:$invite).textInputAutocapitalization(.never).textFieldStyle(.roundedBorder).accessibilityIdentifier("auth-invite")}}
                 Button { Task { if isRegister{await model.register(email:email,password:password,name:name,household:household,invite:invite)}else{await model.login(email:email,password:password)} } } label:{HStack{Spacer();if model.isBusy{ProgressView().tint(.white)}else{Text(isRegister ? "创建账号":"登录").bold()};Spacer()}}.buttonStyle(.borderedProminent).controlSize(.large).disabled(model.isBusy||email.isEmpty||password.isEmpty||(isRegister&&(password.count<6||name.isEmpty||invite.isEmpty))).accessibilityIdentifier("auth-submit")
-                Button(isRegister ? "已有账号？登录":"第一次使用？用邀请码注册"){withAnimation{isRegister.toggle()}}.frame(maxWidth:.infinity)
+                Button(isRegister ? "返回登录":"邀请码注册"){withAnimation{isRegister.toggle()}}.frame(maxWidth:.infinity)
             }.padding(28) } }.background(Color(.systemGroupedBackground)) }
 }
 
@@ -69,22 +70,70 @@ struct ScopePicker: View {
 struct LibraryView: View {
     @ObservedObject var model:NomiAppModel
     @State private var showUpload=false
-    private var ingestJobs:[JobModel]{model.jobs.filter{$0.kind=="ingest"}}
-    var body: some View { VStack(spacing:12){ScopePicker(model:model);if ingestJobs.isEmpty{ContentUnavailableView("还没有资料",systemImage:"doc.badge.plus",description:Text("上传报告、截图、PDF 或文字资料，Nomi 会结合已有上下文整理。"))}else{List(ingestJobs){job in JobRow(job:job)}.listStyle(.plain).refreshable{await model.refreshAll()}}}.navigationTitle("健康资料").toolbar{ToolbarItem(placement:.topBarTrailing){Button{showUpload=true}label:{Image(systemName:"plus")}.accessibilityIdentifier("upload-open")}}.sheet(isPresented:$showUpload){UploadView(model:model)} }
+    private var pendingJobs:[JobModel]{model.jobs.filter{$0.kind=="ingest" && $0.status != "completed"}}
+    var body: some View { VStack(spacing:12){ScopePicker(model:model);if pendingJobs.isEmpty && model.knowledge.isEmpty{ContentUnavailableView("暂无资料",systemImage:"doc.badge.plus")}else{List{ForEach(pendingJobs){job in JobRow(job:job)};ForEach(model.knowledge){entry in NavigationLink{KnowledgeDetailView(entry:entry)}label:{KnowledgeRow(entry:entry)}}}.listStyle(.plain).refreshable{await model.refreshAll()}}}.navigationTitle("资料").toolbar{ToolbarItem(placement:.topBarTrailing){Button{showUpload=true}label:{Image(systemName:"plus")}.accessibilityIdentifier("upload-open")}}.sheet(isPresented:$showUpload){UploadView(model:model)} }
 }
 
 struct JobRow: View {
     let job:JobModel
-    var body: some View { VStack(alignment:.leading,spacing:8){HStack{Image(systemName:icon);Text(job.result?.title ?? (job.kind=="chat" ? "正在回答":"正在整理资料")).font(.headline);Spacer();statusBadge};if let result=job.result{if !result.summary.isEmpty{Text(result.summary)};if !result.changes.isEmpty{Label(result.changes,systemImage:"arrow.triangle.2.circlepath").font(.subheadline).foregroundStyle(.secondary)};if !result.currentAssessment.isEmpty{Text(result.currentAssessment).font(.subheadline)};if !result.citations.isEmpty{Text(result.citations.joined(separator:" · ")).font(.caption).foregroundStyle(.tertiary).lineLimit(2)}}else if let error=job.error,!error.isEmpty{Text(error).font(.caption).foregroundStyle(.red)}}.padding(.vertical,6) }
+    var body: some View { VStack(alignment:.leading,spacing:6){HStack{Image(systemName:icon);Text(job.result?.title ?? (job.kind=="chat" ? "正在回答":"正在整理")).font(.headline);Spacer();statusBadge};if let result=job.result,!result.summary.isEmpty{Text(result.summary).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)}else if let error=job.error,!error.isEmpty{Text(error).font(.caption).foregroundStyle(.red).lineLimit(2)}}.padding(.vertical,6) }
     private var icon:String{job.kind=="chat" ? "bubble.left":"doc.text.magnifyingglass"}
     @ViewBuilder private var statusBadge:some View{switch job.status{case "queued":Text("等待").foregroundStyle(.secondary);case "processing":ProgressView();case "completed":Image(systemName:"checkmark.circle.fill").foregroundStyle(.green);default:Image(systemName:"exclamationmark.circle.fill").foregroundStyle(.red)}}
+}
+
+struct KnowledgeRow: View {
+    let entry: KnowledgeEntryModel
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(entry.title)
+                .font(.headline)
+                .lineLimit(2)
+            if !entry.summary.isEmpty {
+                Text(entry.summary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            if let date = entry.occurredOn?.prefix(10) {
+                Text(String(date))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 5)
+    }
+}
+
+struct KnowledgeDetailView: View {
+    let entry: KnowledgeEntryModel
+    private var result: AgentResultModel? { entry.result }
+    var body: some View {
+        List {
+            Section {
+                Text(entry.summary)
+            }
+            if let result, !result.changes.isEmpty {
+                Section("变化") { Text(result.changes) }
+            }
+            if let result, !result.currentAssessment.isEmpty {
+                Section("判断") { Text(result.currentAssessment) }
+            }
+            if let result, !result.openQuestions.isEmpty {
+                Section("待确认") {
+                    ForEach(result.openQuestions, id: \.self) { Text($0) }
+                }
+            }
+        }
+        .navigationTitle(entry.title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
 }
 
 struct UploadView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var model:NomiAppModel
     @State private var photo:PhotosPickerItem?;@State private var showFiles=false
-    var body: some View { NavigationStack { VStack(spacing:18){Text("资料会归入当前选择的家庭成员，并交给 Agent 异步整理。") .foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading);PhotosPicker(selection:$photo,matching:.images){UploadButtonLabel(title:"从照片选择",icon:"photo.on.rectangle")}.onChange(of:photo){_,item in guard let item else{return};Task{if let data=try? await item.loadTransferable(type:Data.self){let contentType=item.supportedContentTypes.first ?? .image;let fileExtension=contentType.preferredFilenameExtension ?? "img";await model.upload(data:data,name:"photo-\(UUID().uuidString).\(fileExtension)",mimeType:contentType.preferredMIMEType ?? "application/octet-stream");dismiss()}}};Button{showFiles=true}label:{UploadButtonLabel(title:"选择文件或 PDF",icon:"folder")}.buttonStyle(.plain);Spacer()}.padding(24).navigationTitle("添加资料").navigationBarTitleDisplayMode(.inline).toolbar{ToolbarItem(placement:.cancellationAction){Button("取消"){dismiss()}}}.fileImporter(isPresented:$showFiles,allowedContentTypes:[.image,.pdf,.plainText],allowsMultipleSelection:false){result in guard case .success(let urls)=result,let url=urls.first else{return};Task{let access=url.startAccessingSecurityScopedResource();defer{if access{url.stopAccessingSecurityScopedResource()}};do{let data=try Data(contentsOf:url);let type=(try? url.resourceValues(forKeys:[.contentTypeKey]).contentType?.preferredMIMEType) ?? "application/octet-stream";await model.upload(data:data,name:url.lastPathComponent,mimeType:type);dismiss()}catch{model.errorMessage=error.localizedDescription}}} } }
+    var body: some View { NavigationStack { VStack(spacing:18){PhotosPicker(selection:$photo,matching:.images){UploadButtonLabel(title:"照片",icon:"photo.on.rectangle")}.onChange(of:photo){_,item in guard let item else{return};Task{if let data=try? await item.loadTransferable(type:Data.self){let contentType=item.supportedContentTypes.first ?? .image;let fileExtension=contentType.preferredFilenameExtension ?? "img";await model.upload(data:data,name:"photo-\(UUID().uuidString).\(fileExtension)",mimeType:contentType.preferredMIMEType ?? "application/octet-stream");dismiss()}}};Button{showFiles=true}label:{UploadButtonLabel(title:"文件或 PDF",icon:"folder")}.buttonStyle(.plain);Spacer()}.padding(24).navigationTitle("添加资料").navigationBarTitleDisplayMode(.inline).toolbar{ToolbarItem(placement:.cancellationAction){Button("取消"){dismiss()}}}.fileImporter(isPresented:$showFiles,allowedContentTypes:[.image,.pdf,.plainText],allowsMultipleSelection:false){result in guard case .success(let urls)=result,let url=urls.first else{return};Task{let access=url.startAccessingSecurityScopedResource();defer{if access{url.stopAccessingSecurityScopedResource()}};do{let data=try Data(contentsOf:url);let type=(try? url.resourceValues(forKeys:[.contentTypeKey]).contentType?.preferredMIMEType) ?? "application/octet-stream";await model.upload(data:data,name:url.lastPathComponent,mimeType:type);dismiss()}catch{model.errorMessage=error.localizedDescription}}} } }
 }
 
 struct UploadButtonLabel: View {
@@ -96,7 +145,7 @@ struct UploadButtonLabel: View {
 struct ChatView: View {
     @ObservedObject var model:NomiAppModel
     @State private var text=""
-    var body: some View { VStack(spacing:0){ScopePicker(model:model).padding(.bottom,8);if model.activeThread==nil{ContentUnavailableView("开始一段对话",systemImage:"bubble.left.and.text.bubble.right",description:Text("Nomi 会读取当前家庭或成员的长期资料后回答。"));Button("新建对话"){Task{await model.newThread()}}.buttonStyle(.borderedProminent)}else{ScrollViewReader{proxy in ScrollView{LazyVStack(spacing:12){ForEach(model.messages){message in MessageBubble(message:message).id(message.id)}}.padding()}.onChange(of:model.messages.count){_,_ in if let id=model.messages.last?.id{withAnimation{proxy.scrollTo(id,anchor:.bottom)}}}};HStack(alignment:.bottom,spacing:10){TextField("基于已有资料提问",text:$text,axis:.vertical).lineLimit(1...5).textFieldStyle(.roundedBorder);Button{let value=text;text="";Task{await model.send(value)}}label:{Image(systemName:"arrow.up.circle.fill").font(.title)}.disabled(text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)}.padding().background(.bar)}}.navigationTitle(model.activeThread?.title ?? "家庭对话").toolbar{ToolbarItem(placement:.topBarTrailing){Menu{Button("新建对话"){Task{await model.newThread()}};ForEach(model.threads){thread in Button(thread.title){Task{await model.openThread(thread)}}}}label:{Image(systemName:"ellipsis.circle")}}} }
+    var body: some View { VStack(spacing:0){ScopePicker(model:model).padding(.bottom,8);if model.activeThread==nil{ContentUnavailableView("新对话",systemImage:"bubble.left.and.text.bubble.right");Button("开始"){Task{await model.newThread()}}.buttonStyle(.borderedProminent)}else{ScrollViewReader{proxy in ScrollView{LazyVStack(spacing:12){ForEach(model.messages){message in MessageBubble(message:message).id(message.id)}}.padding()}.onChange(of:model.messages.count){_,_ in if let id=model.messages.last?.id{withAnimation{proxy.scrollTo(id,anchor:.bottom)}}}};HStack(alignment:.bottom,spacing:10){TextField("问 Nomi",text:$text,axis:.vertical).lineLimit(1...5).textFieldStyle(.roundedBorder);Button{let value=text;text="";Task{await model.send(value)}}label:{Image(systemName:"arrow.up.circle.fill").font(.title)}.disabled(text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)}.padding().background(.bar)}}.navigationTitle(model.activeThread?.title ?? "对话").toolbar{ToolbarItem(placement:.topBarTrailing){Menu{Button("新建对话"){Task{await model.newThread()}};ForEach(model.threads){thread in Button(thread.title){Task{await model.openThread(thread)}}}}label:{Image(systemName:"ellipsis.circle")}}} }
 }
 
 struct MessageBubble: View {
@@ -128,7 +177,7 @@ struct FamilyView: View {
                     }
                 }
             }
-            Section("健康档案") {
+            Section("成员") {
                 ForEach(model.people) { person in
                     VStack(alignment: .leading) {
                         Text(person.displayName)
@@ -139,7 +188,7 @@ struct FamilyView: View {
                         }
                     }
                 }
-                Button("添加家庭成员", systemImage: "person.badge.plus") {
+                Button("添加成员", systemImage: "person.badge.plus") {
                     showAdd = true
                 }
             }
@@ -147,8 +196,6 @@ struct FamilyView: View {
                 Button("退出登录", role: .destructive) {
                     Task { await model.logout() }
                 }
-            } footer: {
-                Text("API: \(NomiAPIClient.baseURL.absoluteString)")
             }
         }
         .navigationTitle("家庭")
@@ -162,5 +209,5 @@ struct AddPersonView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var model:NomiAppModel
     @State private var name="";@State private var relationship=""
-    var body: some View { NavigationStack{Form{TextField("名字",text:$name);TextField("关系，例如孩子、父亲",text:$relationship)}.navigationTitle("添加健康档案").toolbar{ToolbarItem(placement:.cancellationAction){Button("取消"){dismiss()}};ToolbarItem(placement:.confirmationAction){Button("添加"){Task{await model.createPerson(name:name,relationship:relationship);dismiss()}}.disabled(name.isEmpty)}}} }
+    var body: some View { NavigationStack{Form{TextField("名字",text:$name);TextField("关系（可选）",text:$relationship)}.navigationTitle("添加成员").toolbar{ToolbarItem(placement:.cancellationAction){Button("取消"){dismiss()}};ToolbarItem(placement:.confirmationAction){Button("添加"){Task{await model.createPerson(name:name,relationship:relationship);dismiss()}}.disabled(name.isEmpty)}}} }
 }

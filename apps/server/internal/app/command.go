@@ -66,6 +66,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.Flags().DurationVar(&cfg.SeedXCommandTimeout, "seedx-command-timeout", cfg.SeedXCommandTimeout, "Agent job timeout")
 	cmd.Flags().DurationVar(&cfg.JobPollInterval, "job-poll-interval", cfg.JobPollInterval, "Persistent job queue poll interval")
 	cmd.AddCommand(newProvisionReviewHouseholdCommand(&cfg))
+	cmd.AddCommand(newImportLegacyWorkspaceCommand(&cfg))
 	return cmd
 }
 

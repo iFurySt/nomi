@@ -14,7 +14,7 @@ final class NomiUploadFlowUITests: XCTestCase {
         XCTAssertTrue(app.secureTextFields.matching(identifier: "auth-password").firstMatch.exists)
         XCTAssertTrue(app.buttons["登录"].exists)
 
-        app.buttons["第一次使用？用邀请码注册"].tap()
+        app.buttons["邀请码注册"].tap()
         XCTAssertTrue(app.textFields.matching(identifier: "auth-invite").firstMatch.waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["创建账号"].exists)
     }
@@ -40,16 +40,16 @@ final class NomiUploadFlowUITests: XCTestCase {
         }
 
         XCTAssertTrue(app.buttons.matching(identifier: "upload-open").firstMatch.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(app.navigationBars["健康资料"].exists || app.staticTexts["健康资料"].exists)
+        XCTAssertTrue(app.navigationBars["资料"].exists || app.staticTexts["资料"].exists)
 
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 3), app.debugDescription)
         XCTAssertGreaterThanOrEqual(tabBar.buttons.count, 3, app.debugDescription)
         tabBar.buttons.element(boundBy: 1).tap()
-        XCTAssertTrue(app.textFields["基于已有资料提问"].waitForExistence(timeout: 3) || app.staticTexts["开始一段对话"].exists)
+        XCTAssertTrue(app.textFields["问 Nomi"].waitForExistence(timeout: 3) || app.staticTexts["新对话"].exists)
         tabBar.buttons.element(boundBy: 2).tap()
         XCTAssertTrue(app.navigationBars["家庭"].waitForExistence(timeout: 3) || app.staticTexts["家庭"].exists)
-        XCTAssertTrue(app.buttons["添加家庭成员"].exists)
+        XCTAssertTrue(app.buttons["添加成员"].exists)
         XCTAssertTrue(app.buttons["退出登录"].exists)
     }
 

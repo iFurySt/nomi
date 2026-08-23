@@ -8,6 +8,7 @@ struct PersonModel: Codable, Identifiable, Hashable { let id: String; let displa
 struct AgentResultModel: Codable { let title: String; let answer: String; let summary: String; let changes: String; let currentAssessment: String; let openQuestions: [String]; let citations: [String]; enum CodingKeys: String,CodingKey { case title,answer,summary,changes,citations; case currentAssessment="current_assessment"; case openQuestions="open_questions" } }
 struct AssetModel: Codable, Identifiable { let id: String; let personID: String?; let originalName: String; let mimeType: String; let status: String; let analysis: AgentResultModel?; let createdAt: String; enum CodingKeys: String,CodingKey { case id,status,analysis; case personID="person_id"; case originalName="original_name"; case mimeType="mime_type"; case createdAt="created_at" } }
 struct JobModel: Codable, Identifiable { let id: String; let personID: String?; let kind: String; let status: String; let result: AgentResultModel?; let error: String?; let createdAt: String; enum CodingKeys: String,CodingKey { case id,kind,status,result,error; case personID="person_id"; case createdAt="created_at" } }
+struct KnowledgeEntryModel: Codable, Identifiable { let id: String; let personID: String?; let kind: String; let title: String; let summary: String; let sourcePath: String; let result: AgentResultModel?; let occurredOn: String?; let updatedAt: String; enum CodingKeys: String,CodingKey { case id,kind,title,summary,result; case personID="person_id"; case sourcePath="source_path"; case occurredOn="occurred_on"; case updatedAt="updated_at" } }
 struct ThreadModel: Codable, Identifiable { let id: String; let personID: String?; let title: String; let updatedAt: String; enum CodingKeys: String,CodingKey { case id,title; case personID="person_id"; case updatedAt="updated_at" } }
 struct MessageModel: Codable, Identifiable { let id: String; let role: String; let content: String; let citations: [String]?; let status: String; let createdAt: String; enum CodingKeys: String,CodingKey { case id,role,content,citations,status; case createdAt="created_at" } }
 struct UploadResponse: Codable { let asset: AssetModel; let job: JobModel }
@@ -37,6 +38,7 @@ enum NomiAPIClient {
     static func createPerson(token:String,name:String,relationship:String) async throws -> PersonModel { try await json(path:"v1/people",method:"POST",body:["display_name":name,"relationship":relationship],token:token) }
     static func assets(token:String,personID:String?) async throws -> [AssetModel] { let response: AssetsResponse=try await json(path:path("v1/assets",personID),token:token);return response.assets }
     static func jobs(token:String,personID:String?) async throws -> [JobModel] { let response: JobsResponse=try await json(path:path("v1/jobs",personID),token:token);return response.jobs }
+    static func knowledge(token:String,personID:String?) async throws -> [KnowledgeEntryModel] { let response: KnowledgeResponse=try await json(path:path("v1/knowledge",personID),token:token);return response.entries }
     static func threads(token:String,personID:String?) async throws -> [ThreadModel] { let response: ThreadsResponse=try await json(path:path("v1/threads",personID),token:token);return response.threads }
     static func createThread(token:String,personID:String?,title:String) async throws -> ThreadModel { var body=["title":title];if let personID{body["person_id"]=personID};return try await json(path:"v1/threads",method:"POST",body:body,token:token) }
     static func messages(token:String,threadID:String) async throws -> [MessageModel] { let response: MessagesResponse=try await json(path:"v1/threads/\(threadID)/messages",token:token);return response.messages }
@@ -63,6 +65,7 @@ private struct EmptyResponse:Decodable{init(){}}
 private struct PeopleResponse:Decodable{let people:[PersonModel]}
 private struct AssetsResponse:Decodable{let assets:[AssetModel]}
 private struct JobsResponse:Decodable{let jobs:[JobModel]}
+private struct KnowledgeResponse:Decodable{let entries:[KnowledgeEntryModel]}
 private struct ThreadsResponse:Decodable{let threads:[ThreadModel]}
 private struct MessagesResponse:Decodable{let messages:[MessageModel]}
 

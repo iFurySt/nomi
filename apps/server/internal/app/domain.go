@@ -90,6 +90,21 @@ type Job struct {
 	CompletedAt *time.Time      `json:"completed_at,omitempty"`
 }
 
+type KnowledgeEntry struct {
+	ID          string          `json:"id"`
+	HouseholdID string          `json:"household_id"`
+	PersonID    *string         `json:"person_id,omitempty"`
+	Kind        string          `json:"kind"`
+	Title       string          `json:"title"`
+	Summary     string          `json:"summary"`
+	SourcePath  string          `json:"source_path"`
+	SourceHash  string          `json:"-"`
+	Result      json.RawMessage `json:"result,omitempty"`
+	OccurredOn  *time.Time      `json:"occurred_on,omitempty"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+}
+
 type Thread struct {
 	ID          string    `json:"id"`
 	HouseholdID string    `json:"household_id"`

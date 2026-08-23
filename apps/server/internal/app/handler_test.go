@@ -24,6 +24,7 @@ func TestAllV1RoutesRequireSession(t *testing.T) {
 		{http.MethodGet, "/v1/people"}, {http.MethodPost, "/v1/people"}, {http.MethodPatch, "/v1/people/p1"}, {http.MethodDelete, "/v1/people/p1"},
 		{http.MethodGet, "/v1/assets"}, {http.MethodPost, "/v1/assets"}, {http.MethodGet, "/v1/assets/a1"}, {http.MethodGet, "/v1/assets/a1/content"}, {http.MethodDelete, "/v1/assets/a1"},
 		{http.MethodGet, "/v1/jobs"}, {http.MethodGet, "/v1/jobs/j1"},
+		{http.MethodGet, "/v1/knowledge"},
 		{http.MethodGet, "/v1/threads"}, {http.MethodPost, "/v1/threads"}, {http.MethodGet, "/v1/threads/t1"}, {http.MethodDelete, "/v1/threads/t1"}, {http.MethodGet, "/v1/threads/t1/messages"}, {http.MethodPost, "/v1/threads/t1/messages"},
 		{http.MethodGet, "/v1/future-route"},
 	}

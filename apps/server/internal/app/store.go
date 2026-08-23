@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -45,6 +46,8 @@ type Store interface {
 	CompleteJob(context.Context, string, json.RawMessage) error
 	FailJob(context.Context, string, string) error
 	RequeueExpiredJobs(context.Context, time.Time) error
+	ListKnowledge(context.Context, string, *string) ([]KnowledgeEntry, error)
+	UpsertKnowledge(context.Context, KnowledgeEntry) (KnowledgeEntry, error)
 	CreateThread(context.Context, Principal, *string, string) (Thread, error)
 	ListThreads(context.Context, string, *string) ([]Thread, error)
 	GetThread(context.Context, string, string) (Thread, error)
@@ -70,6 +73,7 @@ create table if not exists household_invites(id uuid primary key default gen_ran
 create table if not exists people(id uuid primary key default gen_random_uuid(),household_id uuid not null references households(id) on delete cascade,display_name text not null,relationship text not null default '',created_by uuid not null references users(id),created_at timestamptz not null default now(),updated_at timestamptz not null default now());
 create table if not exists assets(id uuid primary key default gen_random_uuid(),household_id uuid not null references households(id) on delete cascade,person_id uuid references people(id) on delete set null,created_by uuid not null references users(id),storage_provider text not null,storage_key text not null unique,original_name text not null,mime_type text not null,size_bytes bigint not null,sha256 text not null,status text not null default 'queued',analysis jsonb,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
 create table if not exists jobs(id uuid primary key default gen_random_uuid(),household_id uuid not null references households(id) on delete cascade,person_id uuid references people(id) on delete set null,created_by uuid not null references users(id),kind text not null check(kind in('ingest','chat')),status text not null default 'queued' check(status in('queued','processing','completed','failed')),payload jsonb not null default '{}'::jsonb,result jsonb,error text not null default '',attempts int not null default 0,created_at timestamptz not null default now(),started_at timestamptz,completed_at timestamptz);
+create table if not exists knowledge_entries(id uuid primary key default gen_random_uuid(),household_id uuid not null references households(id) on delete cascade,person_id uuid references people(id) on delete set null,kind text not null,title text not null,summary text not null default '',source_path text not null,source_hash text not null,result jsonb,occurred_on date,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(household_id,source_path));
 create table if not exists threads(id uuid primary key default gen_random_uuid(),household_id uuid not null references households(id) on delete cascade,person_id uuid references people(id) on delete set null,created_by uuid not null references users(id),title text not null,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
 create table if not exists messages(id uuid primary key default gen_random_uuid(),household_id uuid not null references households(id) on delete cascade,thread_id uuid not null references threads(id) on delete cascade,user_id uuid references users(id) on delete set null,role text not null check(role in('user','assistant')),content text not null,citations jsonb,status text not null default 'completed',created_at timestamptz not null default now());
 create index if not exists sessions_token_hash_idx on sessions(token_hash);
@@ -77,6 +81,7 @@ create index if not exists people_household_idx on people(household_id,created_a
 create index if not exists assets_household_idx on assets(household_id,created_at desc);
 create index if not exists jobs_queue_idx on jobs(status,created_at);
 create index if not exists jobs_household_idx on jobs(household_id,created_at desc);
+create index if not exists knowledge_household_idx on knowledge_entries(household_id,occurred_on desc,updated_at desc);
 create index if not exists threads_household_idx on threads(household_id,updated_at desc);
 create index if not exists messages_thread_idx on messages(thread_id,created_at);`)
 	return err
@@ -369,6 +374,49 @@ func (s *PostgresStore) FailJob(ctx context.Context, id, message string) error {
 func (s *PostgresStore) RequeueExpiredJobs(ctx context.Context, before time.Time) error {
 	_, err := s.pool.Exec(ctx, `update jobs set status='queued',started_at=null,error='worker lease expired' where status='processing' and started_at<$1`, before)
 	return err
+}
+
+func scanKnowledge(row pgx.Row) (KnowledgeEntry, error) {
+	var entry KnowledgeEntry
+	err := row.Scan(&entry.ID, &entry.HouseholdID, &entry.PersonID, &entry.Kind, &entry.Title, &entry.Summary, &entry.SourcePath, &entry.SourceHash, &entry.Result, &entry.OccurredOn, &entry.CreatedAt, &entry.UpdatedAt)
+	return entry, err
+}
+
+const knowledgeCols = `id::text,household_id::text,person_id::text,kind,title,summary,source_path,source_hash,result,occurred_on,created_at,updated_at`
+
+func (s *PostgresStore) ListKnowledge(ctx context.Context, householdID string, personID *string) ([]KnowledgeEntry, error) {
+	query := `select ` + knowledgeCols + ` from knowledge_entries where household_id=$1::uuid`
+	args := []any{householdID}
+	if personID != nil {
+		query += ` and person_id=$2::uuid`
+		args = append(args, *personID)
+	}
+	query += ` order by occurred_on desc nulls last,updated_at desc limit 200`
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	entries := []KnowledgeEntry{}
+	for rows.Next() {
+		entry, err := scanKnowledge(rows)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	return entries, rows.Err()
+}
+
+func (s *PostgresStore) UpsertKnowledge(ctx context.Context, entry KnowledgeEntry) (KnowledgeEntry, error) {
+	if strings.TrimSpace(entry.ID) == "" {
+		var err error
+		entry.ID, err = newID()
+		if err != nil {
+			return KnowledgeEntry{}, err
+		}
+	}
+	return scanKnowledge(s.pool.QueryRow(ctx, `insert into knowledge_entries(id,household_id,person_id,kind,title,summary,source_path,source_hash,result,occurred_on) values($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7,$8,$9,$10) on conflict(household_id,source_path) do update set person_id=excluded.person_id,kind=excluded.kind,title=excluded.title,summary=excluded.summary,source_hash=excluded.source_hash,result=excluded.result,occurred_on=excluded.occurred_on,updated_at=now() returning `+knowledgeCols, entry.ID, entry.HouseholdID, entry.PersonID, entry.Kind, entry.Title, entry.Summary, entry.SourcePath, entry.SourceHash, entry.Result, entry.OccurredOn))
 }
 
 func scanThread(row pgx.Row) (Thread, error) {

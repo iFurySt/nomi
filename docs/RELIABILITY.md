@@ -12,6 +12,7 @@
 - job 状态为 `queued`、`processing`、`completed`、`failed`。
 - worker 用数据库 claim 和 `SKIP LOCKED`，启动时回收超过 10 分钟的 processing job。
 - 原件 materialize 与最终归档按 asset ID 幂等；ai-vault index 不重复追加同一 asset。
+- 旧知识库导入按目标相对路径和内容 hash 幂等：相同内容跳过，不同内容拒绝覆盖；`knowledge_entries` 按 household + source path upsert。
 - `raw-data/_incoming` 被 git ignore，失败任务不会被后续无关 commit 带入历史。
 - 当前失败任务不会自动无限重试，用户可看到稳定错误；后续应增加显式 retry API 和退避策略。
 
@@ -27,6 +28,7 @@
 - `/opt/nomi/data` bind mount 同时保存 assets 和 household workspaces；Postgres 独立持久化。
 - 发布前后要验证 data bind、workspace cwd 和容器 UID 写权限。
 - 备份必须同时覆盖 Postgres 与 `/opt/nomi/data`，并以同一恢复点为目标。
+- 一次性历史导入先保留只读 staging，并在变更前生成 Postgres dump；目标 workspace 原本不存在时要把这一事实记录为恢复边界。
 
 ## 验证
 

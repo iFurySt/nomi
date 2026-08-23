@@ -78,6 +78,7 @@ func (h *Handler) Routes() http.Handler {
 	protected.HandleFunc("DELETE /v1/assets/{id}", h.deleteAsset)
 	protected.HandleFunc("GET /v1/jobs", h.listJobs)
 	protected.HandleFunc("GET /v1/jobs/{id}", h.getJob)
+	protected.HandleFunc("GET /v1/knowledge", h.listKnowledge)
 	protected.HandleFunc("GET /v1/threads", h.listThreads)
 	protected.HandleFunc("POST /v1/threads", h.createThread)
 	protected.HandleFunc("GET /v1/threads/{id}", h.getThread)
@@ -432,6 +433,16 @@ func (h *Handler) getJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, job)
+}
+
+func (h *Handler) listKnowledge(w http.ResponseWriter, r *http.Request) {
+	p := mustPrincipal(r)
+	entries, err := h.store.ListKnowledge(r.Context(), p.HouseholdID, personFilter(r))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "knowledge_unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"entries": entries})
 }
 
 func (h *Handler) createThread(w http.ResponseWriter, r *http.Request) {
