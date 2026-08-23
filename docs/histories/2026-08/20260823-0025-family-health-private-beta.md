@@ -34,6 +34,7 @@
 - 使用无真实个人/医疗信息的 synthetic 文本在隔离审核家庭完成生产 ingest → workspace citation → chat 全链路；ingest 和 chat job 均完成且各返回 1 条引用，验证外测账号实际可用而不只是能够登录。
 - 生产多账号验收中，owner 生成一次性邀请码、第二个 synthetic 账号加入同一审核家庭，并从双方验证 people/assets/threads 投影一致；member 创建邀请码正确返回 `403`。临时 session 与 synthetic 成员随后精确清理，不触碰真实家庭。
 - 经用户确认后为 `Nomi Family Beta` 启用人数上限为 10 的 Public Link；公网直连和 App Store Connect UI 均验证可用。实际链接不写入 git，安装后的真实家庭注册仍需 owner 生成的一次性 Nomi 邀请码。
+- 最终 completion audit 按原始目标重跑 server race/vet、iOS simulator build、登录/邀请码 XCUITest、生产 public/protected HTTP 边界和部署运行态检查；`server-v0.2.3` 容器 healthy、SeedX service active。工程侧要求均有当前证据，计划只保留家庭成员真机安装、注册、上传与对话验收这一项。
 
 ### 🧠 Design Intent (Why)
 

@@ -10,6 +10,6 @@
 | 后端 | B | `/v1` 默认鉴权、tenant scoped CRUD、持久 job queue、workspace git 和 SeedX/Codex 均已实现。 | 缺速率限制、审计表、retry API 与完整删除语义。 |
 | Agent | B | 真实 ingest 37.8 秒、chat 45.8 秒完成，归档/摘要/commit/citations 均有实证。 | SeedX 0.2.1 daemon 的 60 秒硬上限需上游配置化。 |
 | 测试 | B | Go 单测、鉴权默认拒绝、storage traversal、workspace finalization、Swift build 与 auth UI test。 | 缺自动 Postgres 集成测试和 CI 中的真实 SeedX smoke。 |
-| 部署 | B | `server-v0.2.1` 已通过 GHCR tag release 部署 amoylab，bind data、nginx、SeedX systemd、Codex auth 和线上 ingest/chat smoke 已验证；切换前保留旧 PG/上传卷备份。 | 需要做周期化备份和完整恢复演练。 |
+| 部署 | B | `server-v0.2.3` 已通过 GHCR tag release 部署 amoylab；当前容器 healthy、SeedX systemd active，bind data、nginx、Codex auth 和线上 ingest/chat smoke 已验证；切换前保留旧 PG/上传卷备份。 | 需要做周期化备份和完整恢复演练。 |
 | 安全 | B- | bcrypt、hashed opaque sessions、single household bootstrap、一次性邀请、tenant isolation、Keychain。 | 缺 rate limit、邮箱验证、密码重置、设备会话和彻底删除。 |
 | 可观测性 | C | 结构化 job 日志包含 id/kind/household/duration/error。 | 缺 metrics、traces、队列告警和 request id。 |

@@ -54,3 +54,18 @@
 - 2026-08-23：审核凭据由生产 CLI 随机生成，生产与本机副本均为 `0600`；App Store Connect API 只提交经用户确认的联系人、审核凭据和说明，敏感值不进入 git 或 history。
 - 2026-08-23：Build 5 加入 `Nomi Family Beta` 后 Apple API 与 App Store Connect UI 均确认外部组已有 1 个 build，Beta Review 状态直接为 `APPROVED`。
 - 2026-08-23：用户确认创建 10 人 Public Link；TestFlight 链接只提供安装资格，真实家庭的账号加入继续由 owner 生成的一次性 Nomi 邀请码控制。
+
+## Completion audit
+
+2026-08-23 按原始 V1 目标重新核验当前源码、测试与生产状态：
+
+| 原始要求 | 权威证据 | 结论 |
+| --- | --- | --- |
+| mobile-first iOS，不维护 macOS 兼容 | `apps/ios/Nomi` 当前 SwiftUI shell；iPhone 17 Pro Debug build 与登录/邀请码 XCUITest 通过 | 已证明 |
+| server CRUD 后异步驱动 SeedX/Codex | Postgres job queue、worker、SeedX controller 与 Codex runner；生产 synthetic ingest/chat 均完成并返回 citation | 已证明 |
+| 多用户与默认全局鉴权 | `/v1/*` 顶层 session gate、未知 `/v1/future-route` 单测与生产请求均返回 `401`；synthetic 双账号共享投影、member invite `403` | 已证明 |
+| FS 为资料真相源，PG 保存结构化状态，storage 可替换 | household workspace、显式 tenant-scoped Store 查询与 `StorageProvider` 接口；race tests 覆盖 traversal/workspace finalization | 已证明 |
+| 部署 amoylab 并使用服务端 Codex 登录态 | `server-v0.2.3` 容器 healthy、`nomi-seedx.service` active；生产 ingest/chat smoke 已完成 | 已证明 |
+| 家庭成员可以安装、注册、上传并 chat | Build 5 已获 Beta Review `APPROVED`，10 人 Public Link 可访问；仍缺一台家庭成员真机完成安装、邀请码注册、上传和对话 | 待外部验收 |
+
+本轮重新执行 `go test -race ./...`、`go vet ./...`、iOS simulator build、登录/邀请码 XCUITest、生产 public/protected HTTP 边界与部署运行态检查，均通过。工程侧没有发现新的 V1 阻塞项；在家庭成员真机证据出现前，plan 保持 active，整体目标不提前标记完成。
