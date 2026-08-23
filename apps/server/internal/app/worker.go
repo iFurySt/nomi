@@ -111,6 +111,7 @@ func (w *JobWorker) processIngest(ctx context.Context, job Job, workspace, agent
 	if err != nil {
 		return AgentResult{}, err
 	}
+	result = result.Normalized()
 	archived, err := w.workspace.FinalizeIngest(workspace, asset, relative, personName, result)
 	if err != nil {
 		return AgentResult{}, err
@@ -174,6 +175,7 @@ func (w *JobWorker) processChat(ctx context.Context, job Job, workspace, agentCW
 	if err != nil {
 		return AgentResult{}, err
 	}
+	result = result.Normalized()
 	if len(result.Citations) == 0 {
 		if citation := w.workspace.ExistingContextPath(workspace, thread.PersonID); citation != "" {
 			result.Citations = []string{citation}

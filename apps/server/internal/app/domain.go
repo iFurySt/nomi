@@ -136,6 +136,16 @@ type AgentResult struct {
 	Citations         []string `json:"citations"`
 }
 
+func (r AgentResult) Normalized() AgentResult {
+	if r.OpenQuestions == nil {
+		r.OpenQuestions = []string{}
+	}
+	if r.Citations == nil {
+		r.Citations = []string{}
+	}
+	return r
+}
+
 func (r AgentResult) Validate(kind string) error {
 	if kind == JobKindChat && strings.TrimSpace(r.Answer) == "" {
 		return errors.New("agent_answer_required")

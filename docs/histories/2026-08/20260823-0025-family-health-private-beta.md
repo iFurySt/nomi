@@ -40,6 +40,8 @@
 - `nomi-codex` 保持只读；稳定资料通过无 `--delete` 的 rsync 同步到生产独立 staging，共 670 个文件、约 92 MiB。发布 `server-v0.2.4` 后生成权限 `0600` 的导入前 Postgres dump，dry-run 唯一命中真实家庭，正式导入新增 565 个文件、1 位成员和 81 条 knowledge。
 - 导入后验证两位成员均使用 UUID scope，空标题/摘要、legacy slug 目录和未改写引用均为 0；审核家庭仍为 0 条 knowledge。重复运行 importer 得到 `files_added=0`、`people_created=0`、knowledge 总数不增长，线上认证 API 返回 81 条且未认证仍为 `401`。
 - iOS `0.1 (6)` 已 archive 并上传 TestFlight，Build 6 同时进入内部与外部测试组；内部状态为 `IN_BETA_TESTING`，外部状态为 `BETA_APPROVED`。真实家庭内容不进入 binary 或审核家庭。
+- Build 6 首次读取真实导入知识时暴露 JSON contract 缺陷：legacy result 的 `open_questions` 为 `null`，Swift 必需数组使整次刷新失败并显示系统英文 missing。生产先留存修正前 PG dump，再精确把 81 条 null 规范为 `[]`；随后真实账号 XCUITest 确认登录后出现 knowledge entry、无 alert，且资料/对话/家庭三页可进入。
+- 长期修复在 server 持久化前统一规范 Agent 数组，在 iOS 解码层对旧 null/missing 字段容错并输出稳定中文错误；legacy projection 同时隐藏内部路径型摘要、移除列表标题中与日期行重复的日期前缀。iOS build number 递增到 7。
 
 ### 🧠 Design Intent (Why)
 

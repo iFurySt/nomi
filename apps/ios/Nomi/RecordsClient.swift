@@ -5,14 +5,27 @@ struct NomiUser: Codable, Identifiable { let id: String; let email: String; let 
 struct NomiHousehold: Codable, Identifiable { let id: String; let name: String; let role: String }
 struct AuthSession: Codable { let token: String; let expiresAt: String; let user: NomiUser; let household: NomiHousehold; enum CodingKeys: String,CodingKey { case token,user,household; case expiresAt="expires_at" } }
 struct PersonModel: Codable, Identifiable, Hashable { let id: String; let displayName: String; let relationship: String; enum CodingKeys: String,CodingKey { case id,relationship; case displayName="display_name" } }
-struct AgentResultModel: Codable { let title: String; let answer: String; let summary: String; let changes: String; let currentAssessment: String; let openQuestions: [String]; let citations: [String]; enum CodingKeys: String,CodingKey { case title,answer,summary,changes,citations; case currentAssessment="current_assessment"; case openQuestions="open_questions" } }
-struct AssetModel: Codable, Identifiable { let id: String; let personID: String?; let originalName: String; let mimeType: String; let status: String; let analysis: AgentResultModel?; let createdAt: String; enum CodingKeys: String,CodingKey { case id,status,analysis; case personID="person_id"; case originalName="original_name"; case mimeType="mime_type"; case createdAt="created_at" } }
-struct JobModel: Codable, Identifiable { let id: String; let personID: String?; let kind: String; let status: String; let result: AgentResultModel?; let error: String?; let createdAt: String; enum CodingKeys: String,CodingKey { case id,kind,status,result,error; case personID="person_id"; case createdAt="created_at" } }
-struct KnowledgeEntryModel: Codable, Identifiable { let id: String; let personID: String?; let kind: String; let title: String; let summary: String; let sourcePath: String; let result: AgentResultModel?; let occurredOn: String?; let updatedAt: String; enum CodingKeys: String,CodingKey { case id,kind,title,summary,result; case personID="person_id"; case sourcePath="source_path"; case occurredOn="occurred_on"; case updatedAt="updated_at" } }
+struct AgentResultModel: Decodable {
+    let title: String; let answer: String; let summary: String; let changes: String; let currentAssessment: String; let openQuestions: [String]; let citations: [String]
+    enum CodingKeys: String,CodingKey { case title,answer,summary,changes,citations; case currentAssessment="current_assessment"; case openQuestions="open_questions" }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        title = try values.decodeIfPresent(String.self, forKey: .title) ?? ""
+        answer = try values.decodeIfPresent(String.self, forKey: .answer) ?? ""
+        summary = try values.decodeIfPresent(String.self, forKey: .summary) ?? ""
+        changes = try values.decodeIfPresent(String.self, forKey: .changes) ?? ""
+        currentAssessment = try values.decodeIfPresent(String.self, forKey: .currentAssessment) ?? ""
+        openQuestions = try values.decodeIfPresent([String].self, forKey: .openQuestions) ?? []
+        citations = try values.decodeIfPresent([String].self, forKey: .citations) ?? []
+    }
+}
+struct AssetModel: Decodable, Identifiable { let id: String; let personID: String?; let originalName: String; let mimeType: String; let status: String; let analysis: AgentResultModel?; let createdAt: String; enum CodingKeys: String,CodingKey { case id,status,analysis; case personID="person_id"; case originalName="original_name"; case mimeType="mime_type"; case createdAt="created_at" } }
+struct JobModel: Decodable, Identifiable { let id: String; let personID: String?; let kind: String; let status: String; let result: AgentResultModel?; let error: String?; let createdAt: String; enum CodingKeys: String,CodingKey { case id,kind,status,result,error; case personID="person_id"; case createdAt="created_at" } }
+struct KnowledgeEntryModel: Decodable, Identifiable { let id: String; let personID: String?; let kind: String; let title: String; let summary: String; let sourcePath: String; let result: AgentResultModel?; let occurredOn: String?; let updatedAt: String; enum CodingKeys: String,CodingKey { case id,kind,title,summary,result; case personID="person_id"; case sourcePath="source_path"; case occurredOn="occurred_on"; case updatedAt="updated_at" } }
 struct ThreadModel: Codable, Identifiable { let id: String; let personID: String?; let title: String; let updatedAt: String; enum CodingKeys: String,CodingKey { case id,title; case personID="person_id"; case updatedAt="updated_at" } }
 struct MessageModel: Codable, Identifiable { let id: String; let role: String; let content: String; let citations: [String]?; let status: String; let createdAt: String; enum CodingKeys: String,CodingKey { case id,role,content,citations,status; case createdAt="created_at" } }
-struct UploadResponse: Codable { let asset: AssetModel; let job: JobModel }
-struct MessageResponse: Codable { let message: MessageModel; let job: JobModel }
+struct UploadResponse: Decodable { let asset: AssetModel; let job: JobModel }
+struct MessageResponse: Decodable { let message: MessageModel; let job: JobModel }
 struct HouseholdInvite: Codable { let inviteCode: String; let expiresAt: String; enum CodingKeys: String,CodingKey { case inviteCode="invite_code"; case expiresAt="expires_at" } }
 
 enum NomiAPIError: LocalizedError {
@@ -57,7 +70,7 @@ enum NomiAPIClient {
     private static func endpointURL(_ path:String)->URL { URL(string:path,relativeTo:baseURL.appending(path:"/"))! }
     private static func json<T:Decodable>(path:String,method:String="GET",token:String?,allowEmpty:Bool=false) async throws -> T { var request=URLRequest(url:endpointURL(path));request.httpMethod=method;request.timeoutInterval=90;if let token{request.setValue("Bearer \(token)",forHTTPHeaderField:"Authorization")};return try await perform(request,allowEmpty:allowEmpty) }
     private static func json<T:Decodable,B:Encodable>(path:String,method:String="GET",body:B,token:String?,allowEmpty:Bool=false) async throws -> T { var request=URLRequest(url:endpointURL(path));request.httpMethod=method;request.timeoutInterval=90;if let token{request.setValue("Bearer \(token)",forHTTPHeaderField:"Authorization")};request.setValue("application/json",forHTTPHeaderField:"Content-Type");request.httpBody=try JSONEncoder().encode(body);return try await perform(request,allowEmpty:allowEmpty) }
-    private static func perform<T:Decodable>(_ request:URLRequest,allowEmpty:Bool=false) async throws -> T { let data:Data;let response:URLResponse;do{(data,response)=try await URLSession.shared.data(for:request)}catch{throw NomiAPIError.transport(request.url?.host ?? baseURL.absoluteString)};guard let http=response as? HTTPURLResponse else{throw NomiAPIError.invalidResponse};guard (200..<300).contains(http.statusCode) else{let code=(try? JSONDecoder().decode(ErrorResponse.self,from:data).error) ?? "HTTP \(http.statusCode)";throw NomiAPIError.server(code)};if allowEmpty&&data.isEmpty{return EmptyResponse() as! T};return try JSONDecoder().decode(T.self,from:data) }
+    private static func perform<T:Decodable>(_ request:URLRequest,allowEmpty:Bool=false) async throws -> T { let data:Data;let response:URLResponse;do{(data,response)=try await URLSession.shared.data(for:request)}catch{throw NomiAPIError.transport(request.url?.host ?? baseURL.absoluteString)};guard let http=response as? HTTPURLResponse else{throw NomiAPIError.invalidResponse};guard (200..<300).contains(http.statusCode) else{let code=(try? JSONDecoder().decode(ErrorResponse.self,from:data).error) ?? "HTTP \(http.statusCode)";throw NomiAPIError.server(code)};if allowEmpty&&data.isEmpty{return EmptyResponse() as! T};do{return try JSONDecoder().decode(T.self,from:data)}catch{throw NomiAPIError.invalidResponse} }
 }
 
 private struct ErrorResponse:Decodable{let error:String}

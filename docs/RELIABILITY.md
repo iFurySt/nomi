@@ -13,6 +13,7 @@
 - worker 用数据库 claim 和 `SKIP LOCKED`，启动时回收超过 10 分钟的 processing job。
 - 原件 materialize 与最终归档按 asset ID 幂等；ai-vault index 不重复追加同一 asset。
 - 旧知识库导入按目标相对路径和内容 hash 幂等：相同内容跳过，不同内容拒绝覆盖；`knowledge_entries` 按 household + source path upsert。
+- Agent result 的 `open_questions` 与 `citations` 在持久化前统一规范为 JSON `[]`，不得以 `null` 破坏移动端 projection 解码；iOS 同时对旧数据中的 null/missing 字段容错。
 - `raw-data/_incoming` 被 git ignore，失败任务不会被后续无关 commit 带入历史。
 - 当前失败任务不会自动无限重试，用户可看到稳定错误；后续应增加显式 retry API 和退避策略。
 

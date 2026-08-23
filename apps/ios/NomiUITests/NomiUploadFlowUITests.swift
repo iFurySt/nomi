@@ -20,7 +20,7 @@ final class NomiUploadFlowUITests: XCTestCase {
     }
 
     func testRealFamilyLoginShowsMobileShell() throws {
-        let app = launchApp()
+        let app = launchApp(resetSession: true)
         defer { app.terminate() }
         if !app.buttons.matching(identifier: "upload-open").firstMatch.waitForExistence(timeout: 3) {
             let environment = ProcessInfo.processInfo.environment
@@ -41,6 +41,8 @@ final class NomiUploadFlowUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons.matching(identifier: "upload-open").firstMatch.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.navigationBars["资料"].exists || app.staticTexts["资料"].exists)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "knowledge-entry").firstMatch.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
 
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 3), app.debugDescription)

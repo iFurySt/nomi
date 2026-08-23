@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -85,6 +86,26 @@ func TestParseLegacyKnowledgeFile(t *testing.T) {
 	}
 	if !strings.Contains(string(entry.Result), "raw-data/people/person-id/report.pdf") {
 		t.Fatalf("missing citation: %s", entry.Result)
+	}
+	var result AgentResult
+	if err = json.Unmarshal(entry.Result, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.OpenQuestions == nil || result.Citations == nil {
+		t.Fatalf("nullable arrays in result: %s", entry.Result)
+	}
+}
+
+func TestParseLegacyKnowledgeFileHidesInternalPathSummaryAndRepeatedDate(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "2026-08-22-example.md")
+	writeTestFile(t, path, "# 2026-08-22 家用记录\n\n原始口述记录：`raw-data/people/person-id/note.txt`\n")
+	entry, err := parseLegacyKnowledgeFile(path, "ai-vault/people/person-id/notes/2026-08-22-example.md", "household-id", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry.Title != "家用记录" || strings.Contains(entry.Summary, "raw-data/") {
+		t.Fatalf("internal metadata leaked into display fields: %+v", entry)
 	}
 }
 

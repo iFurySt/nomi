@@ -80,7 +80,7 @@ func parseAgentResult(text string) (AgentResult, error) {
 	if !found {
 		return AgentResult{}, errors.New("agent_result_json_missing")
 	}
-	return out, nil
+	return out.Normalized(), nil
 }
 
 func ingestPrompt(personName, relativePath, contextPath, jobID string) string {

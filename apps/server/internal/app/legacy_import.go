@@ -38,6 +38,7 @@ type legacyImportStats struct {
 
 var legacySlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 var legacyDatePattern = regexp.MustCompile(`(?:^|[^0-9])(20[0-9]{2}-[01][0-9]-[0-3][0-9])(?:[^0-9]|$)`)
+var legacyTitleDatePattern = regexp.MustCompile(`^20[0-9]{2}-[01][0-9]-[0-3][0-9]\s*[-–—:]?\s*`)
 var legacyCitationPattern = regexp.MustCompile("`((?:raw-data|ai-vault)/[^`]+)`")
 var legacyUUIDPattern = regexp.MustCompile(`^[0-9a-f-]{36}$`)
 var legacyOrderedListPattern = regexp.MustCompile(`^[0-9]+\. `)
@@ -415,7 +416,11 @@ func parseLegacyKnowledgeFile(path, sourcePath, householdID string, personID *st
 	if title == "" {
 		title = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	}
-	if summary == "" {
+	title = strings.TrimSpace(legacyTitleDatePattern.ReplaceAllString(title, ""))
+	if title == "" {
+		title = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	}
+	if summary == "" || strings.Contains(summary, "raw-data/") || strings.Contains(summary, "ai-vault/") {
 		summary = "已从原知识库导入，可在对话中继续查询完整内容。"
 	}
 	citations := []string{sourcePath}
@@ -427,7 +432,7 @@ func parseLegacyKnowledgeFile(path, sourcePath, householdID string, personID *st
 			citations = append(citations, citation)
 		}
 	}
-	result, err := json.Marshal(AgentResult{Title: title, Summary: summary, Citations: citations})
+	result, err := json.Marshal(AgentResult{Title: title, Summary: summary, Citations: citations}.Normalized())
 	if err != nil {
 		return KnowledgeEntry{}, err
 	}

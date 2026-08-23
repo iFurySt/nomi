@@ -133,6 +133,17 @@ func TestParseAgentResult(t *testing.T) {
 	}
 }
 
+func TestParseAgentResultNormalizesNullableArrays(t *testing.T) {
+	t.Parallel()
+	result, err := parseAgentResult(`{"title":"资料","summary":"已整理","open_questions":null,"citations":null}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OpenQuestions == nil || result.Citations == nil {
+		t.Fatalf("result arrays were not normalized: %#v", result)
+	}
+}
+
 func TestParseAgentResultAcceptsTrailingSeedXText(t *testing.T) {
 	t.Parallel()
 	input := `{"title":"回答","answer":"第一份完整结果","summary":"","changes":"","current_assessment":"","open_questions":[],"citations":[]}` + "\n" + `{"event":"duplicate transport text"}`

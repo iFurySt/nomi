@@ -71,7 +71,7 @@ struct LibraryView: View {
     @ObservedObject var model:NomiAppModel
     @State private var showUpload=false
     private var pendingJobs:[JobModel]{model.jobs.filter{$0.kind=="ingest" && $0.status != "completed"}}
-    var body: some View { VStack(spacing:12){ScopePicker(model:model);if pendingJobs.isEmpty && model.knowledge.isEmpty{ContentUnavailableView("暂无资料",systemImage:"doc.badge.plus")}else{List{ForEach(pendingJobs){job in JobRow(job:job)};ForEach(model.knowledge){entry in NavigationLink{KnowledgeDetailView(entry:entry)}label:{KnowledgeRow(entry:entry)}}}.listStyle(.plain).refreshable{await model.refreshAll()}}}.navigationTitle("资料").toolbar{ToolbarItem(placement:.topBarTrailing){Button{showUpload=true}label:{Image(systemName:"plus")}.accessibilityIdentifier("upload-open")}}.sheet(isPresented:$showUpload){UploadView(model:model)} }
+    var body: some View { VStack(spacing:12){ScopePicker(model:model);if pendingJobs.isEmpty && model.knowledge.isEmpty{ContentUnavailableView("暂无资料",systemImage:"doc.badge.plus")}else{List{ForEach(pendingJobs){job in JobRow(job:job)};ForEach(model.knowledge){entry in NavigationLink{KnowledgeDetailView(entry:entry)}label:{KnowledgeRow(entry:entry)}.accessibilityIdentifier("knowledge-entry")}}.listStyle(.plain).refreshable{await model.refreshAll()}}}.navigationTitle("资料").toolbar{ToolbarItem(placement:.topBarTrailing){Button{showUpload=true}label:{Image(systemName:"plus")}.accessibilityIdentifier("upload-open")}}.sheet(isPresented:$showUpload){UploadView(model:model)} }
 }
 
 struct JobRow: View {
