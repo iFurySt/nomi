@@ -40,11 +40,13 @@
 - [x] 确认真实家庭初始化成功，Build 5 已进入内部测试组。
 - [x] 完成公开隐私/支持页面和隔离审核账号入口。
 - [x] 部署外测 server 能力并验证公开页面。
-- [ ] 经用户确认后创建隔离审核家庭。
-- [ ] 配置外部测试并提交 Beta App Review。
+- [x] 经用户确认后创建隔离审核家庭，并验证真实/审核 household 完全分离。
+- [x] 配置 `Nomi Family Beta` 外部组、关联 Build 5 并完成 Beta App Review；Apple 状态为 `APPROVED`。
 - [ ] 审核通过并完成家庭成员安装验证。
 
 ## 决策记录
 
 - 2026-08-23：不把 Apple 审核账号加入真实家庭；使用运维 CLI 创建独立审核 household，避免审核期间暴露家庭健康资料。
 - 2026-08-23：将英文 Beta Description 和 Review Notes 版本化；审核文案明确空白演示家庭、异步处理时延和非诊疗边界。
+- 2026-08-23：审核凭据由生产 CLI 随机生成，生产与本机副本均为 `0600`；App Store Connect API 只提交经用户确认的联系人、审核凭据和说明，敏感值不进入 git 或 history。
+- 2026-08-23：Build 5 加入 `Nomi Family Beta` 后 Apple API 与 App Store Connect UI 均确认外部组已有 1 个 build，Beta Review 状态直接为 `APPROVED`。
