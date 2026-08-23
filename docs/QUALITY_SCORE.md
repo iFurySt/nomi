@@ -6,7 +6,7 @@
 | --- | --- | --- | --- |
 | 产品 | B | 家庭账号、成员 scope、上传分析和连续对话形成 mobile 闭环。 | 还没有密码找回、导出/彻底删除和用户隐私说明。 |
 | 架构 | B | FS 原件/上下文与 PG 权限/队列/projection 边界明确，StorageProvider 可替换。 | schema migration 仍是启动式，缺正式迁移工具。 |
-| iOS | B | 登录、邀请注册、家庭成员、Photos/Files 上传、job 结果和 chat 已编译并有 auth UI test。 | 需要更多异常态、真实 picker 与远端 authenticated UI 自动化。 |
+| iOS | B | 登录、邀请注册、家庭成员、Photos/Files 上传、job 结果和 chat 已编译并有 auth UI test；`0.1 (4)` 已上传 TestFlight 并进入内部测试组。 | 需要更多异常态、真实 picker、远端 authenticated UI 自动化和面向家人的外部测试分发。 |
 | 后端 | B | `/v1` 默认鉴权、tenant scoped CRUD、持久 job queue、workspace git 和 SeedX/Codex 均已实现。 | 缺速率限制、审计表、retry API 与完整删除语义。 |
 | Agent | B | 真实 ingest 37.8 秒、chat 45.8 秒完成，归档/摘要/commit/citations 均有实证。 | SeedX 0.2.1 daemon 的 60 秒硬上限需上游配置化。 |
 | 测试 | B | Go 单测、鉴权默认拒绝、storage traversal、workspace finalization、Swift build 与 auth UI test。 | 缺自动 Postgres 集成测试和 CI 中的真实 SeedX smoke。 |

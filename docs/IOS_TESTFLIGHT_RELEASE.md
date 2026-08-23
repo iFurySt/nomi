@@ -18,9 +18,9 @@ The app binary display name can remain `Nomi` through `PRODUCT_NAME`; App Store 
 
 ## 本机前置条件
 
-1. Xcode 已登录 Yifan PANG 的 paid Apple Developer account。
+1. Xcode 已登录 Yifan PANG 的 paid Apple Developer account，或仓库本机 `.apple/` 中已有 Admin 角色的 App Store Connect API key。
 2. Xcode 能通过 automatic signing 使用 team `J9P29FA5BX`。
-3. Keychain / Xcode 里可用 Cloud Managed Apple Distribution；不需要把 iOS distribution `.p12` 提交到仓库。
+3. Keychain / Xcode 或 Admin API key 可使用 Cloud Managed Apple Distribution；不需要把 iOS distribution `.p12` 提交到仓库。
 4. `nomi.ifuryst.com` 已指向 amoylab，并通过 HTTPS 暴露 server API。
 
 快速检查：
@@ -92,13 +92,22 @@ rm -f /tmp/NomiUploadOptions.plist
 
 1. 上传到 App Store Connect。
 
+默认使用仓库本机 `.apple/app-store-connect.env` 中的 Admin API key，以免依赖容易过期的 Xcode Apple ID session：
+
 ```sh
+set -a
+. ./.apple/app-store-connect.env
+set +a
+
 xcodebuild \
   -exportArchive \
   -archivePath build/Nomi-TestFlight.xcarchive \
   -exportPath build/Nomi-TestFlight-upload \
   -exportOptionsPlist /tmp/NomiUploadOptions.plist \
-  -allowProvisioningUpdates
+  -allowProvisioningUpdates \
+  -authenticationKeyPath "$(pwd)/${ASC_KEY_PATH}" \
+  -authenticationKeyID "${ASC_KEY_ID}" \
+  -authenticationKeyIssuerID "${ASC_ISSUER_ID}"
 ```
 
 成功时输出里会出现：
@@ -121,7 +130,7 @@ https://appstoreconnect.apple.com/apps/6767420142/testflight
 真实 Apple 密钥和证书不要提交到仓库。若后续必须保留本机发布材料，只放在已被 `.gitignore` 忽略的目录：
 
 ```text
-.harness/secret/apple/
+.apple/
 ```
 
 建议只保存这类本机材料：
@@ -129,13 +138,14 @@ https://appstoreconnect.apple.com/apps/6767420142/testflight
 - `AuthKey_*.p8`，仅当后续改成 API key 上传时需要。
 - `*.p12`，仅当不用 Xcode cloud managed signing、改为手动签名时需要。
 - `*.mobileprovision`，仅当手动 provisioning 时需要。
-- `release.env`，仅保存本机环境变量名和值，不要复制到 docs 或 history。
+- `app-store-connect.env`，保存 key name、role、key ID、issuer ID 和相对私钥路径，不要复制真实值到 docs 或 history。
 
-本次 TestFlight 上传使用 Xcode 账号会话和 Cloud Managed Apple Distribution，不需要额外保存 iOS distribution `.p12`。
+`0.1 (4)` 已使用 `.apple/` 中的 Admin API key 和 Cloud Managed Apple Distribution 上传成功，并进入现有内部测试组；不需要额外保存 iOS distribution `.p12`。
 
 ## 常见阻塞
 
 - `missingApp(bundleId: "com.ifuryst.nomi")`：App Store Connect 里还没有创建对应 App 记录。
 - `dev.nomi.native cannot be registered`：旧 bundle id 不属于当前 paid team；发布必须使用 `com.ifuryst.nomi`。
 - `No profiles for ... were found`：Xcode 没有登录 paid team，或 automatic signing 没有权限创建 profile。
+- `Cloud signing permission error`：Developer 角色 API key 可以认证，但没有 Cloud Managed Apple Distribution 权限；使用 Account Holder 或 Admin key。
 - `Error Downloading App Information`：通常是 App Store Connect App 记录缺失、账号没有 App Store Connect 权限，或 Safari/Xcode 账号会话失效。
