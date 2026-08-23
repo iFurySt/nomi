@@ -16,18 +16,15 @@ struct HouseholdInvite: Codable { let inviteCode: String; let expiresAt: String;
 
 enum NomiAPIError: LocalizedError {
     case server(String)
+    case transport(String)
     case invalidResponse
-    var errorDescription: String? { switch self { case .server(let code): return code; case .invalidResponse: return "服务器返回无效响应" } }
+    var errorDescription: String? { switch self { case .server(let code): return code; case .transport(let endpoint): return "无法连接服务器（\(endpoint)）"; case .invalidResponse: return "服务器返回无效响应" } }
 }
 
 enum NomiAPIClient {
     static var baseURL: URL {
         if let value=ProcessInfo.processInfo.environment["NOMI_API_BASE_URL"],let url=URL(string:value) { return url }
-        #if DEBUG
-        return URL(string:"http://127.0.0.1:8088")!
-        #else
         return URL(string:"https://nomi.ifuryst.com")!
-        #endif
     }
 
     static func register(email:String,password:String,displayName:String,householdName:String,inviteCode:String) async throws -> AuthSession {
@@ -58,7 +55,7 @@ enum NomiAPIClient {
     private static func endpointURL(_ path:String)->URL { URL(string:path,relativeTo:baseURL.appending(path:"/"))! }
     private static func json<T:Decodable>(path:String,method:String="GET",token:String?,allowEmpty:Bool=false) async throws -> T { var request=URLRequest(url:endpointURL(path));request.httpMethod=method;request.timeoutInterval=90;if let token{request.setValue("Bearer \(token)",forHTTPHeaderField:"Authorization")};return try await perform(request,allowEmpty:allowEmpty) }
     private static func json<T:Decodable,B:Encodable>(path:String,method:String="GET",body:B,token:String?,allowEmpty:Bool=false) async throws -> T { var request=URLRequest(url:endpointURL(path));request.httpMethod=method;request.timeoutInterval=90;if let token{request.setValue("Bearer \(token)",forHTTPHeaderField:"Authorization")};request.setValue("application/json",forHTTPHeaderField:"Content-Type");request.httpBody=try JSONEncoder().encode(body);return try await perform(request,allowEmpty:allowEmpty) }
-    private static func perform<T:Decodable>(_ request:URLRequest,allowEmpty:Bool=false) async throws -> T { let(data,response)=try await URLSession.shared.data(for:request);guard let http=response as? HTTPURLResponse else{throw NomiAPIError.invalidResponse};guard (200..<300).contains(http.statusCode) else{let code=(try? JSONDecoder().decode(ErrorResponse.self,from:data).error) ?? "HTTP \(http.statusCode)";throw NomiAPIError.server(code)};if allowEmpty&&data.isEmpty{return EmptyResponse() as! T};return try JSONDecoder().decode(T.self,from:data) }
+    private static func perform<T:Decodable>(_ request:URLRequest,allowEmpty:Bool=false) async throws -> T { let data:Data;let response:URLResponse;do{(data,response)=try await URLSession.shared.data(for:request)}catch{throw NomiAPIError.transport(request.url?.host ?? baseURL.absoluteString)};guard let http=response as? HTTPURLResponse else{throw NomiAPIError.invalidResponse};guard (200..<300).contains(http.statusCode) else{let code=(try? JSONDecoder().decode(ErrorResponse.self,from:data).error) ?? "HTTP \(http.statusCode)";throw NomiAPIError.server(code)};if allowEmpty&&data.isEmpty{return EmptyResponse() as! T};return try JSONDecoder().decode(T.self,from:data) }
 }
 
 private struct ErrorResponse:Decodable{let error:String}

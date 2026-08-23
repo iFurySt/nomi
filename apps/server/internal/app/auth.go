@@ -34,8 +34,10 @@ func randomToken(bytes int) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(data), nil
 }
 
+const minimumPasswordLength = 6
+
 func hashPassword(password string) (string, error) {
-	if len(password) < 10 || len(password) > 200 {
+	if len(password) < minimumPasswordLength || len(password) > 200 {
 		return "", errors.New("password_length_invalid")
 	}
 	value, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

@@ -63,6 +63,17 @@ func TestPasswordHashRoundTrip(t *testing.T) {
 		t.Fatal("wrong password verified")
 	}
 }
+
+func TestPasswordMinimumLength(t *testing.T) {
+	t.Parallel()
+	if _, err := hashPassword("12345"); err == nil || err.Error() != "password_length_invalid" {
+		t.Fatalf("five-character password error=%v", err)
+	}
+	if _, err := hashPassword("123456"); err != nil {
+		t.Fatalf("six-character password rejected: %v", err)
+	}
+}
+
 func TestParseAgentResult(t *testing.T) {
 	t.Parallel()
 	input := "```json\n" + `{"title":"化验单","answer":"","summary":"已归档","changes":"新增一次检查","current_assessment":"需要继续观察","open_questions":["复查时间？"],"citations":["raw-data/a.pdf"]}` + "\n```"

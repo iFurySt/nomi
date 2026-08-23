@@ -4,7 +4,7 @@ Nomi 处理真实家庭健康资料，默认按高敏感个人数据对待。
 
 ## 身份与授权
 
-- iOS 不持有服务端共享 secret；用户使用邮箱密码登录，密码以 bcrypt hash 保存。
+- iOS 不持有服务端共享 secret；用户使用邮箱密码登录，密码要求 6–200 位并以 bcrypt hash 保存。
 - session token 使用 CSPRNG 生成，只把 SHA-256 hash 存入 Postgres；客户端原 token 存入 iOS Keychain。
 - `/v1/*` 在顶层默认鉴权，handler 从服务端 session 取得 `household_id`，不得信任客户端传入 household ID。
 - bootstrap code 只能创建全实例第一个 household，并通过 Postgres advisory lock 防并发重复创建。

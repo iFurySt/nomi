@@ -8,6 +8,7 @@ final class NomiUploadFlowUITests: XCTestCase {
 
     func testAuthenticationAndInvitationEntryPoints() {
         let app = launchApp(resetSession: true)
+        defer { app.terminate() }
 
         XCTAssertTrue(app.textFields.matching(identifier: "auth-email").firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.secureTextFields.matching(identifier: "auth-password").firstMatch.exists)
@@ -20,6 +21,7 @@ final class NomiUploadFlowUITests: XCTestCase {
 
     func testRealFamilyLoginShowsMobileShell() throws {
         let app = launchApp()
+        defer { app.terminate() }
         if !app.buttons.matching(identifier: "upload-open").firstMatch.waitForExistence(timeout: 3) {
             let environment = ProcessInfo.processInfo.environment
             guard let email = environment["NOMI_E2E_EMAIL"],

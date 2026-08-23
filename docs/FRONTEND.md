@@ -12,7 +12,7 @@
 
 ## 客户端状态与安全
 
-- Debug 默认 API 为 `http://127.0.0.1:8088`，Release 默认 `https://nomi.ifuryst.com`；可用 `NOMI_API_BASE_URL` 覆盖。
+- Debug 和 Release 默认 API 都是 `https://nomi.ifuryst.com`，确保模拟器普通启动直接连接生产 private beta；本地 server 和 UI test 必须显式用 `NOMI_API_BASE_URL` 覆盖。
 - AuthSession 存 Keychain，使用 `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`；退出会删除 server session 和本地 Keychain item。
 - App 每两秒轻量刷新 people/assets/jobs/threads/messages，使异步结果自动出现。
 - 客户端只传 person scope，不传 household ID；服务端以 session 做最终授权。
