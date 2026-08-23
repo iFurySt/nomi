@@ -42,6 +42,8 @@
 - iOS `0.1 (6)` 已 archive 并上传 TestFlight，Build 6 同时进入内部与外部测试组；内部状态为 `IN_BETA_TESTING`，外部状态为 `BETA_APPROVED`。真实家庭内容不进入 binary 或审核家庭。
 - Build 6 首次读取真实导入知识时暴露 JSON contract 缺陷：legacy result 的 `open_questions` 为 `null`，Swift 必需数组使整次刷新失败并显示系统英文 missing。生产先留存修正前 PG dump，再精确把 81 条 null 规范为 `[]`；随后真实账号 XCUITest 确认登录后出现 knowledge entry、无 alert，且资料/对话/家庭三页可进入。
 - 长期修复在 server 持久化前统一规范 Agent 数组，在 iOS 解码层对旧 null/missing 字段容错并输出稳定中文错误；legacy projection 同时隐藏内部路径型摘要、移除列表标题中与日期行重复的日期前缀。iOS build number 递增到 7。
+- `server-v0.2.5` 发布成功且容器 healthy；生产重跑 importer 保持 `files_added=0`、`people_created=0` 和 81 条 knowledge，复核结果为 null/non-array Agent 数组 0、内部路径摘要 0、日期前缀标题 0。发布切换窗口曾产生一次 HTTP 502，容器稳定后真实生产账号 XCUITest 再次通过，资料列表有内容且无 alert，资料/对话/家庭三页均可进入。
+- iOS `0.1 (7)` 使用本机 git ignored 的 App Store Connect 发布材料完成 archive 和上传，processing 后为 `VALID`；Build 7 自动进入内部测试组，随后加入既有 `Nomi Family Beta` external group 并提交 Beta Review，最终状态为 `BETA_APPROVED`。
 
 ### 🧠 Design Intent (Why)
 

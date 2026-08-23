@@ -65,30 +65,33 @@ xcodebuild -project apps/ios/Nomi.xcodeproj -scheme Nomi -configuration Debug -d
 1. Archive。
 
 ```sh
-rm -rf build/Nomi-TestFlight.xcarchive build/Nomi-TestFlight-export build/Nomi-TestFlight-upload
+nomi_build=7
 
 xcodebuild \
   -project apps/ios/Nomi.xcodeproj \
   -scheme Nomi \
   -configuration Release \
   -destination 'generic/platform=iOS' \
-  -archivePath build/Nomi-TestFlight.xcarchive \
+  -archivePath "build/Nomi-TestFlight-${nomi_build}.xcarchive" \
   -allowProvisioningUpdates \
-  clean archive
+  archive
 ```
 
 1. 准备 export options。
 
 ```sh
-rm -f /tmp/NomiUploadOptions.plist
-/usr/libexec/PlistBuddy \
-  -c 'Add :method string app-store-connect' \
-  -c 'Add :teamID string J9P29FA5BX' \
-  -c 'Add :signingStyle string automatic' \
-  -c 'Add :destination string upload' \
-  -c 'Add :manageAppVersionAndBuildNumber bool false' \
-  /tmp/NomiUploadOptions.plist
+if [ ! -f .apple/NomiUploadOptions.plist ]; then
+  /usr/libexec/PlistBuddy \
+    -c 'Add :method string app-store-connect' \
+    -c 'Add :teamID string J9P29FA5BX' \
+    -c 'Add :signingStyle string automatic' \
+    -c 'Add :destination string upload' \
+    -c 'Add :manageAppVersionAndBuildNumber bool false' \
+    .apple/NomiUploadOptions.plist
+fi
 ```
+
+archive、upload 输出和发布配置均按 build 保留，不需要先删除旧版本；`.apple/` 已被 git ignore。
 
 1. 上传到 App Store Connect。
 
@@ -101,9 +104,9 @@ set +a
 
 xcodebuild \
   -exportArchive \
-  -archivePath build/Nomi-TestFlight.xcarchive \
-  -exportPath build/Nomi-TestFlight-upload \
-  -exportOptionsPlist /tmp/NomiUploadOptions.plist \
+  -archivePath "build/Nomi-TestFlight-${nomi_build}.xcarchive" \
+  -exportPath "build/Nomi-TestFlight-upload-${nomi_build}" \
+  -exportOptionsPlist .apple/NomiUploadOptions.plist \
   -allowProvisioningUpdates \
   -authenticationKeyPath "$(pwd)/${ASC_KEY_PATH}" \
   -authenticationKeyID "${ASC_KEY_ID}" \
@@ -179,7 +182,9 @@ Nomi is an invitation-only family health record organizer. Use the supplied revi
 
 当前 `0.1 (5)` 已进入 `Nomi Family Beta` external group，Beta Review 状态为 `APPROVED`。审核联系人和 demo credential 已提交 Apple，但敏感值只保留在 App Store Connect 与 git ignored 的本机/生产凭据文件中。
 
-`0.1 (6)` 已进入内部组和同一 external group；内部状态为 `IN_BETA_TESTING`，外部状态为 `BETA_APPROVED`。Build 5 仍保留，家庭成员可从原 TestFlight 入口更新到 Build 6。
+`0.1 (6)` 已进入内部组和同一 external group；内部状态为 `IN_BETA_TESTING`，外部状态为 `BETA_APPROVED`。
+
+`0.1 (7)` 修复 legacy knowledge 中 nullable Agent 数组导致的整页解码失败，并对旧数据增加客户端容错。该 build 已进入内部组和 `Nomi Family Beta` external group，外部状态为 `BETA_APPROVED`。较早 build 仍保留，家庭成员可从原 TestFlight 入口更新到 Build 7。
 
 经用户单独确认后，`Nomi Family Beta` 已启用人数上限为 10 的 Public Link。实际链接属于分发入口，不写入 git，只通过私密渠道交付给家庭成员。持有链接的人可以安装 build，但不能因此进入真实家庭：注册仍必须提供由家庭 owner 在 App 内生成的一次性邀请码。
 
