@@ -14,10 +14,18 @@ import {
   type BlockDrag,
   type TextSnapshot,
 } from "../writing/blockOperations";
-import { Plus, Check, TriangleAlert } from "lucide-react";
+import {
+  Plus,
+  Check,
+  TriangleAlert,
+  FileText,
+  ChevronRight,
+} from "lucide-react";
 import { WritingOutline } from "../writing/WritingOutline";
 import { Markdown } from "../canvas/Markdown";
 import {
+  noteAncestors,
+  noteSubtreeIds,
   newCanvasId,
   temperatureProgram,
   parseInteractiveProgram,
@@ -37,7 +45,8 @@ import {
   RichMarkdownEditor,
   needsSourceEditor,
 } from "../writing/RichMarkdownEditor";
-import { NoteListItem } from "../writing/NoteListItem";
+import { NotesLibrary, noteMoveTargets } from "../writing/NotesLibrary";
+import { ResizableNotesLayout } from "../writing/ResizableNotesLayout";
 import { writingRows, type WritingRow } from "../writing/writingRows";
 import { Modal } from "../components/primitives";
 import { Select } from "../components/Select";
@@ -71,6 +80,8 @@ export function Notes({ profile }: { profile: string }) {
   const lastTextEdit = useRef(0);
   const drafts = useRef(new Map<string, string>());
   const [query, setQuery] = useState("");
+  const [movingNote, setMovingNote] = useState<string>();
+  const [deletingNote, setDeletingNote] = useState<string>();
   const scrollPane = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(""),
     [message, setMessage] = useState("");
@@ -109,11 +120,14 @@ export function Notes({ profile }: { profile: string }) {
         target.closest('.writing-math-popover,[role="dialog"]')
       )
         return;
+      if (target.closest(".notes-library") && target.matches("input,textarea"))
+        return;
       if (
         target !== document.body &&
         target !== document.documentElement &&
+        target.id !== "main-content" &&
         !target.closest(
-          ".writing-article,.writing-block-menu,.writing-add-menu",
+          ".writing-article,.writing-block-menu,.writing-add-menu,.notes-library,.notes-context-menu",
         )
       )
         return;
@@ -144,7 +158,7 @@ export function Notes({ profile }: { profile: string }) {
       setError((e as Error).message);
     }
   };
-  function createNote(source = "", title = "未命名文稿") {
+  function createNote(source = "", title = "未命名文稿", parentId?: string) {
     const block = {
         id: newCanvasId("text"),
         type: "markdown" as const,
@@ -153,7 +167,15 @@ export function Notes({ profile }: { profile: string }) {
       id = newCanvasId("note");
     data.edit([
       { type: "add_block", block },
-      { type: "add_note", note: { id, title, blocks: [block.id] } },
+      {
+        type: "add_note",
+        note: {
+          id,
+          title,
+          blocks: [block.id],
+          ...(parentId ? { parentId } : {}),
+        },
+      },
     ]);
     setQuery("");
     choose(id);
@@ -265,8 +287,10 @@ export function Notes({ profile }: { profile: string }) {
     const removed = current.notes[index];
     if (!removed) return;
     const result = data.edit([{ type: "delete_note", id }]);
-    if (note?.id === id) {
-      const next = result.notes[Math.min(index, result.notes.length - 1)];
+    if (note && !result.notes.some((n) => n.id === note.id)) {
+      const next =
+        result.notes.find((n) => n.id === removed.parentId) ??
+        result.notes[Math.min(index, result.notes.length - 1)];
       setSelected(next?.id ?? "");
       location.hash = next
         ? `/notes?note=${encodeURIComponent(next.id)}`
@@ -275,6 +299,18 @@ export function Notes({ profile }: { profile: string }) {
     setDeleted({ id, revision: result.revision });
     setError("");
     setMessage(`已删除「${removed.title || "未命名文稿"}」`);
+  }
+  function requestDelete(id: string) {
+    if (noteSubtreeIds(data.current.current!.notes, id).size > 1)
+      setDeletingNote(id);
+    else attempt(() => deleteNote(id));
+  }
+  function moveNote(id: string, parentId: string | null) {
+    data.endGroup();
+    data.edit([{ type: "move_note", id, parentId }]);
+    setMovingNote(undefined);
+    setQuery("");
+    choose(id);
   }
   function snapshots() {
     return new Map(
@@ -610,48 +646,20 @@ export function Notes({ profile }: { profile: string }) {
     (b) => b.type === "interactive" && !note?.blocks.includes(b.id),
   );
   return (
-    <div className="notes-workspace">
-      <aside className="notes-library" aria-label="文稿列表">
-        <header>
-          <h1>文稿</h1>
-          <button
-            aria-label="新建文稿"
-            title="新建文稿"
-            onClick={() => attempt(() => createNote())}
-          >
-            <Plus size={18} />
-          </button>
-        </header>
-        <input
-          className="notes-search"
-          aria-label="搜索文稿"
-          placeholder="搜索文稿…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <nav>
-          {doc.notes
-            .filter((n) =>
-              `${n.title} ${n.blocks
-                .map((id) => {
-                  const b = doc.blocks.find((b) => b.id === id);
-                  return b?.type === "markdown" ? b.source : "";
-                })
-                .join(" ")}`
-                .toLocaleLowerCase()
-                .includes(query.toLocaleLowerCase()),
-            )
-            .map((n) => (
-              <NoteListItem
-                key={n.id}
-                note={n}
-                selected={n.id === note?.id}
-                onChoose={() => choose(n.id)}
-                onDelete={() => attempt(() => deleteNote(n.id))}
-              />
-            ))}
-        </nav>
-      </aside>
+    <ResizableNotesLayout profile={profile}>
+      <NotesLibrary
+        profile={profile}
+        document={doc}
+        selected={note?.id}
+        query={query}
+        onQuery={setQuery}
+        onChoose={choose}
+        onCreate={(parentId) =>
+          attempt(() => createNote("", "未命名文稿", parentId))
+        }
+        onMove={setMovingNote}
+        onDelete={requestDelete}
+      />
       <div className="notes-main">
         <header className="notes-topbar">
           <span
@@ -759,6 +767,18 @@ export function Notes({ profile }: { profile: string }) {
           >
             {note ? (
               <article className="writing-article" key={note.id}>
+                {note.parentId && (
+                  <nav className="notes-breadcrumb" aria-label="文稿路径">
+                    {noteAncestors(doc.notes, note.id).map((parent) => (
+                      <span key={parent.id}>
+                        <button onClick={() => choose(parent.id)}>
+                          {parent.title || "未命名文稿"}
+                        </button>
+                        <ChevronRight size={12} />
+                      </span>
+                    ))}
+                  </nav>
+                )}
                 <input
                   className="writing-title"
                   aria-label="文稿标题"
@@ -955,6 +975,28 @@ export function Notes({ profile }: { profile: string }) {
                     </section>
                   );
                 })}
+                {!!doc.notes.some((child) => child.parentId === note.id) && (
+                  <section className="notes-children" aria-label="子文稿">
+                    {doc.notes
+                      .filter((child) => child.parentId === note.id)
+                      .map((child) => (
+                        <button key={child.id} onClick={() => choose(child.id)}>
+                          <FileText size={15} />
+                          <span>{child.title || "未命名文稿"}</span>
+                          <ChevronRight size={13} />
+                        </button>
+                      ))}
+                    <button
+                      className="notes-child-create"
+                      onClick={() =>
+                        attempt(() => createNote("", "未命名文稿", note.id))
+                      }
+                    >
+                      <Plus size={15} />
+                      新建子文稿
+                    </button>
+                  </section>
+                )}
               </article>
             ) : (
               <div className="notes-empty">
@@ -989,6 +1031,68 @@ export function Notes({ profile }: { profile: string }) {
           if (f) void importProgram(f);
         }}
       />
+      <Modal
+        open={!!movingNote}
+        onOpenChange={(open) => !open && setMovingNote(undefined)}
+        title="移动文稿到…"
+        className="notes-move-dialog"
+      >
+        <div className="notes-move-targets">
+          <button
+            disabled={!doc.notes.find((n) => n.id === movingNote)?.parentId}
+            onClick={() =>
+              movingNote && attempt(() => moveNote(movingNote, null))
+            }
+          >
+            <FileText size={16} />
+            文稿根目录
+          </button>
+          {movingNote &&
+            noteMoveTargets(doc.notes, movingNote).map((target) => (
+              <button
+                key={target.id}
+                disabled={
+                  doc.notes.find((n) => n.id === movingNote)?.parentId ===
+                  target.id
+                }
+                onClick={() => attempt(() => moveNote(movingNote, target.id))}
+              >
+                <FileText size={15} />
+                <span>
+                  {[...noteAncestors(doc.notes, target.id), target]
+                    .map((n) => n.title || "未命名文稿")
+                    .join(" / ")}
+                </span>
+              </button>
+            ))}
+        </div>
+      </Modal>
+      <Modal
+        open={!!deletingNote}
+        onOpenChange={(open) => !open && setDeletingNote(undefined)}
+        title="删除文稿及子文稿？"
+      >
+        <p>
+          将删除「
+          {doc.notes.find((n) => n.id === deletingNote)?.title || "未命名文稿"}
+          」及其{" "}
+          {deletingNote
+            ? noteSubtreeIds(doc.notes, deletingNote).size - 1
+            : 0}{" "}
+          篇子文稿。删除后可以撤销恢复。
+        </p>
+        <div className="notes-delete-actions">
+          <button onClick={() => setDeletingNote(undefined)}>取消</button>
+          <button
+            onClick={() => {
+              if (deletingNote) attempt(() => deleteNote(deletingNote));
+              setDeletingNote(undefined);
+            }}
+          >
+            删除文稿及子文稿
+          </button>
+        </div>
+      </Modal>
       <Modal
         open={formula !== undefined}
         onOpenChange={(open) => !open && setFormula(undefined)}
@@ -1069,6 +1173,6 @@ export function Notes({ profile }: { profile: string }) {
           {error && <p role="alert">{error}</p>}
         </div>
       </Modal>
-    </div>
+    </ResizableNotesLayout>
   );
 }

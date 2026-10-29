@@ -6,7 +6,7 @@
 | --- | --- | --- | --- |
 | 产品 | C+ | 已确认个人一站式工作台与家庭扩展定位，并形成长笔记 / 无限画布 / GenUI / 平台中立 DSL 架构提案；已有家庭账号、成员 scope、上传分析和连续对话 mobile 闭环；生产 synthetic 双账号验证共享 people/assets/threads 与 owner-only invite；外测 Public Link 已按 10 人上限启用。 | 已有 Canvas / 长笔记 / 附件 / 交互学习本地切片；手写、跨端与通用信息 hub 未开发；桌面和 server 尚未统一；原 beta 缺密码找回、导出/彻底删除。 |
 | 架构 | B | FS 原件/上下文与 PG 权限/队列/projection 边界明确；legacy AI 文档已投影为 household-scoped knowledge，StorageProvider 可替换。 | 桌面本地 SQLite 与家庭 server FS / PG 是独立路径，需设计个人归属与共享模型；server schema migration 仍缺正式工具。 |
-| 桌面 | B- | AIFi Electron / React / Node / Go 基础已迁入并独立命名，采用 Nomi「知己相伴」独立图标与主题反转标志；类型检查、374 个单测、Go vet / race、生产构建和 ChatGPT / Codex / MCP 合成验证通过。 | 保留金融专用页面；Nomi 真实账号登录待用户授权；新增默认 Canvas、Note / Block / Placement、IndexedDB 原子保存、附件校验、Learn 与独立进度；36 个画布内核 / 附件 / 连接与几何测试与 3 个体验样例测试（类型、复用、幂等和 PDF 原件），并验证真实 App 中 11 项样例、公式行数、定位和刷新恢复，以及双击原位编辑 / 退出渲染 / 放大连续性、顶部可选标题和八方向缩放 / 取消 / 刷新恢复；新增内容上层的四角选框、选中态四侧圆点直接拖线、边界锚点吸附与连线浮动工具栏 / 样式 / 文字 / 剪贴板 / 锁定 / 线段拖动、方向 cursor、吸附 / Alt / Shift、形状、连接 / 改接 / 标签 / 样式 / 删除关联撤销和浅深色截图，加上此前 30 个交互内核 / 存储测试、实际 App 的 Electron 交互回归和 Swift 18,500 数值比较；新增 26 种语义形状、形状 / 多选属性栏、框选 / 分组 / 统一缩放、等距 / 等尺寸辅助线、独立副本与内部绑定，详见选择与布局矩阵；仍缺跨端同步、原生 UI、桌面分发与完整 CI，Workspace 手势协调仍需拆分。 |
+| 桌面 | B- | AIFi Electron / React / Node / Go 基础已迁入并独立命名，采用 Nomi「知己相伴」独立图标与主题反转标志；类型检查、385 个单测、Go vet / race、生产构建和 ChatGPT / Codex / MCP 合成验证通过。 | 保留金融专用页面；Nomi 真实账号登录待用户授权；新增默认 Canvas、Note / Block / Placement、IndexedDB 原子保存、附件校验、Learn 与独立进度；36 个画布内核 / 附件 / 连接与几何测试与 3 个体验样例测试（类型、复用、幂等和 PDF 原件），并验证真实 App 中 11 项样例、公式行数、定位和刷新恢复，以及双击原位编辑 / 退出渲染 / 放大连续性、顶部可选标题和八方向缩放 / 取消 / 刷新恢复；新增内容上层的四角选框、选中态四侧圆点直接拖线、边界锚点吸附与连线浮动工具栏 / 样式 / 文字 / 剪贴板 / 锁定 / 线段拖动、方向 cursor、吸附 / Alt / Shift、形状、连接 / 改接 / 标签 / 样式 / 删除关联撤销和浅深色截图，加上此前 30 个交互内核 / 存储测试、实际 App 的 Electron 交互回归和 Swift 18,500 数值比较；新增 26 种语义形状、形状 / 多选属性栏、框选 / 分组 / 统一缩放、等距 / 等尺寸辅助线、独立副本与内部绑定，详见选择与布局矩阵；仍缺跨端同步、原生 UI、桌面分发与完整 CI，Workspace 手势协调仍需拆分。 |
 | iOS | B | 登录、邀请注册、家庭成员、上传、资料知识列表和 chat 已编译；真实生产账号 authenticated XCUITest 已验证 81 条 legacy knowledge 可加载、无 alert，且资料/对话/家庭三页可进入；`0.1 (7)` 已在内部/外部组可用并获 `BETA_APPROVED`。 | 真实家庭真机资料/对话体验待用户确认；还需要更多异常态自动化。 |
 | 后端 | B | `/v1` 默认鉴权、tenant scoped CRUD/knowledge、持久 job queue、幂等 legacy importer、workspace git 和 SeedX/Codex 均已实现。 | 缺速率限制、审计表、retry API 与完整删除语义。 |
 | Agent | B | 真实 ingest 37.8 秒、chat 45.8 秒完成，归档/摘要/commit/citations 均有实证。 | SeedX 0.2.1 daemon 的 60 秒硬上限需上游配置化。 |
@@ -46,3 +46,7 @@ Notion v3 剪贴板空段恢复已接入：原生系统剪贴板隔离验证恢�
 ## 2026-10-27 实际写作增量证据
 
 通过 Computer Use 在真实 Nomi 创建独立长文与图片附件文稿，实际编辑 Markdown、嵌套列表、待办、表格、公式与图片说明，验证上移 / 撤销 / 重做、大图、目录及重启保存。修复标题 Enter 跳转、新建文稿残留搜索、列表 / 短片段留白、小图放大及按钮底色、中间编辑撤销丢光标、粘贴与快速输入合并撤销。374 单测、类型检查、生产构建、完整 Notes / Canvas Electron 回归与基础 CI 通过；新增原生撤销 / 重做选区与继续输入回归，此前 Notes 安静输入 / 空行菜单阶段已在本轮完整流程通过。真实窗口截图见 verification 的 writing-dogfood 文件。
+
+## 2026-10-29 层级文稿增量证据
+
+Note 新增可选 parentId 与无环 / 父引用校验，平铺旧文档不迁移；支持子页新建、展开 / 路径、带子树移动、搜索祖先、删除范围确认与原子撤销。单页导出 / 画布独立复制处理父引用边界；父子一起复制映射到新副本。侧栏支持原生拖宽、键盘微调与本机宽度恢复，窄屏采用纵向树。65 文件 / 385 单测、类型、构建、完整 Notes / Canvas 回归及基础 CI 通过；真实窗口验证三层创建、正文、折叠、菜单移动 / ⌘Z 和 240→336 拖宽，截图见 nomi-note-tree-live-2026-10-29.png。

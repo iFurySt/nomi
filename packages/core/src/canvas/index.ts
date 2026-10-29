@@ -6,3 +6,5 @@ export * from "./layout";
 export * from "./shapes";
 
 export * from "./paint";
+
+export * from "./note-tree";

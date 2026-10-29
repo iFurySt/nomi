@@ -61,12 +61,13 @@ export function planNoteExport(
   const assets = document.assets.filter((a) =>
     blocks.some((b) => "asset" in b && b.asset === a.id),
   );
+  const { parentId: _parentId, ...standaloneNote } = note;
   const snapshot: CanvasDocument = {
     schema: document.schema,
     id: document.id,
     title: note.title,
     revision: 1,
-    notes: [note],
+    notes: [standaloneNote],
     blocks,
     assets,
     board: { id: document.board.id, placements: [] },

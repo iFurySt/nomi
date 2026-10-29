@@ -9,7 +9,15 @@ import {
 } from "@nomi/core";
 export function selectionSnapshot(doc: CanvasDocument, ids: string[]) {
   const placements = doc.board.placements.filter((p) => ids.includes(p.id)),
-    notes = doc.notes.filter((n) => placements.some((p) => p.content === n.id));
+    selectedNotes = doc.notes.filter((n) =>
+      placements.some((p) => p.content === n.id),
+    ),
+    notes = selectedNotes.map((note) => {
+      const { parentId, ...copy } = note;
+      return parentId && selectedNotes.some((parent) => parent.id === parentId)
+        ? { ...copy, parentId }
+        : copy;
+    });
   const blocks = doc.blocks.filter(
     (b) =>
       placements.some((p) => p.content === b.id) ||
@@ -81,6 +89,7 @@ export function pasteSelection(
       note: {
         ...n,
         id: mapped(n.id, "note"),
+        ...(n.parentId ? { parentId: mapped(n.parentId, "note") } : {}),
         blocks: n.blocks.map((id) => mapped(id, "block")),
       },
     });

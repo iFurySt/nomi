@@ -53,7 +53,7 @@ document "d_example" title="学习笔记" {
 - Note 的子节点顺序就是阅读顺序；首版每个 Block 最多属于一个 Note。脱离 Note 的 Block 可作为 Document 的直接声明。
 - Place 可以引用本 Document 内的 Note 或 Block，不引用另一个 Place。复制 Place 不复制内容。
 - Board 的叠放由 `order` 表达，不依赖声明顺序；排序键冲突按 Place ID 确定性排序。`order` 的生成 / 并发移动策略需要独立算法验证。
-- 同一 Block 可以被一个 Note 和多个 Place 引用。新增 Note 内复用、跨文档引用、嵌套 Note / Frame 不属于这个最小 schema。
+- 同一 Block 可以被一个 Note 和多个 Place 引用。跨文档引用与嵌套 Frame 不属于这个最小文件语法。当前 JSON IR 已支持 Block 复用与可选 Note.parentId 文稿层级（详见画布运行时），不表示这份历史 KDL 草案已具备 parser。
 
 ## 各类声明
 

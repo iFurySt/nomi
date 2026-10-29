@@ -331,6 +331,236 @@ async function checks(phase) {
       imageLightbox: true,
     };
   }
+  const noteRow = (id) =>
+    [...document.querySelectorAll("[data-note-row]")].find(
+      (row) => row.dataset.noteRow === id,
+    );
+  if (phase === "hierarchy-prepare") {
+    document.querySelector('[aria-label="新建文稿"]').click();
+    await until(() => title()?.value === "未命名文稿");
+    input(title(), "层级回归");
+    await wait(30);
+    const rootId = new URLSearchParams(location.hash.split("?")[1]).get("note");
+    noteRow(rootId).querySelector(".notes-row-add").click();
+    await until(() => title()?.value === "未命名文稿");
+    input(title(), "子页回归");
+    await wait(30);
+    const childId = new URLSearchParams(location.hash.split("?")[1]).get(
+      "note",
+    );
+    noteRow(childId).querySelector(".notes-row-add").click();
+    await until(() => title()?.value === "未命名文稿");
+    input(title(), "叶页回归");
+    await wait(30);
+    const leafId = new URLSearchParams(location.hash.split("?")[1]).get("note");
+    window.canvasFixture.hierarchyIds = { rootId, childId, leafId };
+    await until(() => noteRow(leafId));
+    assert(
+      noteRow(rootId).getAttribute("aria-level") === "1" &&
+        noteRow(childId).getAttribute("aria-level") === "2" &&
+        noteRow(leafId).getAttribute("aria-level") === "3",
+      "Nested documents lost tree depth",
+    );
+    assert(
+      [...document.querySelectorAll(".notes-breadcrumb button")]
+        .map((b) => b.textContent)
+        .join("|") === "层级回归|子页回归",
+      "Child breadcrumb missing",
+    );
+    document.querySelector(".notes-breadcrumb button").click();
+    await until(() => title()?.value === "层级回归");
+    assert(
+      document.querySelector(".notes-children button").textContent ===
+        "子页回归",
+      "Parent page has no child navigation",
+    );
+    noteRow(rootId).querySelector(".notes-row-toggle").click();
+    await until(() => !noteRow(childId));
+    noteRow(rootId).querySelector(".notes-row-toggle").click();
+    await until(() => noteRow(childId));
+    const search = document.querySelector('[aria-label="搜索文稿"]');
+    input(search, "叶页回归");
+    await wait(30);
+    assert(
+      document.querySelectorAll("[data-note-row]").length === 3 &&
+        noteRow(rootId) &&
+        noteRow(childId) &&
+        noteRow(leafId),
+      "Search hides the matching page ancestry",
+    );
+    input(search, "");
+    await wait(30);
+    noteRow(childId)
+      .querySelector(".notes-row-menu")
+      .dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          button: 0,
+          pointerType: "mouse",
+        }),
+      );
+    await until(() => menuItem("移动到…"));
+    menuItem("移动到…").click();
+    await until(() => document.querySelector(".notes-move-dialog"));
+    assert(
+      ![...document.querySelectorAll(".notes-move-targets button")].some(
+        (b) =>
+          b.textContent.includes("子页回归") ||
+          b.textContent.includes("叶页回归"),
+      ),
+      "Move picker permits descendants",
+    );
+    [...document.querySelectorAll(".notes-move-targets button")]
+      .find((b) => b.textContent === "观察与问题")
+      .click();
+    await until(() => !document.querySelector(".notes-move-dialog"));
+    await until(
+      () =>
+        title()?.value === "子页回归" &&
+        document.querySelector(".notes-save").dataset.saveState === "saved",
+    );
+    assert(
+      (await saved()).notes.find((n) => n.id === childId).parentId ===
+        "note.questions",
+      "Move did not update semantic parent",
+    );
+    return;
+  }
+  if (phase === "hierarchy-move-undone" || phase === "hierarchy-move-redone") {
+    const { rootId, childId, leafId } = window.canvasFixture.hierarchyIds;
+    await until(
+      async () =>
+        (await saved()).notes.find((n) => n.id === childId)?.parentId ===
+        (phase === "hierarchy-move-undone" ? rootId : "note.questions"),
+    );
+    assert(
+      (await saved()).notes.find((n) => n.id === leafId).parentId === childId,
+      "Moving parent detached its descendants",
+    );
+    return;
+  }
+  if (phase === "hierarchy-delete") {
+    const { childId, leafId } = window.canvasFixture.hierarchyIds;
+    const remove = async () => {
+      noteRow(childId)
+        .querySelector(".notes-row-menu")
+        .dispatchEvent(
+          new PointerEvent("pointerdown", {
+            bubbles: true,
+            button: 0,
+            pointerType: "mouse",
+          }),
+        );
+      await until(() => menuItem("删除文稿"));
+      menuItem("删除文稿").click();
+      await until(() => document.querySelector('[role="dialog"]'));
+    };
+    const revision = (await saved()).revision;
+    await remove();
+    assert(
+      document
+        .querySelector('[role="dialog"]')
+        .textContent.includes("1 篇子文稿"),
+      "Parent deletion does not explain its scope",
+    );
+    [...document.querySelectorAll('[role="dialog"] button')]
+      .find((b) => b.textContent === "取消")
+      .click();
+    await until(() => !document.querySelector('[role="dialog"]'));
+    assert(
+      (await saved()).revision === revision,
+      "Cancel deletion modified the document",
+    );
+    await remove();
+    [...document.querySelectorAll('[role="dialog"] button')]
+      .find((b) => b.textContent === "删除文稿及子文稿")
+      .click();
+    await until(
+      async () =>
+        !(await saved()).notes.some((n) => n.id === childId || n.id === leafId),
+    );
+    return;
+  }
+  if (phase === "hierarchy-restored-width-target") {
+    const { childId, leafId } = window.canvasFixture.hierarchyIds;
+    await until(
+      async () =>
+        (await saved()).notes.some((n) => n.id === childId) &&
+        (await saved()).notes.some((n) => n.id === leafId),
+    );
+    const divider = document.querySelector(".notes-library-resizer"),
+      rect = divider.getBoundingClientRect();
+    window.canvasFixture.widthBefore = Number(
+      divider.getAttribute("aria-valuenow"),
+    );
+    window.canvasFixture.widthEvents = [];
+    for (const type of [
+      "pointerdown",
+      "pointermove",
+      "pointerup",
+      "lostpointercapture",
+    ])
+      divider.addEventListener(type, (event) =>
+        window.canvasFixture.widthEvents.push([
+          type,
+          event.clientX,
+          event.buttons,
+        ]),
+      );
+    window.canvasFixture.widthRevision = (await saved()).revision;
+    return {
+      x: Math.round(rect.left + rect.width / 2),
+      y: Math.round(rect.top + 100),
+    };
+  }
+  if (phase === "hierarchy-width-in-progress") {
+    await until(
+      () =>
+        Number(
+          localStorage.getItem("nomi:notes:local-device:library-width"),
+        ) ===
+        window.canvasFixture.widthBefore + 90,
+    );
+    assert(
+      (await saved()).revision === window.canvasFixture.widthRevision,
+      "In-progress view resize changed document content",
+    );
+    return;
+  }
+  if (phase === "hierarchy-width-result") {
+    const divider = document.querySelector(".notes-library-resizer");
+    await until(
+      () => !document.querySelector(".notes-workspace").dataset.resizing,
+    );
+    await wait(40);
+    assert(
+      Number(divider.getAttribute("aria-valuenow")) ===
+        window.canvasFixture.widthBefore + 90,
+      "Native sidebar drag did not follow pointer: " +
+        JSON.stringify({
+          before: window.canvasFixture.widthBefore,
+          after: divider.getAttribute("aria-valuenow"),
+          resizing: document.querySelector(".notes-workspace").dataset.resizing,
+          events: window.canvasFixture.widthEvents,
+        }),
+    );
+    assert(
+      Number(localStorage.getItem("nomi:notes:local-device:library-width")) ===
+        window.canvasFixture.widthBefore + 90,
+      "Sidebar width was not saved",
+    );
+    assert(
+      (await saved()).revision === window.canvasFixture.widthRevision,
+      "View resizing wrote content history",
+    );
+    return {
+      nestedPages: true,
+      hierarchicalSearch: true,
+      parentMoveUndoRedo: true,
+      subtreeDeleteUndo: true,
+      nativeSidebarResize: true,
+    };
+  }
   if (phase === "dogfood-title-prepare") {
     const search = document.querySelector('[aria-label="搜索文稿"]');
     input(search, "no-matching-note-dogfood");
@@ -510,6 +740,12 @@ async function checks(phase) {
     return true;
   }
   if (phase === "quiet-pointer-restored") {
+    await until(() => {
+      const button = document.querySelector(
+        '.writing-block-gutter [aria-label="添加内容"]',
+      );
+      return button && getComputedStyle(button.parentElement).opacity === "1";
+    });
     const button = document.querySelector(
       '.writing-block-gutter [aria-label="添加内容"]',
     );
@@ -1172,6 +1408,17 @@ async function checks(phase) {
     return { nativeBlockDrag: true };
   }
   if (phase === "restored") {
+    const savedWidth = Number(
+      localStorage.getItem("nomi:notes:local-device:library-width"),
+    );
+    assert(
+      Number(
+        document
+          .querySelector(".notes-library-resizer")
+          .getAttribute("aria-valuenow"),
+      ) === savedWidth,
+      "Sidebar width lost after reload",
+    );
     await until(() => find("单一空正文回归"));
     find("单一空正文回归").click();
     await until(() => title()?.value === "单一空正文回归");
@@ -2403,7 +2650,7 @@ async function checks(phase) {
   assert(find("列表项拖动回归"), "Escape deleted note");
   rightClick();
   await until(() => document.querySelector('[role="menuitem"]'));
-  document.querySelector('[role="menuitem"]').click();
+  menuItem("删除文稿").click();
   await until(() => !find("列表项拖动回归"));
   assert(title().value === "Transformer", "Right-click changed active note");
   find("撤销删除").click();
@@ -2547,6 +2794,8 @@ if(process.env.NOMI_CHECK_NOTE_IMAGES==='1') {await runImageChecks();writeFileSy
 
 if(process.env.NOMI_CHECK_NOTION_CLIPBOARD==='1'){await win.webContents.executeJavaScript(check('notion-native-prepare'));win.webContents.paste();Object.assign(report,await win.webContents.executeJavaScript(check('notion-native-result')));}
 win.show();app.focus({steal:true});win.focus();await new Promise(r=>setTimeout(r,80));
+const hierarchyKey=async(redo=false)=>{for(const type of ['keyDown','keyUp'])win.webContents.sendInputEvent({type,keyCode:'Z',modifiers:redo?['meta','shift']:['meta']});await new Promise(r=>setTimeout(r,60));};
+await win.webContents.executeJavaScript(check('hierarchy-prepare'));await hierarchyKey();await win.webContents.executeJavaScript(check('hierarchy-move-undone'));await hierarchyKey(true);await win.webContents.executeJavaScript(check('hierarchy-move-redone'));await win.webContents.executeJavaScript(check('hierarchy-delete'));await hierarchyKey();const sidebarPoint=await win.webContents.executeJavaScript(check('hierarchy-restored-width-target'));win.webContents.debugger.attach('1.3');await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseMoved',...sidebarPoint});await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',buttons:1,clickCount:1,...sidebarPoint});for(let i=1;i<=6;i++){await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseMoved',button:'left',buttons:1,x:sidebarPoint.x+15*i,y:sidebarPoint.y});await new Promise(r=>setTimeout(r,20));}await win.webContents.executeJavaScript(check('hierarchy-width-in-progress'));await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',buttons:0,clickCount:1,x:sidebarPoint.x+90,y:sidebarPoint.y});win.webContents.debugger.detach();Object.assign(report,await win.webContents.executeJavaScript(check('hierarchy-width-result')));writeFileSync(join(${JSON.stringify(output)},'notes-hierarchy.png'),(await win.webContents.capturePage()).toPNG());
 await win.webContents.executeJavaScript(check('dogfood-title-prepare'));for(const type of ['keyDown','keyUp'])win.webContents.sendInputEvent({type,keyCode:'Enter'});await win.webContents.executeJavaScript(check('dogfood-title-result'));win.webContents.insertText('替换');await win.webContents.executeJavaScript(check('dogfood-replaced'));
 const writingHistoryKey=async(redo=false)=>{for(const type of ['keyDown','keyUp'])win.webContents.sendInputEvent({type,keyCode:'Z',modifiers:redo?['meta','shift']:['meta']});await new Promise(r=>setTimeout(r,50));};await writingHistoryKey();await win.webContents.executeJavaScript(check('dogfood-undo-selection'));await writingHistoryKey(true);await win.webContents.executeJavaScript(check('dogfood-redo-selection'));await writingHistoryKey();await win.webContents.executeJavaScript(check('dogfood-undo-selection'));win.webContents.insertText('续');Object.assign(report,await win.webContents.executeJavaScript(check('dogfood-continued')));
 const tailPoints=await win.webContents.executeJavaScript(check('tail-prepare'));for(const point of tailPoints){win.webContents.sendInputEvent({type:'mouseMove',...point});win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...point});win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...point});await win.webContents.executeJavaScript(check('tail-clicked'));}win.webContents.insertText('继续输入');Object.assign(report,await win.webContents.executeJavaScript(check('tail-typed')));
@@ -2601,6 +2850,7 @@ if (code === 0) {
         "report.json",
         "notes-desktop.png",
         "notes-quiet-gutter.png",
+        "notes-hierarchy.png",
         "notes-dark.png",
         "notes-context.png",
         "notes-block-menu.png",

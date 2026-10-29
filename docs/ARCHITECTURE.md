@@ -91,4 +91,4 @@ workspaces/<household-id>/
 
 ### 文稿写作视图
 
-Canvas 下方的「文稿」复用同一 CanvasDocument / Note / Block 与 IndexedDB，富文本只是 Markdown 的编辑投影，交互仍通过严格 DSL 与现有 renderer 执行。文稿当前仅提供富文本写作、粘贴自适应与折叠目录；模式切换、导入和导出入口已移除。底层导出契约仍在 core / platform 保留并单独验证。详见 [文稿实现](design-docs/notes-authoring.md)。
+Canvas 下方的「文稿」复用同一 CanvasDocument / Note / Block 与 IndexedDB，富文本只是 Markdown 的编辑投影，交互仍通过严格 DSL 与现有 renderer 执行。文稿当前仅提供富文本写作、粘贴自适应、折叠目录、文稿作为父节点的子页导航与可调宽侧栏；模式切换、导入和导出入口已移除。底层导出契约仍在 core / platform 保留并单独验证。详见 [文稿实现](design-docs/notes-authoring.md)。

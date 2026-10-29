@@ -30,13 +30,15 @@
 | 对象 | 内容 |
 | --- | --- |
 | Document | ID、标题、本机 revision、notes、blocks、assets、board |
-| Note | ID、可选标题（当前 JSON 字段为空字符串表示无标题）、有序 Block ID 列表 |
+| Note | ID、可选标题（当前 JSON 字段为空字符串表示无标题）、有序 Block ID 列表、可选 parentId（文稿层级） |
 | Block | Markdown 原文、未求值 InteractiveProgram、image / file 的 Asset 引用，或 shape 的形状 / 文字 / 色调枚举与可选格式 |
 | Placement | ID、内容 ID、世界坐标 x / y、逻辑宽度、可选逻辑高度；省略高度表示内容自动高度，可选 group / locked，顺序是原始叠放顺序 |
 | Connector | ID、绑定 Placement / side / 可选归一化 anchor 或自由 point / side 端点，routing、线型、起终标记、颜色 / 透明度 / 粗细、折点 / 跳线、文字格式、锁定 / 层级；属于 Board，不是 Note 正文 |
 | Asset | ID、原始文件名、MIME、字节数、SHA-256、可选图片尺寸 |
 
 `applyCanvasCommands` 在校验基准 revision 后原子提交创建笔记、改正文 / 标题、添加块、移动、调宽高、复制 / 删除 / 新增摆放、层级、形状和连接修改。中途失败不修改原文档；引用、唯一 ID、必需类型、交互能力、数值与预算均检查。Undo / Redo 恢复语义内容但产生新的 revision，避免旧写入重新变得有效。
+
+文稿层级使用可选 `Note.parentId`，省略表示根级，旧文档保持平铺不改写；父文稿必须存在且不能循环。`move_note` 原子修改父关系与同级顺序，可移回根级，不能移入自身 / 后代；`delete_note` 同时删除后代、相关摆放及连线，仅清理不再被外部引用的所属块。页面层级不自动创建画布摆放或连接。单页归档去除父引用，不包含祖先 / 子页。完整体验见 [文稿层级](notes-authoring.md)。
 
 连接绑定到摆放，而非内容：同一笔记的多个摆放可拥有不同关系。删除摆放在同一事务删除其关联连接，Undo 恢复两者；卡片复制摆放不自动复制连接；选区复制 / 独立副本会重新映射内部连接。允许旧文档省略 `board.connectors`，新增连接有最多 400 条、标签 200 字、有效端点 / 枚举 / 唯一 ID 约束，不接受悬空端点、自连接或任意样式字符串。当前运行时理解旧 draft-1，旧客户端可能拒绝新增字段；不声称跨版本双向兼容。
 

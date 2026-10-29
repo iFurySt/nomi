@@ -60,6 +60,36 @@ function fixture(): CanvasDocument {
   return d;
 }
 describe("canvas semantic selection clipboard", () => {
+  it("copies a child alone as a standalone note without including its parent", () => {
+    const doc = fixture();
+    doc.notes[1].parentId = doc.notes[0].id;
+    const snapshot = selectionSnapshot(doc, [doc.board.placements[1].id]);
+    expect(snapshot.notes).toHaveLength(1);
+    expect(snapshot.notes[0]).not.toHaveProperty("parentId");
+    const paste = pasteSelection(doc, snapshot);
+    const next = applyCanvasCommands(doc, doc.revision, paste.commands);
+    expect(next.notes.at(-1)).not.toHaveProperty("parentId");
+    expect(doc.notes[1].parentId).toBe(doc.notes[0].id);
+  });
+  it("remaps parent links when both parent and child are copied", () => {
+    const doc = fixture();
+    doc.notes[1].parentId = doc.notes[0].id;
+    const snapshot = selectionSnapshot(
+      doc,
+      doc.board.placements.slice(0, 2).map((p) => p.id),
+    );
+    const paste = pasteSelection(doc, snapshot);
+    const next = applyCanvasCommands(doc, doc.revision, paste.commands);
+    const parent = next.notes.find(
+      (n) => n.id !== doc.notes[0].id && n.title === doc.notes[0].title,
+    )!;
+    const child = next.notes.find(
+      (n) => n.id !== doc.notes[1].id && n.title === doc.notes[1].title,
+    )!;
+    expect(child.parentId).toBe(parent.id);
+    expect(parent.id).not.toBe(doc.notes[0].id);
+  });
+
   it("clones independent content with remapped groups and internal bindings only", () => {
     const d = fixture(),
       ids = [d.board.placements[0].id, "place.shape"],

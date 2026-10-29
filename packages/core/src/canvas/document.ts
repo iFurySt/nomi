@@ -1,9 +1,11 @@
+import { noteSubtreeIds } from "./note-tree";
 import { parseInteractiveProgram } from "../interactive/validate";
 import { temperatureProgram } from "../interactive/index";
 import type { InteractiveProgram } from "../interactive/types";
 export interface CanvasNote {
   id: string;
   title: string;
+  parentId?: string;
   blocks: string[];
 }
 export const CANVAS_SHAPES = [
@@ -384,7 +386,8 @@ export function parseCanvasDocument(raw: unknown): CanvasDocument {
   const notes = list(p.notes, 100);
   for (const entry of notes) {
     const n = record(entry);
-    keys(n, ["id", "title", "blocks"]);
+    keys(n, ["id", "title", "blocks", "parentId"]);
+    if (n.parentId !== undefined) id(n.parentId);
     identity(n.id);
     contentIds.add(n.id);
     text(n.title, 200);
@@ -394,6 +397,17 @@ export function parseCanvasDocument(raw: unknown): CanvasDocument {
       children.some((b) => !blocks.some((x) => x.id === b))
     )
       bad("笔记包含无效或重复内容引用。");
+  }
+  for (const note of notes) {
+    const seen = new Set<string>([note.id]);
+    let parent = note.parentId;
+    while (parent !== undefined) {
+      if (seen.has(parent)) bad("文稿层级不能循环引用。");
+      seen.add(parent);
+      const ancestor = notes.find((n) => n.id === parent);
+      if (!ancestor) bad("父文稿已不存在。");
+      parent = ancestor.parentId;
+    }
   }
   const board = record(p.board);
   keys(board, ["id", "placements", "connectors"]);
@@ -537,6 +551,7 @@ export type CanvasCommand =
   | { type: "set_image_caption"; id: string; caption: string }
   | { type: "add_note"; note: CanvasNote }
   | { type: "delete_note"; id: string }
+  | { type: "move_note"; id: string; parentId: string | null; before?: string }
   | { type: "rename_note"; id: string; title: string }
   | { type: "set_note_blocks"; id: string; blocks: string[] }
   | { type: "set_shape"; block: Extract<CanvasBlock, { type: "shape" }> }
@@ -701,15 +716,45 @@ export function applyCanvasCommands(
         n.title = command.title;
         break;
       }
+      case "move_note": {
+        const note =
+          next.notes.find((n) => n.id === command.id) ?? bad("文稿已不存在。");
+        if (
+          command.parentId &&
+          noteSubtreeIds(next.notes, note.id).has(command.parentId)
+        )
+          bad("不能移入自身或子文稿。");
+        if (command.parentId === null) delete note.parentId;
+        else note.parentId = command.parentId;
+        const before =
+          command.before && next.notes.find((n) => n.id === command.before);
+        if (
+          command.before &&
+          (!before ||
+            before.id === note.id ||
+            before.parentId !== note.parentId)
+        )
+          bad("目标顺序不是同级文稿。");
+        next.notes = next.notes.filter((n) => n.id !== note.id);
+        const index = before ? next.notes.indexOf(before) : next.notes.length;
+        next.notes.splice(index, 0, note);
+        break;
+      }
       case "delete_note": {
         const note =
           next.notes.find((n) => n.id === command.id) ?? bad("文稿已不存在。");
+        const deletedNotes = noteSubtreeIds(next.notes, note.id);
+        const deletedBlocks = new Set(
+          next.notes
+            .filter((n) => deletedNotes.has(n.id))
+            .flatMap((n) => n.blocks),
+        );
         const placements = new Set(
           next.board.placements
-            .filter((p) => p.content === note.id)
+            .filter((p) => deletedNotes.has(p.content))
             .map((p) => p.id),
         );
-        next.notes = next.notes.filter((n) => n.id !== note.id);
+        next.notes = next.notes.filter((n) => !deletedNotes.has(n.id));
         next.board.placements = next.board.placements.filter(
           (p) => !placements.has(p.id),
         );
@@ -724,7 +769,7 @@ export function applyCanvasCommands(
           ...next.board.placements.map((p) => p.content),
         ]);
         const removed = next.blocks.filter(
-          (b) => note.blocks.includes(b.id) && !retained.has(b.id),
+          (b) => deletedBlocks.has(b.id) && !retained.has(b.id),
         );
         next.blocks = next.blocks.filter(
           (b) => !removed.some((r) => r.id === b.id),
