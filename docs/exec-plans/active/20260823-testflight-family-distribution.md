@@ -1,5 +1,7 @@
 # TestFlight 家庭外部分发
 
+> 2026-10-18 范围更新：Nomi 已定位为个人一站式工作台，并迁入 Electron 桌面基础；本计划仅跟踪原有 iOS 家庭资料 beta 的分发，不约束桌面或全产品范围。
+
 ## 目标
 
 让没有 Apple Developer / App Store Connect 权限的家庭成员可以通过 TestFlight 安装 Nomi，同时确保 Apple Beta App Review 使用隔离的演示家庭，不能访问真实家庭健康资料。

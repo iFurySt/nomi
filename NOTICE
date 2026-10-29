@@ -1,0 +1,14 @@
+Nomi desktop foundation
+
+Derived from AIFi, Copyright (c) 2026 Leo.
+Source: https://github.com/iFurySt/aifi
+Imported from the 2026-10-18 working tree based on commit
+1e1beb5beca79e30d5f87ee0bae5d934c45f65f1, including uncommitted changes.
+
+The imported apps/desktop, apps/web, apps/cli, packages, JavaScript workspace
+configuration, desktop build/check scripts and fixtures, and desktop design
+reference are AGPL-3.0-only. See LICENSE.aifi. Their Nomi adaptations retain
+that license. LICENSE continues to apply to the pre-existing MIT Nomi code.
+
+Third-party components retain their own notices, including the Apache-2.0
+Codex runtime in third_party/codex. No user credentials or datasets were imported.

@@ -84,7 +84,7 @@ func parseAgentResult(text string) (AgentResult, error) {
 }
 
 func ingestPrompt(personName, relativePath, contextPath, jobID string) string {
-	return fmt.Sprintf(`Analyze the single new household health source at %q for subject %q. Read AGENTS.md and, only if it exists, the compact prior context at %q. For a PDF, inspect any sibling files matching %q; the worker may have extracted text and rendered the first pages there. Do not rename, move, edit, or create files; the Nomi worker owns archival. Return only the required JSON in Chinese: a concise title, factual summary, what this changes versus prior context, current evidence-backed assessment, open questions, and citations. Cite %q for new-source facts. Keep uncertainty explicit and do not diagnose or prescribe. answer may be empty. Job id: %s.`, relativePath, personName, contextPath, relativePath+".*", relativePath, jobID)
+	return fmt.Sprintf(`Analyze the single new household source at %q for subject %q. Read AGENTS.md and, only if it exists, the compact prior context at %q. For a PDF, inspect any sibling files matching %q; the worker may have extracted text and rendered the first pages there. Do not rename, move, edit, or create files; the Nomi worker owns archival. Return only the required JSON in Chinese: a concise title, factual summary, what this changes versus prior context, current evidence-backed assessment, open questions, and citations. Cite %q for new-source facts. Keep uncertainty explicit and do not diagnose or prescribe. answer may be empty. Job id: %s.`, relativePath, personName, contextPath, relativePath+".*", relativePath, jobID)
 }
 func chatPrompt(personName string, messages []Message) string {
 	var b strings.Builder

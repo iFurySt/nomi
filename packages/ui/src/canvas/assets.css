@@ -1,0 +1,233 @@
+.canvas-image.asset-image {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.asset-image-content {
+  position: relative;
+}
+.canvas-image.asset-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+}
+.canvas-image.asset-image > figcaption {
+  display: block;
+  padding: 8px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.asset-caption {
+  display: block;
+  width: 100%;
+  min-height: 24px;
+  resize: none;
+  overflow: hidden;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  padding: 2px 0;
+  margin: 0;
+  background: transparent;
+  color: var(--muted);
+  text-align: center;
+  font-family: inherit;
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.asset-caption::placeholder {
+  color: transparent;
+}
+.asset-image:hover .asset-caption:not(:focus)::placeholder {
+  color: var(--muted);
+}
+.asset-caption:focus::placeholder {
+  color: transparent;
+}
+.asset-image-download {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  background: var(--canvas);
+  color: var(--muted);
+  opacity: 0;
+  text-decoration: none;
+}
+.asset-image:hover .asset-image-download,
+.asset-image:focus-within .asset-image-download {
+  opacity: 1;
+}
+.canvas-file.asset-file-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  color: var(--text);
+  text-decoration: none;
+}
+.asset-file-card > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.asset-file-card > span {
+  flex: 1;
+  min-width: 0;
+}
+.asset-file-card strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.asset-file-card small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.asset-pdf,
+.asset-text-preview {
+  min-width: 0;
+}
+.asset-pdf-page {
+  overflow: auto;
+  max-height: 900px;
+  background: white;
+}
+.asset-pdf canvas {
+  display: block;
+  max-width: 100%;
+  margin: auto;
+}
+.asset-pdf footer,
+.asset-text-preview footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.asset-pdf footer > span,
+.asset-text-preview footer > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.asset-pdf footer > div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.asset-pdf footer button,
+.asset-pdf footer a,
+.asset-text-preview footer a {
+  display: grid;
+  place-items: center;
+  border: 0;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.asset-pdf footer button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.asset-pdf footer small {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.asset-text-preview pre {
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+  padding: 12px 0;
+  color: var(--secondary);
+  font:
+    12px/1.75 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+@media (hover: none) {
+  .asset-image-download {
+    opacity: 1;
+  }
+  .asset-caption::placeholder {
+    color: var(--muted);
+  }
+}
+
+.asset-image-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.dialog-content.asset-image-lightbox {
+  width: min(1200px, calc(100vw - 32px));
+  padding: 16px;
+  border-radius: 12px;
+}
+.asset-image-lightbox .dialog-header {
+  margin-bottom: 12px;
+}
+.asset-image-lightbox .dialog-header h2 {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+.asset-image-lightbox > img {
+  display: block;
+  width: 100%;
+  max-height: calc(100dvh - 140px);
+  object-fit: contain;
+}
+.asset-image-lightbox > p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+.asset-image-lightbox .dialog-description {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

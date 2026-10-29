@@ -340,7 +340,7 @@ func (h *Handler) handleLegacySeedXSmoke(conn *websocket.Conn) error {
 		Type:      "seedx.request",
 		CreatedAt: time.Now(),
 		Payload: map[string]any{
-			"prompt": "请用中文总结最近保存的身体记录，不要提供医疗建议。",
+			"prompt": "请用中文总结最近保存的个人或家庭资料，区分事实与推断，不要编造来源或提供诊断、处方。",
 			"mode":   "smoke",
 		},
 	}

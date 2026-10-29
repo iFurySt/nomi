@@ -1,45 +1,40 @@
 # 设计原则
 
-这份文档沉淀 Nomi / 知己 相对稳定的产品设计原则。具体功能规格见 `docs/product-specs/`，前端工程约定见 `docs/FRONTEND.md`，可执行 UIUX 标准和参考入口见 `docs/UIUX_REFERENCE.md`。
+Nomi / 知己是个人一站式工作台，涵盖学习、笔记、信息 hub、知识、健康与财富管理，并可扩展到家庭成员。功能边界见 [产品规格](product-specs/personal-workbench.md)，前端实现见 [FRONTEND.md](FRONTEND.md)。
 
-## Design Direction
+## 体验方向
 
-Nomi should feel like a niche, carefully crafted iOS app: quiet, personal, focused, and intentionally small. The product follows a "less is more" design philosophy, where every screen exists to help the user capture, review, or ask about their own records with minimal effort.
+quiet、personal、less is more。让用户轻松收集、记录、整理、阅读、查询和理解自己的长期上下文。增加领域能力时，保持清楚的导航和聚焦的内容区，避免把所有模块和指标堆到首页。
 
-The app should not feel like a dashboard, medical system, enterprise tool, or generic calorie tracker. It should feel like a private personal log with intelligence built in.
+## 桌面
 
-## Principles
+沿用从 AIFi 迁入并经过迭代的 Electron 外壳、inset sidebar / document panel、导航历史、主题、搜索、设置与对话交互。细节与 token 见 [桌面设计基线](design-docs/desktop-design.md)。其中金融内容与品牌图形是迁入基线，Nomi 产品定位以当前规格为准。
 
-- Clarity over density: show only what matters now.
-- Calm over urgency: avoid alerts, warnings, aggressive colors, and judgmental language.
-- Native over custom: prefer familiar iOS patterns, system typography, standard navigation, sheets, segmented controls, lists, and subtle haptics.
-- Content over chrome: records, photos, numbers, and AI answers should be the focus; UI decoration should stay quiet.
-- Fast capture over completeness: recording should take seconds, and details can be corrected later.
-- Personal memory over analytics dashboard: trends should feel like gentle reflection, not performance scoring.
-- Trust through restraint: AI answers should be grounded, sourced, and modest, not overconfident.
+保留成熟交互，再逐项改造领域页面。桌面不照搬 iPhone 底栏；窗口控制交给系统，renderer 不伪造系统三色按钮。
 
-## Visual Style
+## 文稿写作
 
-- Use generous whitespace.
-- Use a small, warm, neutral color palette with one restrained accent color.
-- Avoid gradients, heavy shadows, flashy cards, gamification, badges, streak pressure, and red/yellow warning systems.
-- Use large readable typography where it helps reflection, but keep operational screens compact and scannable.
-- Prefer native iOS components unless a custom component clearly improves the experience.
-- Animations should be subtle, tactile, and purposeful.
+遵循用户明确要求的 less is more：单一富文本编辑，优先粘贴自适应内容；不展示 Markdown 切换、文件导入、导出或重复的历史按钮。常用操作收进内容上下文，能够清晰表达的动作用图标并配可访问名称 / tooltip，不堆说明文字。保存状态安静稳定，目录默认在正文左侧收为短线、悬停展开，只有用户固定时才占据侧栏。表格以轻边框和留白服务阅读。
 
-## UX Style
+文稿列表、更多按钮、标题输入和上下文工具禁止使用 outline 或阴影形成聚焦框线。点击与键盘聚焦沿用轻微底色 / 文字反馈，标题保持纯净，不添加底线或外框。
 
-- Home should answer: "What did I record today?" and "What can I add quickly?"
-- Capture should be the primary action.
-- Editing AI-extracted data should feel lightweight and forgiving.
-- Ask should feel like talking to a quiet personal assistant, not a chatbot gimmick.
-- Trends should reveal patterns without making the user feel judged.
-- Empty states should invite one small action, not explain the whole product.
+固定目录与正文以留白区分，不加竖向分割线。块属性菜单及其子菜单展开期间保持原块锚点，菜单焦点不能跟随旧正文光标切换目标。
 
-## Do Not Build
+块类型图标（空行加号）悬停即可展开，延迟收起以便进入菜单 / 子菜单；六点仅负责拖动。公式直接在附近浮层编辑并即时预览，Esc 或外部点击结束，不再使用遮罩弹窗与保存按钮。公式对齐和表格复制文本 / CSV 下载使用菜单内图标。分割线是行内居中的灰色细线。
 
-- A medical dashboard.
-- A productivity CRM for health.
-- A social or gamified health app.
-- A dense quantified-self cockpit.
-- A loud AI-first interface where chat dominates everything.
+空行加号在悬停 / 展开时也不描边。输入、删除或开始中文组词时隐藏所有左侧块工具，鼠标静止时不恢复；下一次鼠标移动后，只显示悬停行的工具，不因正文光标或焦点常驻。
+
+代码块使用克制的语法颜色，复制图标仅在块内右上角悬停 / 聚焦时出现。正文图片不加外框、卡片标题或文件名条；说明位于图片下方居中，用灰色斜体，未填写时仅悬停显示输入提示。PDF 优先直接预览并用小图标翻页 / 下载；无法预览的文件才使用含类型图标、名称、大小和下载入口的简洁卡片。
+
+## 移动端
+
+iOS 延续系统控件、Dynamic Type、语义色、标准导航和 sheet。当前资料 / 对话 / 家庭结构仍服务已有 beta；更早的 Today、Log、营养 timeline 设计作为历史参考。
+
+## 共同原则
+
+- 内容优先：原始材料、笔记、来源、事实与 AI 结论比装饰重要。
+- 清晰优先：安静的中性色、可扫描的层级、适当留白和轻量动效。
+- 低摩擦：快速收集，之后可整理和修正；空态提供一个真实可完成的动作。
+- 可信：区分事实、推断、不确定性和示例，引用能回到来源；不制造焦虑、评分压力或夸大 AI 能力。
+- 归属明确：个人私有、成员资料和家庭共享始终清楚；不以家庭扩展牺牲个人隐私。
+- 各领域保持自己的语义；健康不是整个产品，也不把工作台做成医疗驾驶舱或自动交易界面。

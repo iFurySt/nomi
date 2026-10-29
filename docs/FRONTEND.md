@@ -1,6 +1,22 @@
-# iOS 协作说明
+# 前端协作说明
 
-当前唯一产品客户端是 `apps/ios/` 的原生 SwiftUI iPhone App。旧 macOS body-log 客户端不在家庭健康 V1 范围内。
+Nomi 当前同时维护 Electron 桌面工作台与原生 SwiftUI iPhone beta。产品定位见 `docs/product-specs/personal-workbench.md`。
+
+## Electron / Web
+
+- `apps/desktop` 与 `apps/web` 组合 `packages/ui` 的同一 React renderer；共享契约在 core，host 能力通过 platform 适配。
+- 桌面迁入自 AIFi 当前工作区，保留现有布局、导航、主题、设置与金融页面作为继续开发的基础，避免迁入时重做成熟交互。
+- 桌面运行、ChatGPT 登录、测试、数据目录与迁入边界以 [DESKTOP.md](DESKTOP.md) 为准；设计细节参考 [桌面设计基线](design-docs/desktop-design.md)。
+- `pnpm dev:desktop` 启动开发桌面；`pnpm build && pnpm desktop` 验证构建版本；ChatGPT 能力只在桌面开放。
+- 可见文字、助手定位和新模块围绕个人工作台展开；当前本地金融工具不应被描述成已经可读所有个人或家庭资料。
+
+## 笔记与 GenUI 协议
+
+未来交互块由平台中立的组件 catalog、状态、表达式 / 动作和能力接口定义。首批 React / TypeScript 是参考实现，SwiftUI / UIKit / Compose 可独立实现相同语义；不把 WebView、CSS 或 React 状态作为原生客户端的必要契约。React 的第一轮已提供 Learn、通用组件映射、SVG 图表、KaTeX、定义编辑 / 导入导出和独立本机学习状态；学习页及公式依赖按路由加载。`pnpm smoke:learning` 验证真实 App 的交互、持久化和错误路径。默认 Canvas 已提供平移 / 缩放、长笔记 Markdown / LaTeX 编辑与聚焦视图、附件和交互块；结构 / 附件在 IndexedDB 保存，`pnpm smoke:canvas` 验证默认主界面与恢复。详见 [画布实现](design-docs/canvas-workspace-runtime.md)。Swift 已有计算 conformance，原生 UI、手写、OpenUI 文本前端和同步待实现。详见 [本轮运行时](design-docs/interactive-learning-runtime.md) 与 [GenUI 与跨端 DSL](design-docs/generative-interactive-content.md)。
+
+## iOS beta
+
+`apps/ios/` 保留现有家庭资料与对话能力。旧 Swift macOS body-log 客户端不再维护；新的桌面入口为 Electron。
 
 ## 信息架构
 

@@ -11,7 +11,7 @@
 
 ## 发起 Pull Request 之前
 
-- 运行 `make ci`。
+- 运行 `make ci`；桌面变更同时按 `docs/DESKTOP.md` 跑类型、单测、构建和相关 smoke；Go 本地服务变更运行 `pnpm check:desktop-go`。
 - 如果本次改动涉及代码或仓库流程，补齐或更新对应 history。
 - 如果变更对用户可感知，补齐 release note。
 - 确认示例、脚本、说明文档和当前实现一致。
@@ -21,3 +21,7 @@
 - 优先拆成范围清晰的小 PR。
 - 明确写出风险点、迁移影响和后续待办。
 - 如果上下文复杂，直接链接对应 plan、spec 或 history，不要依赖评审者自己猜。
+
+## 来源与许可证
+
+迁入的桌面应用和依赖源码保留 AGPL-3.0-only，具体范围见 `NOTICE` / `LICENSE.aifi`；既有 Nomi 代码继续使用 MIT。修改迁入代码时保留来源与第三方 notices。

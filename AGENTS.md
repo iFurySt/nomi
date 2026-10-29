@@ -1,6 +1,6 @@
 # nomi
 
-这个仓库是一个面向 Agent 协作开发的基础模板。
+Nomi / 知己是个人一站式工作台，覆盖学习、笔记、信息 hub、知识、健康和财富管理，并可扩展到家庭成员。这个仓库采用 Agent-first 协作方式。
 
 `AGENTS.md` 故意保持简短，只负责做导航，不负责塞满所有规则。仓库内的 `docs/` 才是本地知识的正式来源。
 
@@ -20,6 +20,10 @@
 ## 按任务需要选读
 
 - `docs/PLANS_GUIDE.md`：什么时候要写 execution plan，怎么维护。
+- `docs/product-specs/personal-workbench.md`：当前产品定位、领域边界和阶段范围。
+- `docs/design-docs/generative-interactive-content.md`：GenUI、交互学习、平台中立 DSL 与原生 renderer 的当前架构修订。
+- `docs/design-docs/notes-infinite-canvas.md`：当前笔记 / 无限画布方向、DSL、跨端和手写架构提案。
+- `docs/DESKTOP.md`：Electron 工作台、本地数据、ChatGPT 登录与迁入边界。
 - `docs/PRODUCT_SENSE.md`：产品价值、取舍方式和优先级判断。
 - `docs/RELIABILITY.md`：运行稳定性、观测性和上线前的基本要求。
 - `docs/SECURITY.md`：认证、数据处理、外部集成等安全默认约束。

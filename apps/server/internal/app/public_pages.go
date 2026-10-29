@@ -15,8 +15,8 @@ func writePublicPage(w http.ResponseWriter, title, body string) {
 
 func (h *Handler) privacy(w http.ResponseWriter, _ *http.Request) {
 	writePublicPage(w, "Nomi Privacy Policy", `<h1>Nomi Privacy Policy</h1>
-<small>Effective: August 23, 2026</small>
-<p>Nomi is a private-beta family health record organizer. It stores account details, household membership, files you upload, the health context you enter, and conversations needed to provide the service.</p>
+<small>Effective: October 18, 2026</small>
+<p>Nomi is a personal workbench for learning, notes, information, knowledge, health and wealth management, with optional family use. The current server private beta provides household records and conversations. It stores account details, household membership, uploaded files, the context you enter, and conversations needed for those features.</p>
 <h2>How data is used</h2>
 <p>Data is used only to authenticate household members, preserve the household knowledge base, organize uploaded records, and generate source-linked summaries and answers. Nomi does not sell personal or health data and does not use it for advertising.</p>
 <h2>Processing and sharing</h2>
@@ -28,16 +28,16 @@ func (h *Handler) privacy(w http.ResponseWriter, _ *http.Request) {
 <h2>Contact</h2>
 <p>For privacy questions, use the TestFlight feedback channel or contact the person who invited you to the private beta.</p>
 <hr><h1>隐私说明</h1>
-<p>Nomi 是家庭健康资料整理 private beta。服务仅为账号认证、家庭资料保存、上传资料整理和带来源的分析使用必要数据；不出售数据、不用于广告。家庭内获授权成员可访问家庭资料，服务端 AI provider 会按用户请求处理上传内容。参与者可通过家庭 owner 或 TestFlight 反馈渠道申请访问、更正、导出或删除。Nomi 不提供诊断、处方、治疗或急救服务。</p>`)
+<p>Nomi 是涵盖学习、笔记、信息、知识、健康与财富管理，并可扩展到家庭成员的个人工作台；当前服务端 private beta 提供家庭资料整理与对话。服务仅为账号认证、家庭资料保存、上传资料整理和带来源的分析使用必要数据；不出售数据、不用于广告。家庭内获授权成员可访问家庭资料，服务端 AI provider 会按用户请求处理上传内容。参与者可通过家庭 owner 或 TestFlight 反馈渠道申请访问、更正、导出或删除。Nomi 不提供诊断、处方、治疗或急救服务。</p>`)
 }
 
 func (h *Handler) support(w http.ResponseWriter, _ *http.Request) {
 	writePublicPage(w, "Nomi Support", `<h1>Nomi Support</h1>
-<p>Nomi is currently available to invited family members through TestFlight.</p>
+<p>Nomi is a personal workbench. The iOS private beta is available to invited family members through TestFlight; the local Electron desktop foundation is developed separately.</p>
 <h2>Getting help</h2>
 <p>Send feedback from the TestFlight app, or contact the household owner who invited you. Include the screen you were using and the approximate time of the issue, but do not include passwords, invitation codes, session tokens, or unredacted health records.</p>
 <h2>Important</h2>
 <p>Nomi is not an emergency or medical-care service. For urgent medical concerns, contact local emergency services or a qualified clinician.</p>
 <hr><h1>支持</h1>
-<p>Nomi 目前仅通过 TestFlight 向受邀家庭成员开放。遇到问题请使用 TestFlight 反馈，或联系邀请你的家庭 owner。请勿在反馈中发送密码、邀请码、session token 或未脱敏的健康报告。Nomi 不是急救或医疗服务。</p>`)
+<p>Nomi 是个人工作台。目前 iOS private beta 通过 TestFlight 向受邀家庭成员开放，Electron 桌面工作台在本地独立开发。遇到问题请使用 TestFlight 反馈，或联系邀请你的家庭 owner。请勿在反馈中发送密码、邀请码、session token 或未脱敏的健康报告。Nomi 不是急救或医疗服务。</p>`)
 }

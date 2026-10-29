@@ -1,0 +1,3 @@
+Nomi notes/canvas design fixture
+This synthetic attachment demonstrates an immutable file reference.
+It is not user data or an external research source.

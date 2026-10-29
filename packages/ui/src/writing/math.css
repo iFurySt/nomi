@@ -1,0 +1,22 @@
+.nomi-math-block[data-math-align="left"],
+.tiptap-mathematics-render[data-math-align="left"] {
+  text-align: left;
+}
+.nomi-math-block[data-math-align="center"],
+.tiptap-mathematics-render[data-math-align="center"] {
+  text-align: center;
+}
+.nomi-math-block[data-math-align="right"],
+.tiptap-mathematics-render[data-math-align="right"] {
+  text-align: right;
+}
+.nomi-math-block .katex-display,
+.tiptap-mathematics-render[data-math-align] .katex-display,
+.nomi-math-block .katex-display > .katex,
+.tiptap-mathematics-render[data-math-align] .katex-display > .katex {
+  text-align: inherit;
+}
+.nomi-math-block .katex-display > .katex,
+.tiptap-mathematics-render[data-math-align] .katex-display > .katex {
+  min-width: max-content;
+}

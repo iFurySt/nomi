@@ -1,0 +1,131 @@
+package command
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/ifuryst/nomi/apps/cli/internal/directory"
+	"github.com/ifuryst/nomi/apps/cli/internal/research"
+	"github.com/ifuryst/nomi/apps/cli/internal/service"
+	"github.com/ifuryst/nomi/apps/cli/internal/store"
+	"github.com/spf13/cobra"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+func New() *cobra.Command {
+	var dataDir string
+	root := &cobra.Command{Use: "nomi", Short: "Local Nomi data tools", SilenceUsage: true, SilenceErrors: true}
+	root.PersistentFlags().StringVar(&dataDir, "data-dir", os.Getenv("NOMI_DATA_DIR"), "Local data directory (default: OS config directory/nomi/data)")
+	data := &cobra.Command{Use: "data", Short: "Collect and inspect local datasets"}
+	dir := &cobra.Command{Use: "directory", Short: "Official US-listed security directory"}
+	root.AddCommand(data, newQueryCommand(&dataDir), newMCPCommand(&dataDir))
+	data.AddCommand(dir)
+	withStore := func(cmd *cobra.Command, action func(context.Context, *store.Store) (any, error)) error {
+		path := dataDir
+		if path == "" {
+			base, err := os.UserConfigDir()
+			if err != nil {
+				return err
+			}
+			path = filepath.Join(base, "nomi", "data")
+		}
+		db, err := store.Open(cmd.Context(), path)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		value, err := action(cmd.Context(), db)
+		if err != nil {
+			return err
+		}
+		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(value)
+	}
+	sync := &cobra.Command{Use: "sync", Short: "Fetch both official files and atomically update SQLite", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		return withStore(cmd, func(ctx context.Context, s *store.Store) (any, error) {
+			cfg, err := s.Settings(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if !cfg.DirectoryEnabled {
+				return nil, fmt.Errorf("directory source is disabled")
+			}
+			return s.Sync(ctx, directory.NewClient())
+		})
+	}}
+	status := &cobra.Command{Use: "status", Short: "Read source provenance and recent sync outcomes", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		return withStore(cmd, func(ctx context.Context, s *store.Store) (any, error) { return s.Status(ctx) })
+	}}
+	var query, scope string
+	var limit, offset int
+	list := &cobra.Command{Use: "list", Short: "Search the cached directory without network calls", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		if scope != "candidates" && scope != "all" {
+			return fmt.Errorf("scope must be candidates or all")
+		}
+		return withStore(cmd, func(ctx context.Context, s *store.Store) (any, error) {
+			return s.List(ctx, query, limit, offset, scope == "all")
+		})
+	}}
+	list.Flags().StringVar(&query, "query", "", "Literal symbol or name search")
+	list.Flags().StringVar(&scope, "scope", "candidates", "candidates excludes test issues and ETFs; all includes every source row")
+	list.Flags().IntVar(&limit, "limit", 20, "Page size (1–200)")
+	list.Flags().IntVar(&offset, "offset", 0, "Offset (0–100000)")
+	var offline bool
+	daemon := &cobra.Command{Use: "service", Short: "Run the app-owned data scheduler over private stdio", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		path := dataDir
+		if path == "" {
+			base, e := os.UserConfigDir()
+			if e != nil {
+				return e
+			}
+			path = filepath.Join(base, "nomi", "data")
+		}
+		absolute, e := filepath.Abs(path)
+		if e != nil {
+			return e
+		}
+		db, e := store.Open(cmd.Context(), absolute)
+		if e != nil {
+			return e
+		}
+		defer db.Close()
+		return service.New(db, directory.NewClient(), absolute, offline).Serve(cmd.Context(), cmd.InOrStdin(), cmd.OutOrStdout())
+	}}
+	daemon.Flags().BoolVar(&offline, "offline", false, "Pause network work while keeping settings/cache available")
+	root.AddCommand(daemon)
+	researchCommand := &cobra.Command{Use: "research", Short: "Persisted whole-directory research datasets"}
+	var syncSymbols []string
+	researchCommand.AddCommand(&cobra.Command{Use: "status", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		return withStore(cmd, func(ctx context.Context, db *store.Store) (any, error) { return db.ResearchStatus(ctx) })
+	}}, &cobra.Command{Use: "read SYMBOL", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		return withStore(cmd, func(ctx context.Context, db *store.Store) (any, error) {
+			return db.ResearchRead(ctx, strings.ToUpper(args[0]))
+		})
+	}}, &cobra.Command{Use: "sync", Short: "Queue whole-directory work; app service executes it", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		return withStore(cmd, func(ctx context.Context, db *store.Store) (any, error) {
+			if e := research.New(db, dataDir, false).Reconcile(ctx, true); e != nil {
+				return nil, e
+			}
+			if len(syncSymbols) > 0 {
+				if e := db.RequestSymbolResearchSync(ctx, syncSymbols); e != nil {
+					return nil, e
+				}
+			} else if e := db.RequestResearchSync(ctx); e != nil {
+				return nil, e
+			}
+			return db.ResearchStatus(ctx)
+		})
+	}})
+	for _, command := range researchCommand.Commands() {
+		if command.Name() == "sync" {
+			command.Flags().StringSliceVar(&syncSymbols, "symbols", nil, "Queue selected directory symbols (at most 50), preserving provider limits")
+		}
+	}
+	researchCommand.AddCommand(newBackfillCommand(&dataDir))
+	data.AddCommand(researchCommand)
+	dir.AddCommand(sync, list, status)
+	return root
+}

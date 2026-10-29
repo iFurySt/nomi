@@ -1,0 +1,213 @@
+{
+  "schema": "nomi-learning-reference/draft-1",
+  "purpose": "Independent numerical references and expected event behavior; no Nomi runtime executed.",
+  "absoluteTolerance": 1e-09,
+  "probabilityCases": [
+    {
+      "logits": [
+        2.0,
+        1.0,
+        0.1
+      ],
+      "temperature": 0.2,
+      "expected": [
+        0.9932333013278166,
+        0.0066923533420735135,
+        7.4345330109789e-05
+      ]
+    },
+    {
+      "logits": [
+        2.0,
+        1.0,
+        0.1
+      ],
+      "temperature": 0.85,
+      "expected": [
+        0.7065510823756447,
+        0.217875743144277,
+        0.07557317448007829
+      ]
+    },
+    {
+      "logits": [
+        2.0,
+        1.0,
+        0.1
+      ],
+      "temperature": 1.0,
+      "expected": [
+        0.6590011388859679,
+        0.24243297070471392,
+        0.09856589040931818
+      ]
+    },
+    {
+      "logits": [
+        2.0,
+        1.0,
+        0.1
+      ],
+      "temperature": 3.0,
+      "expected": [
+        0.4449683677747765,
+        0.31883376772554045,
+        0.23619786449968302
+      ]
+    },
+    {
+      "logits": [
+        1002.0,
+        1001.0,
+        1000.1
+      ],
+      "temperature": 0.85,
+      "expected": [
+        0.7065510823756447,
+        0.217875743144277,
+        0.07557317448007829
+      ],
+      "property": "constant-shift-invariance"
+    }
+  ],
+  "curveCases": [
+    {
+      "mode": "logit",
+      "series": 0,
+      "x": -4,
+      "expectedY": 0.002065878703937931
+    },
+    {
+      "mode": "logit",
+      "series": 0,
+      "x": 2,
+      "expectedY": 0.7065510823756447
+    },
+    {
+      "mode": "logit",
+      "series": 0,
+      "x": 4,
+      "expectedY": 0.9620074863233237
+    },
+    {
+      "mode": "logit",
+      "series": 1,
+      "x": 1,
+      "expectedY": 0.217875743144277
+    },
+    {
+      "mode": "logit",
+      "series": 2,
+      "x": 0.1,
+      "expectedY": 0.07557317448007829
+    }
+  ],
+  "invalidCases": [
+    {
+      "logits": [
+        2.0,
+        1.0,
+        0.1
+      ],
+      "temperature": 0,
+      "expectedError": "domain"
+    },
+    {
+      "logits": [
+        2.0,
+        1.0,
+        0.1
+      ],
+      "temperature": -1,
+      "expectedError": "domain"
+    }
+  ],
+  "eventTrace": [
+    {
+      "event": {
+        "type": "set",
+        "state": "temperature",
+        "value": 1.0
+      },
+      "expectedState": {
+        "temperature": 1.0,
+        "mode": "logit",
+        "logits": [
+          2.0,
+          1.0,
+          0.1
+        ]
+      },
+      "expectedProbabilities": [
+        0.6590011388859679,
+        0.24243297070471392,
+        0.09856589040931818
+      ]
+    },
+    {
+      "event": {
+        "type": "set",
+        "state": "mode",
+        "value": "temperature"
+      },
+      "expectedState": {
+        "temperature": 1.0,
+        "mode": "temperature",
+        "logits": [
+          2.0,
+          1.0,
+          0.1
+        ]
+      },
+      "expectedSeries": "temperatureCurves"
+    },
+    {
+      "event": {
+        "type": "set",
+        "state": "temperature",
+        "value": 3.0
+      },
+      "expectedState": {
+        "temperature": 3.0,
+        "mode": "temperature",
+        "logits": [
+          2.0,
+          1.0,
+          0.1
+        ]
+      },
+      "expectedProbabilities": [
+        0.4449683677747765,
+        0.31883376772554045,
+        0.23619786449968302
+      ]
+    },
+    {
+      "event": {
+        "type": "activate",
+        "node": "control.reset"
+      },
+      "expectedState": {
+        "temperature": 0.85,
+        "mode": "logit",
+        "logits": [
+          2.0,
+          1.0,
+          0.1
+        ]
+      },
+      "expectedProbabilities": [
+        0.7065510823756447,
+        0.217875743144277,
+        0.07557317448007829
+      ]
+    }
+  ],
+  "requiredBehavior": [
+    "All events execute locally with zero AI requests.",
+    "Reset changes personal state, not the authored document.",
+    "Updating text or declared defaults preserves compatible current personal state.",
+    "Both logit and temperature markers match the active distributions.",
+    "Intermediate slider values are view-local; durable user state uses a bounded commit policy."
+  ]
+}

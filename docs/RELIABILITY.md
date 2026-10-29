@@ -1,5 +1,13 @@
 # 稳定性与可运维性
 
+## Electron 桌面
+
+- Go 子进程拥有 SQLite / 调度，Node host 拥有子进程生命周期与 ChatGPT / Codex；退出时停止任务并关闭子进程。
+- 来源数据先落盘再读取；空数据、失败、过期与示例必须区分。聊天只有完整成功的回答才持久化，取消和中断保持可重试。
+- 正常桌面单实例；smoke 使用临时 profile、合成 transport 与空 store，产物留在 ignored `.artifacts/`。
+- 桌面本地账号 / 数据与 server 独立，备份不能只包含 Electron localStorage；本地 SQLite、ChatGPT 密文和密钥、Codex thread 需要一致处理。
+- 构建、测试与当前限制见 `docs/DESKTOP.md`；本轮无桌面发布与跨端同步。
+
 ## Server
 
 - `GET /health` 同时报告 server 与 Postgres 状态。

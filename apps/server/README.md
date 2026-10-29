@@ -1,6 +1,6 @@
 # Nomi Server
 
-Go API for the Nomi family-health private beta.
+Go API for the personal and family records private beta within Nomi, a personal workbench for learning, notes, information, knowledge, health and wealth management. The Electron desktop currently runs independently; see `docs/DESKTOP.md` at the repository root.
 
 ## Responsibilities
 

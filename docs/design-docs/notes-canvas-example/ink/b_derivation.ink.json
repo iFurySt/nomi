@@ -1,0 +1,21 @@
+{
+  "schema": "nomi-ink",
+  "version": 1,
+  "width": 640,
+  "height": 240,
+  "strokes": [
+    {
+      "id": "s_line",
+      "brush": "pen",
+      "brushVersion": 1,
+      "color": "#222222",
+      "width": 2.5,
+      "points": [
+        { "x": 40, "y": 100, "t": 0, "p": 0.4 },
+        { "x": 80, "y": 95, "t": 12, "p": 0.7 },
+        { "x": 120, "y": 105, "t": 24, "p": 0.6 },
+        { "x": 160, "y": 100, "t": 36, "p": 0.3 }
+      ]
+    }
+  ]
+}

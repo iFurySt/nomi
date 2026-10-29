@@ -52,7 +52,7 @@ func NewRootCommand() *cobra.Command {
 		SeedXCommandTimeout:       envDurationOrDefault("NOMI_SEEDX_COMMAND_TIMEOUT", 5*time.Minute),
 		JobPollInterval:           envDurationOrDefault("NOMI_JOB_POLL_INTERVAL", 750*time.Millisecond),
 	}
-	cmd := &cobra.Command{Use: "nomi-server", Short: "Run the Nomi family health API server", RunE: func(cmd *cobra.Command, args []string) error { return run(cmd.Context(), cfg) }}
+	cmd := &cobra.Command{Use: "nomi-server", Short: "Run the Nomi personal and family workspace API server", RunE: func(cmd *cobra.Command, args []string) error { return run(cmd.Context(), cfg) }}
 	cmd.Flags().StringVar(&cfg.Addr, "addr", cfg.Addr, "HTTP listen address")
 	cmd.Flags().StringVar(&cfg.DatabaseURL, "database-url", cfg.DatabaseURL, "Postgres connection URL")
 	cmd.Flags().StringVar(&cfg.SeedXAPIKey, "seedx-api-key", cfg.SeedXAPIKey, "SeedX daemon API key")

@@ -1,6 +1,6 @@
 # CI/CD 说明
 
-这个仓库当前只保留正在使用的 CI/CD 入口：仓库基础检查和 Nomi server 发版。
+当前 GitHub Actions 保留仓库基础检查和 Nomi server 发版。Electron 工作台已具备本地类型检查、单测、Go 检查、构建和 smoke 命令，尚未接入桌面分发或 CI runner 的 GUI 环境。
 
 ## 默认包含的内容
 
@@ -53,3 +53,7 @@ iOS 发布的固定信息：
 5. 在 App Store Connect TestFlight 页面确认 build processing 完成。
 
 详细命令和常见错误见 `docs/IOS_TESTFLIGHT_RELEASE.md`。真实 Apple 密钥、`.p8`、`.p12` 和 provisioning profiles 不写入 git；如必须本机留存，放在 `.harness/secret/apple/`。
+
+## 桌面本地验证
+
+`pnpm install --frozen-lockfile` 后运行 `pnpm check`、`pnpm test`、`pnpm check:desktop-go`、`pnpm build` 和 `pnpm smoke:desktop`。`pnpm smoke:desktop` 包含默认 Canvas 与 Learn 回归，`pnpm smoke:learning` / `pnpm smoke:canvas` 可单独运行；有 swiftc 的机器可额外运行 `pnpm check:interactive-native`。ChatGPT / Codex / MCP 合成检查见 `docs/DESKTOP.md`。`make ci` 继续保持轻量仓库门禁，不代表执行全部桌面测试；桌面打包、签名、公证和自动分发留待实际发布需求。

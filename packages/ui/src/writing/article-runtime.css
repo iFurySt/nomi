@@ -1,0 +1,121 @@
+:root {
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  color-scheme: light dark;
+  --canvas: #fff;
+  --surface: #fff;
+  --surface-muted: #f5f5f5;
+  --sidebar: #f8f8f8;
+  --text: #202020;
+  --secondary: #636363;
+  --muted: #777;
+  --border: #e8e8e8;
+  --primary: #202020;
+  --on-primary: #fff;
+  --negative: #b34c47;
+  background: var(--canvas);
+  color: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #191919;
+    --surface: #242424;
+    --surface-muted: #2c2c2c;
+    --sidebar: #212121;
+    --text: #ececec;
+    --secondary: #b5b5b5;
+    --muted: #a0a0a0;
+    --border: #393939;
+    --primary: #ececec;
+    --on-primary: #202020;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  line-height: 1.8;
+}
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 3px;
+}
+.published-note {
+  max-width: 860px;
+  margin: auto;
+  padding: 28px 24px 80px;
+  overflow-wrap: anywhere;
+}
+.published-note h1 {
+  font-size: 32px;
+  line-height: 1.3;
+  letter-spacing: -1px;
+}
+.published-note section {
+  margin: 24px 0;
+}
+.published-note img {
+  max-width: 100%;
+  height: auto;
+}
+.article-image {
+  margin: 0;
+  border: 0;
+}
+.article-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.article-image figcaption {
+  padding-top: 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+  white-space: pre-wrap;
+}
+.published-note pre {
+  overflow: auto;
+  background: var(--surface-muted);
+  padding: 16px;
+  border-radius: 8px;
+}
+.published-note table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.published-note td,
+.published-note th {
+  border: 1px solid var(--border);
+  padding: 8px;
+}
+.published-note blockquote {
+  margin-left: 0;
+  padding-left: 20px;
+  border-left: 3px solid var(--border);
+}
+.published-note .katex-display {
+  overflow: auto;
+}
+.published-note a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+@media (max-width: 500px) {
+  .published-note {
+    padding: 18px 14px 40px;
+  }
+}

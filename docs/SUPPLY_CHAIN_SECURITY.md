@@ -8,6 +8,13 @@
 - 当前保留的自动化发布只覆盖 `apps/server` Docker 镜像构建、GHCR 推送和 amoylab 部署。
 - 通用 release、SBOM、provenance、Dependency Review 和 OSV 扫描暂不保留占位 workflow；重新接入时必须绑定真实构建产物、依赖清单和明确失败策略。
 
+## 桌面依赖与来源
+
+- Node / pnpm 版本和 pnpm lockfile 纳入版本管理；`pnpm install --frozen-lockfile` 安装迁入的精确依赖。
+- Codex runtime 固定 `0.160.0`，构建携带 `third_party/codex` 的 Apache-2.0 声明；升级需重新验证协议。
+- 迁入的 AIFi 代码及修改保留 AGPL-3.0-only；根目录 `NOTICE` 与 `LICENSE.aifi` 明确范围，既有 MIT Nomi 代码不混标。
+- 不复制源仓库二进制、node_modules、账号凭据或个人数据；桌面构建在本仓库重新生成。
+
 ## 当前对应关系
 
 - `scripts/check-action-pinning.sh`：如果 workflow 里出现浮动 tag 而不是 SHA，直接让 CI 失败。

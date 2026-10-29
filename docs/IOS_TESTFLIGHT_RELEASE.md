@@ -164,7 +164,7 @@ scp amoylab:/opt/nomi/data/admin/testflight-review.json .apple/testflight-review
 chmod 600 .apple/testflight-review.json
 ```
 
-3. 在 TestFlight → Test Information 填写 beta 描述、feedback email、privacy URL、审核联系人和隔离审核账号；review notes 说明这是家庭健康资料 private beta、演示家庭为空、AI 结果仅供资料整理且不是医疗建议。
+3. 在 TestFlight → Test Information 填写 beta 描述、feedback email、privacy URL、审核联系人和隔离审核账号；review notes 说明 Nomi 是个人工作台，本 iOS build 提供家庭资料 private beta、演示家庭为空、AI 结果仅供资料整理且不是医疗建议。
 4. 建立 External Testing group，把当前 build 加入组并提交 Beta App Review。输入联系人、登录凭据和最终提交都属于对 Apple 的外部传输，执行前必须由用户确认。
 5. 审核通过后，把家庭成员邮箱加入 external group；家庭 owner 在 App 内生成一次性邀请码，家人安装后自行注册加入真实家庭。
 
@@ -174,10 +174,10 @@ chmod 600 .apple/testflight-review.json
 
 ```text
 Beta App Description
-Nomi helps invited family members organize health records, keep a shared long-term knowledge base, and ask source-linked questions about the information they provide.
+Nomi is a personal workbench for learning, notes, information, knowledge, health and wealth management, with optional family collaboration. This iOS beta lets invited family members organize records, maintain shared context, and ask source-linked questions; dedicated modules for other domains are still being developed.
 
 Review Notes
-Nomi is an invitation-only family health record organizer. Use the supplied review account, which belongs to an isolated demo household and contains no real family health data. The Records tab accepts photos, PDFs, and text files; processing is asynchronous and may take up to one minute. The Chat tab answers from the demo household workspace and shows source paths when supporting material exists. Nomi organizes user-provided information and does not diagnose, prescribe, adjust medication, or provide emergency services.
+Nomi is a personal workbench; this invitation-only iOS beta provides family record organization and conversations. Use the supplied review account, which belongs to an isolated demo household and contains no real family health data. The Records tab accepts photos, PDFs, and text files; processing is asynchronous and may take up to one minute. The Chat tab answers from the demo household workspace and shows source paths when supporting material exists. Nomi organizes user-provided information and does not diagnose, prescribe, adjust medication, or provide emergency services.
 ```
 
 当前 `0.1 (5)` 已进入 `Nomi Family Beta` external group，Beta Review 状态为 `APPROVED`。审核联系人和 demo credential 已提交 Apple，但敏感值只保留在 App Store Connect 与 git ignored 的本机/生产凭据文件中。

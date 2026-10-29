@@ -1,6 +1,34 @@
 # 安全默认约束
 
-Nomi 处理真实家庭健康资料，默认按高敏感个人数据对待。
+Nomi 处理个人学习、笔记、信息、知识、健康和财富等资料，并可扩展到家庭成员；真实个人及家庭资料默认按敏感数据对待。现有 server beta 的 household 全共享规则不能直接成为未来个人私有空间的默认授权。
+
+## 桌面与本地 AI
+
+- Electron 启用 contextIsolation、sandbox，关闭 nodeIntegration；仅 top-frame allowlist 能访问 host。renderer 不接收 OAuth token、密钥或任意文件 / 进程能力。
+- 剪贴板仅允许受信任主文档的 `clipboard-sanitized-write`，供用户点击复制表格 / 代码；开发入口与打包文件按完整 URL 校验，子 frame、剪贴板读取及其他浏览器权限仍拒绝。
+- Nomi 使用独立 profile、本地数据目录、OAuth host ID 与注册，不复制 AIFi 登录态或数据。
+- ChatGPT 注册 / 会话加密存于本地，文件密钥与密文同目录；目录 0700、文件 0600。同用户文件读取能力仍可解密，不能宣称具有系统 Keychain 等效隔离。
+- 保留 PKCE / state / nonce、回调和 JWT 验证、刷新 / 撤销与显式工具审批。Codex 固定版本，运行在专属 cwd 中。
+- 当前本地 MCP 为金融研究及虚拟 Arena 服务；不得把它描述成对笔记、健康、家庭或 server 数据的授权。真实交易不在能力范围内。
+- Vite 拒绝 secret / ChatGPT / SQLite 及仓库内 `.apple` / `.harness` / `.nomi` 路径；凭据、数据库、临时 profiles 和 smoke artifacts 均不提交。
+- 桌面连接与 server 用户会话 / SeedX 机器凭据独立；后续接入家庭资料前先设计明确的共享授权。
+
+## 画布与附件
+
+- Canvas 文档 IR 严格验证版本、ID、引用、数值与预算；旧 revision 不覆盖已保存的新版本。损坏 / 未来文档只报错，保留原始存储。
+- IndexedDB 按本机 profile / document 组织；结构与附件原件同事务提交，原件 SHA-256 / 字节数匹配，已存在的 Asset 不允许换内容。
+- 图片只按受支持 raster 文件头识别并解码，SVG / HTML 作为普通附件；Markdown 不执行原始 HTML，不自动抓取外部图片，公式保留受限 KaTeX。
+- CSP 仅对 img-src 添加 blob: 用于本机图片预览，object / frame 继续禁用。文件使用明确下载入口，不执行附件代码。
+- 当前是本机单文档实现，不把本机 profile 键当作服务端权限；共享、同步、完整导出与彻底删除仍待实现。
+
+## 交互 DSL 实验
+
+- `portable.learning/draft-1` 仅允许已知 JSON 组件、纯计算和 Reset；校验版本、引用、树与预算，不执行任意 JS / HTML，不开放 host effects。
+- Math 使用 KaTeX `trust:false`、严格错误与展开限制；生成的组件不能访问网络、文件或凭据。
+- 定义与学习进度在 localStorage 按本机 profile 分开组织，不宣称为加密或服务端授权；未来文档、实例与家庭共享需单独设计 scope。
+- 错误定义保留当前可用内容，损坏进度阻止自动覆盖；Swift reference interpreter 仅处理受信测试样例，尚未接生产导入。
+
+以下为现有 iOS / server beta 约束。
 
 ## 身份与授权
 

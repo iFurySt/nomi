@@ -1,0 +1,17 @@
+nomi 1
+
+document "d_study" title="力学学习" {
+  note "n_mechanics" title="牛顿第二定律" {
+    markdown "b_intro" source="text/b_intro.md"
+    image "b_figure" asset="a_figure" caption="受力示意"
+    ink "b_derivation" source="ink/b_derivation.ink.json" width=640 height=240
+    file "b_reference" asset="a_reference"
+  }
+  board "c_main" title="学习画布" {
+    place "p_note" content="n_mechanics" x=0 y=0 width=640 height="auto" order="a0"
+    place "p_figure" content="b_figure" x=760 y=40 width=360 height=180 order="a1"
+    place "p_ink" content="b_derivation" x=760 y=280 width=640 height=240 order="a2"
+  }
+  asset "a_figure" path="assets/force.svg" media="image/svg+xml" sha256="8d9d7ee520934ccf18cdc625bc82626947b4601eecd043b64841cad888a8e6e8" bytes=522 name="force.svg"
+  asset "a_reference" path="assets/reference.txt" media="text/plain" sha256="2166508dfcd5b1c863cb5542ad82bf39175d3016eaa35e626eb45e1679f64124" bytes=153 name="reference.txt"
+}

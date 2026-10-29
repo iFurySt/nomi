@@ -246,7 +246,7 @@ func runGit(ctx context.Context, dir string, args ...string) error {
 
 const workspaceAgents = `# Nomi Household Workspace
 
-This private workspace contains one household's sensitive health source material and AI-maintained context.
+Nomi is a personal workbench for learning, notes, information, knowledge, health and wealth management, with optional family collaboration. This private workspace contains one household's sensitive personal and shared source material and AI-maintained context. Only use material actually available in this workspace.
 
 - Work only inside this workspace.
 - Preserve originals and provenance. Never invent a source.
