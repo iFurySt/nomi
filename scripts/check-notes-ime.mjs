@@ -64,6 +64,11 @@ async function checkIME({ output, disableGuard }) {
       await wait(30);
     }
     win.webContents.debugger.attach("1.3");
+    // Hidden CI windows must retain document focus for Chromium IME events.
+    await win.webContents.debugger.sendCommand(
+      "Emulation.setFocusEmulationEnabled",
+      { enabled: true },
+    );
     const state = () =>
       run(() => ({
         text: window.imeEditor.state.doc.textContent,

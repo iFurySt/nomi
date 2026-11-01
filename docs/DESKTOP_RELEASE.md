@@ -39,7 +39,7 @@ Repository secrets：
 | `DESKTOP_ASC_KEY_ID` / `DESKTOP_ASC_ISSUER_ID` | API key 标识 |
 | `DESKTOP_SPARKLE_PRIVATE_KEY` | Sparkle Ed25519 私钥 |
 
-Repository variable `DESKTOP_SIGN_IDENTITY` 指定身份名称。构建只使用临时 Keychain，结束始终删除 Keychain 和临时凭据。不得在 pull_request 中导入签名 secret。私钥轮换必须先按 Sparkle 官方轮换协议规划已有安装的信任链。
+Repository variable `DESKTOP_SIGN_IDENTITY` 指定身份名称。构建只使用临时 Keychain，导入锁定 SHA-256 的 Apple Developer ID 中间证书以补齐 identity 证书链，结束始终删除 Keychain 和临时凭据。隐藏窗口的 IME 回归显式启用 CDP 焦点模拟，避免 runner 前台状态影响测试。不得在 pull_request 中导入签名 secret。私钥轮换必须先按 Sparkle 官方轮换协议规划已有安装的信任链。
 
 版本化 DMG 发布后不可覆盖；重跑已公开版本应改版本号。`desktop-updates` 是稳定的更新清单 Release，仅其 `appcast-arm64.xml` / `appcast-x64.xml` 可替换。它不设置为 latest，因此 server 的独立 Release 不影响桌面更新地址。更新 feed 最后上传，始终先确保对应 DMG 已公开。
 

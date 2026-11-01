@@ -210,8 +210,11 @@ const sign = (path) => {
       if (
         attempt === 2 ||
         !String(error.stderr).includes("timestamp service is not available")
-      )
-        throw error;
+      ) {
+        throw new Error(
+          `Signing failed: ${path}\n${String(error.stderr || error.message)}`,
+        );
+      }
       console.log(
         "Apple timestamp service temporarily unavailable; retrying signature.",
       );
