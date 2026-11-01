@@ -9,6 +9,7 @@ import {
   rmSync,
   writeFileSync,
   readdirSync,
+  renameSync,
   lstatSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -140,13 +141,14 @@ for (const size of [16, 32, 128, 256, 512])
     );
 run("iconutil", ["-c", "icns", iconset, "-o", join(resources, "nomi.icns")]);
 cpSync(join(cache, "LICENSE"), join(resources, "LICENSE.sparkle"));
+renameSync(join(contents, "MacOS/Electron"), join(contents, "MacOS/Nomi"));
 const plist = join(contents, "Info.plist");
 run("python3", [
   "-c",
   `
 import plistlib,json,sys,pathlib
 p=pathlib.Path(sys.argv[1]);c=json.loads(sys.argv[2]);v=sys.argv[3];arch=sys.argv[4]
-d=plistlib.loads(p.read_bytes());d.update(CFBundleName='Nomi',CFBundleDisplayName='Nomi',CFBundleIdentifier=c['bundleId'],CFBundleShortVersionString=v,CFBundleVersion=v,CFBundleIconFile='nomi.icns',LSApplicationCategoryType='public.app-category.productivity',LSMinimumSystemVersion=c['minimumSystemVersion'],SUFeedURL=c['feedBase']+'/appcast-'+arch+'.xml',SUPublicEDKey=c['sparklePublicKey'],SUEnableAutomaticChecks=True,SUAutomaticallyUpdate=False,SUAllowsAutomaticUpdates=False,SUShowReleaseNotes=False)
+d=plistlib.loads(p.read_bytes());d.update(CFBundleName='Nomi',CFBundleExecutable='Nomi',CFBundleDisplayName='Nomi',CFBundleIdentifier=c['bundleId'],CFBundleShortVersionString=v,CFBundleVersion=v,CFBundleIconFile='nomi.icns',LSApplicationCategoryType='public.app-category.productivity',LSMinimumSystemVersion=c['minimumSystemVersion'],SUFeedURL=c['feedBase']+'/appcast-'+arch+'.xml',SUPublicEDKey=c['sparklePublicKey'],SUEnableAutomaticChecks=True,SUAutomaticallyUpdate=False,SUAllowsAutomaticUpdates=False,SUShowReleaseNotes=False)
 d['UTExportedTypeDeclarations']=[dict(UTTypeIdentifier='com.ifuryst.nomi.document',UTTypeDescription='Nomi Document',UTTypeConformsTo=['com.apple.package','public.composite-content'],UTTypeTagSpecification={'public.filename-extension':['nomi']})]
 d['CFBundleDocumentTypes']=[dict(CFBundleTypeName='Nomi Document',CFBundleTypeRole='Editor',LSHandlerRank='Owner',LSTypeIsPackage=True,CFBundleTypeIconFile='nomi.icns',LSItemContentTypes=['com.ifuryst.nomi.document'])]
 p.write_bytes(plistlib.dumps(d))
@@ -175,24 +177,40 @@ function walk(dir) {
   }
 }
 walk(contents);
-const sign = (path) =>
-  run(
-    "codesign",
-    [
-      "--force",
-      "--sign",
-      unsigned ? "-" : identity,
-      ...(unsigned ? [] : ["--timestamp", "--options", "runtime"]),
-      ...(path.endsWith(".app") || path.includes("/MacOS/")
-        ? [
-            "--entitlements",
-            join(root, "apps/desktop/packaging/entitlements.plist"),
-          ]
-        : []),
-      path,
-    ],
-    { stdio: "pipe" },
-  );
+const sign = (path) => {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      run(
+        "codesign",
+        [
+          "--force",
+          "--sign",
+          unsigned ? "-" : identity,
+          ...(unsigned ? [] : ["--timestamp", "--options", "runtime"]),
+          ...(path.endsWith(".app") || path.includes("/MacOS/")
+            ? [
+                "--entitlements",
+                join(root, "apps/desktop/packaging/entitlements.plist"),
+              ]
+            : []),
+          path,
+        ],
+        { stdio: "pipe" },
+      );
+      return;
+    } catch (error) {
+      if (
+        attempt === 2 ||
+        !String(error.stderr).includes("timestamp service is not available")
+      )
+        throw error;
+      console.log(
+        "Apple timestamp service temporarily unavailable; retrying signature.",
+      );
+      execFileSync("sleep", ["2"]);
+    }
+  }
+};
 for (const file of files) sign(file);
 for (const bundle of bundles) sign(bundle);
 sign(app);

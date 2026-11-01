@@ -79,7 +79,7 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.DESKTOP_SPARKLE_PRIVATE_KEY }}
         run: node scripts/package-desktop.mjs
       - name: Verify standalone release
-        run: .artifacts/desktop-release/${{ matrix.arch }}/Nomi.app/Contents/MacOS/Electron --update-smoke
+        run: .artifacts/desktop-release/${{ matrix.arch }}/Nomi.app/Contents/MacOS/Nomi --update-smoke
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-${{ matrix.arch }}
