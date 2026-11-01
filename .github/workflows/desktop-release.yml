@@ -45,11 +45,11 @@ jobs:
           pnpm install --frozen-lockfile
       - name: Validate application
         run: |
-          pnpm check
-          pnpm test
-          pnpm build
-          pnpm --filter @nomi/desktop smoke
-          pnpm smoke:notes-ime
+          node scripts/ci-desktop-step.mjs pnpm check
+          node scripts/ci-desktop-step.mjs pnpm test
+          node scripts/ci-desktop-step.mjs pnpm build
+          node scripts/ci-desktop-step.mjs pnpm --filter @nomi/desktop smoke
+          node scripts/ci-desktop-step.mjs pnpm smoke:notes-ime
       - name: Import signing credentials
         env:
           CERTIFICATE: ${{ secrets.DESKTOP_CERTIFICATE_P12 }}
@@ -77,9 +77,9 @@ jobs:
           ASC_KEY_ID: ${{ secrets.DESKTOP_ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.DESKTOP_ASC_ISSUER_ID }}
           SPARKLE_PRIVATE_KEY: ${{ secrets.DESKTOP_SPARKLE_PRIVATE_KEY }}
-        run: node scripts/package-desktop.mjs
+        run: node scripts/ci-desktop-step.mjs node scripts/package-desktop.mjs
       - name: Verify standalone release
-        run: .artifacts/desktop-release/${{ matrix.arch }}/Nomi.app/Contents/MacOS/Nomi --update-smoke
+        run: node scripts/ci-desktop-step.mjs .artifacts/desktop-release/${{ matrix.arch }}/Nomi.app/Contents/MacOS/Nomi --update-smoke
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-${{ matrix.arch }}

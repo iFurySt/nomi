@@ -1,3 +1,4 @@
+import { writeDesktopLicenses } from "./desktop-licenses.mjs";
 import { createRequire } from "node:module";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -66,6 +67,13 @@ const vendor = resolve(dirname(require("electron")), "../..");
 run("ditto", [vendor, app]);
 rmSync(join(contents, "Resources/default_app.asar"), { force: true });
 const resources = join(contents, "Resources");
+const electronDist = dirname(vendor);
+cpSync(join(electronDist, "LICENSE"), join(resources, "LICENSE.electron"));
+cpSync(
+  join(electronDist, "LICENSES.chromium.html"),
+  join(resources, "LICENSES.chromium.html"),
+);
+writeDesktopLicenses(root, join(resources, "THIRD_PARTY_LICENSES.txt"));
 const entry = join(resources, "app");
 mkdirSync(entry, { recursive: true });
 writeFileSync(

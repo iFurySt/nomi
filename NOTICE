@@ -10,5 +10,7 @@ configuration, desktop build/check scripts and fixtures, and desktop design
 reference are AGPL-3.0-only. See LICENSE.aifi. Their Nomi adaptations retain
 that license. LICENSE continues to apply to the pre-existing MIT Nomi code.
 
-Third-party components retain their own notices, including the Apache-2.0
-Codex runtime in third_party/codex. No user credentials or datasets were imported.
+Third-party components retain their own notices. Desktop releases include
+Electron, Chromium, Sparkle and workspace dependency licenses in app Resources.
+The historical Codex notice remains in third_party/codex; Codex CLI is no longer
+bundled in desktop 0.1.0. No user credentials or datasets were imported.
