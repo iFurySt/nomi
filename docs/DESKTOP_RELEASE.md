@@ -8,7 +8,7 @@
 - 正式 bundle id：`com.ifuryst.nomi`，开发启动器为 `com.ifuryst.nomi.local`。两者应用名为 Nomi，沿用同一文稿配置；不要同时编辑同一库。
 - `Nomi-X.Y.Z-mac-arm64.dmg` / `Nomi-X.Y.Z-mac-x64.dmg` 分别适用于 Apple Silicon / Intel，随包有 SHA-256。
 - DMG 内含独立 `Nomi.app` 和 Applications 快捷入口。renderer、PDF 资源、原生更新模块全部随包，不引用 checkout；`.nomi` 包注册保持一致。
-- Developer ID 签名、hardened runtime、Apple 公证及 stapling 后才能公开发布。App 和 DMG 都验证。`--unsigned` 只用于本机检查，不上传正式 Release。
+- Developer ID 签名、hardened runtime、Apple 公证及 stapling 后才能公开发布。App 和 DMG 都验证。原生嵌套 helper 必须先于 framework 主二进制签名；Apple 票据服务未就绪 / 网络错误只做有界重试，不跳过票据验证。`--unsigned` 只用于本机检查，不上传正式 Release。
 
 ## 本地构建
 
@@ -39,7 +39,7 @@ Repository secrets：
 | `DESKTOP_ASC_KEY_ID` / `DESKTOP_ASC_ISSUER_ID` | API key 标识 |
 | `DESKTOP_SPARKLE_PRIVATE_KEY` | Sparkle Ed25519 私钥 |
 
-Repository variable `DESKTOP_SIGN_IDENTITY` 指定身份名称。构建只使用临时 Keychain，导入锁定 SHA-256 的 Apple Developer ID 中间证书以补齐 identity 证书链，结束始终删除 Keychain 和临时凭据。隐藏窗口的 IME 回归显式启用 CDP 焦点模拟，避免 runner 前台状态影响测试。不得在 pull_request 中导入签名 secret。私钥轮换必须先按 Sparkle 官方轮换协议规划已有安装的信任链。
+Repository variable `DESKTOP_SIGN_IDENTITY` 指定身份名称。构建只使用临时 Keychain，按固定 SHA-256 检查 Apple Developer ID 中间证书，仅缺失时从 Apple 下载并校验后导入，结束始终删除 Keychain 和临时凭据。IME 回归在 CI 展示测试窗口、关闭后台节流并启用 CDP 焦点模拟，确认编辑器真正获得焦点后才开始组合输入；不依赖固定延迟或后台 requestAnimationFrame。不得在 pull_request 中导入签名 secret。私钥轮换必须先按 Sparkle 官方轮换协议规划已有安装的信任链。
 
 版本化 DMG 发布后不可覆盖；重跑已公开版本应改版本号。`desktop-updates` 是稳定的更新清单 Release，仅其 `appcast-arm64.xml` / `appcast-x64.xml` 可替换。它不设置为 latest，因此 server 的独立 Release 不影响桌面更新地址。更新 feed 最后上传，始终先确保对应 DMG 已公开。
 

@@ -16,6 +16,10 @@ if ! security find-certificate -a -Z "$keychain" | grep -q 'SHA-256 hash: 7AFC9D
   security import "$RUNNER_TEMP/developer-id-ca.cer" -k "$keychain"
 fi
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
-security list-keychains -d user -s "$keychain" login.keychain-db
+python3 - "$keychain" <<'PY'
+import shlex, subprocess, sys
+existing = shlex.split(subprocess.check_output(['security', 'list-keychains', '-d', 'user'], text=True))
+subprocess.run(['security', 'list-keychains', '-d', 'user', '-s', sys.argv[1], *[p for p in existing if p != sys.argv[1]]], check=True)
+PY
 printf '%s' "$ASC_PRIVATE_KEY" > "$RUNNER_TEMP/notary.p8"
 rm "$RUNNER_TEMP/developer-id.p12"

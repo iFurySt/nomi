@@ -222,6 +222,9 @@ const sign = (path) => {
     }
   }
 };
+// codesign recognizes a framework's main binary as its bundle. Its embedded
+// helpers must already be signed, including unsigned Intel Electron helpers.
+files.sort((a, b) => b.split("/").length - a.split("/").length);
 for (const file of files) sign(file);
 for (const bundle of bundles) sign(bundle);
 sign(app);
@@ -277,12 +280,34 @@ async function notarize(file) {
     );
   console.log(`Notarization accepted: ${response.id}`);
 }
+async function staple(file) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const result = spawnSync("xcrun", ["stapler", "staple", file], {
+      encoding: "utf8",
+    });
+    const output = `${result.stdout || ""}${result.stderr || ""}`;
+    if (result.status === 0) {
+      console.log(output.trim());
+      return;
+    }
+    // A successful notarization can precede ticket availability. Never ignore
+    // ticket validation failures or publish an unstapled artifact.
+    const unavailable =
+      result.status === 68 || /Record not found/i.test(output);
+    if (!unavailable || attempt === 3)
+      throw new Error(`Stapling failed (${result.status}): ${output.trim()}`);
+    console.log(
+      `Apple ticket service unavailable; retrying in ${(attempt + 1) * 10}s.`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 10000));
+  }
+}
 if (!unsigned) {
   const zip = join(output, "Nomi-notarization.zip");
   rmSync(zip, { force: true });
   run("ditto", ["-c", "-k", "--keepParent", app, zip]);
   await notarize(zip);
-  run("xcrun", ["stapler", "staple", app]);
+  await staple(app);
   rmSync(zip);
 }
 const stage = join(output, "dmg-stage");
@@ -307,7 +332,7 @@ run("hdiutil", [
 if (!unsigned) {
   sign(dmg);
   await notarize(dmg);
-  run("xcrun", ["stapler", "staple", dmg]);
+  await staple(dmg);
   run("spctl", ["--assess", "--type", "execute", "--verbose=2", app]);
 }
 rmSync(stage, { recursive: true });
