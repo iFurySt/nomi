@@ -13,6 +13,10 @@ Nomi 是个人一站式工作台：把学习、笔记、信息 hub、知识、�
 - **画布与笔记**：默认 Canvas 承载笔记、公式、图片 / 文件和交互块，桌面结构与附件原件保存为本机 `.nomi` 文件包，浏览器预览使用 IndexedDB，摄像机与个人参数单独保存。
 - **交互学习**：声明式 IR 驱动控件、LaTeX、曲线与本地计算，可在 Canvas / 文稿中嵌入；不依赖模型请求。完整笔记产品能力、信息 hub、跨领域知识与完整财富管理仍待扩展。桌面和 server 的身份、数据及 AI 执行路径当前独立，尚无跨端同步。
 
+## macOS 下载
+
+[Nomi 0.1.0 安装包](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.1.0)：选择 Apple Silicon（arm64）或 Intel（x64），需要 macOS 13 或更新版本。打开 DMG，将 Nomi 拖入 Applications。应用已签名并通过 Apple 公证；Settings → General 可检查更新和设置自动检查。
+
 ## 桌面本地运行
 
 需要 Node.js 24+ 和 pnpm 10+；依赖版本以 lockfile 为准。
@@ -71,4 +75,4 @@ Server 通过 `server-v*` tag 发布到 GHCR 并部署 amoylab；桌面通过 `d
 
 ## 许可证
 
-原有 Nomi 代码使用 [MIT](LICENSE)。从 AIFi 迁入的桌面应用、共享包、本地 CLI 和配套脚本及其修改保留 [AGPL-3.0-only](LICENSE.aifi)，具体范围与来源见 [NOTICE](NOTICE)。Codex 等第三方组件保留各自许可证。
+原有 Nomi 代码使用 [MIT](LICENSE)。从 AIFi 迁入的桌面应用、共享包、本地 CLI 和配套脚本及其修改保留 [AGPL-3.0-only](LICENSE.aifi)，具体范围与来源见 [NOTICE](NOTICE)。Electron、Sparkle 等第三方组件保留各自许可证，分发包内包含对应声明。

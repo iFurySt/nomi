@@ -42,8 +42,12 @@ async function checkIME({ output, disableGuard }) {
   const win = new BrowserWindow({
     width: 1200,
     height: 900,
-    show: false,
-    webPreferences: { contextIsolation: true, sandbox: true },
+    show: !!process.env.CI,
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
   });
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const run = (fn, data) =>
@@ -140,7 +144,7 @@ async function checkIME({ output, disableGuard }) {
             from,
             to: from + (scenario.replace ?? 0),
           });
-          editor.commands.focus();
+          editor.view.focus();
           window.imeStarts = 0;
           editor.view.dom.addEventListener(
             "compositionstart",
@@ -149,7 +153,12 @@ async function checkIME({ output, disableGuard }) {
         },
         { scenario, disableGuard },
       );
-      await wait(70);
+      for (let attempt = 0; attempt < 40 && !(await state()).focused; attempt++)
+        await wait(50);
+      assert(
+        (await state()).focused,
+        scenario.name + ": editor did not acquire focus",
+      );
       for (const text of [
         "z",
         "za",
@@ -190,7 +199,8 @@ async function checkIME({ output, disableGuard }) {
     // Cancel a new composition, then start again and delete down to one letter.
     await run(() => {
       window.imeEditor.commands.setContent("", { contentType: "markdown" });
-      window.imeEditor.commands.focus("start");
+      window.imeEditor.commands.setTextSelection(1);
+      window.imeEditor.view.focus();
     });
     await wait(70);
     await compose("ni hao");
