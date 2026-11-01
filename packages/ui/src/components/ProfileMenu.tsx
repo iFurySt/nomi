@@ -26,7 +26,7 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
     : "";
   const avatar = (
     <span className="profile-avatar" aria-hidden="true">
-      {initials || <UserRound size={22} strokeWidth={1.6} />}
+      {initials || <UserRound size={18} strokeWidth={1.8} />}
     </span>
   );
   function signIn() {
@@ -38,9 +38,10 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
     <DropdownMenu.Root open={open} onOpenChange={setOpen}>
       <DropdownMenu.Trigger asChild>
         <button
-          className={`profile-trigger ${mobile ? "mobile-profile" : "rail-profile"}`}
+          className={`profile-trigger ${mobile ? "mobile-profile" : "rail-profile rail-tip"}`}
           aria-label="Account menu"
-          title={name}
+          title={mobile ? name : undefined}
+          data-tooltip={mobile ? undefined : name}
         >
           {avatar}
         </button>

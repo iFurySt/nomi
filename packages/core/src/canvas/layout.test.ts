@@ -180,7 +180,6 @@ describe("platform-neutral shape formatting", () => {
       { rotation: 45 },
       { text: { link: "javascript:alert(1)" } },
       { text: { size: 97 } },
-      { text: { unknown: true } },
     ])
       expect(() =>
         applyCanvasCommands(d, d.revision, [

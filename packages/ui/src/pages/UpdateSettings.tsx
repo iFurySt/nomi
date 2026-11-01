@@ -1,51 +1,10 @@
-import { useEffect, useState } from "react";
+import { updateLabel } from "@nomi/core";
 import { Button } from "../components/primitives";
-import { getRuntimeInfo } from "@nomi/platform";
-type Status = {
-  version: string;
-  available: boolean;
-  canCheck?: boolean;
-  automatic?: boolean;
-  reason?: string;
-};
+import { useUpdates } from "../update-context";
+
 export function UpdateSettings() {
-  const [status, setStatus] = useState<Status>();
-  const [error, setError] = useState("");
-  const bridge = window.nomiDesktop?.requestUpdates;
-  useEffect(() => {
-    let live = true;
-    const refresh = () => {
-      void (
-        bridge
-          ? bridge("status")
-          : getRuntimeInfo().then((info) => ({
-              version: info.version,
-              available: false,
-              reason: "请在正式 macOS App 中检查更新",
-            }))
-      )
-        .then((value) => {
-          if (live) setStatus(value);
-        })
-        .catch(() => {
-          if (live) setError("无法读取更新状态");
-        });
-    };
-    refresh();
-    const timer = setInterval(refresh, 2000);
-    return () => {
-      live = false;
-      clearInterval(timer);
-    };
-  }, [bridge]);
-  async function action(method: "check" | "automatic", value?: boolean) {
-    setError("");
-    try {
-      if (bridge) setStatus(await bridge(method, value));
-    } catch {
-      setError("无法检查更新，请稍后重试。");
-    }
-  }
+  const { status, action } = useUpdates();
+  const phase = status?.phase;
   return (
     <section className="setting-group">
       <h2>Updates</h2>
@@ -53,19 +12,25 @@ export function UpdateSettings() {
         <div className="setting-row">
           <div>
             <strong>Nomi {status?.version ?? ""}</strong>
-            <p>
-              {status?.available
-                ? "通过 Sparkle 检查并安装 macOS 更新"
-                : status?.reason}
-            </p>
+            <p aria-live="polite">{updateLabel(status)}</p>
           </div>
           <div className="setting-control">
-            <Button
-              disabled={!status?.available || !status.canCheck}
-              onClick={() => void action("check")}
-            >
-              检查更新
-            </Button>
+            {phase === "available" ? (
+              <Button onClick={() => void action("download")}>下载更新</Button>
+            ) : phase === "ready" ? (
+              <Button variant="primary" onClick={() => void action("install")}>
+                重启并更新
+              </Button>
+            ) : status?.cancellable ? (
+              <Button onClick={() => void action("cancel")}>取消</Button>
+            ) : (
+              <Button
+                disabled={!status?.available || !status.canCheck}
+                onClick={() => void action("check")}
+              >
+                检查更新
+              </Button>
+            )}
           </div>
         </div>
         {status?.available && (
@@ -83,7 +48,7 @@ export function UpdateSettings() {
           </div>
         )}
       </div>
-      {error && <p role="alert">{error}</p>}
+      {status?.error && <p role="alert">{status.error}</p>}
     </section>
   );
 }

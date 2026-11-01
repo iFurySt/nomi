@@ -132,3 +132,13 @@ PDF 通过按需加载的 PDF.js 本机分页渲染为 Canvas，页码 / 前后�
 富文本在输入法候选阶段保留 Chromium 的 marked range。ProseMirror 解析删除变动时会探测 Backspace keymap；Tiptap 未命中的命令也可能提交空事务，若用旧状态刷新 DOM 会取消候选并残留拼音。`WritingComposition` 仅在组合输入期间过滤无内容 / 选区 / marks / metadata 变化的空事务，真实编辑及选区仍正常应用，不拦截原生按键或 composition 事件。
 
 `pnpm smoke:notes-ime` 使用真实 Chromium `Input.imeSetComposition` 与候选提交，覆盖 `zai yu → zai y → zai → 在`、空段 / 段中 / 标题 / 列表 / 代码块 / 选区替换、取消重输、普通退格、撤销重做和保存重开。它验证渲染器 marked text 行为；系统输入法候选窗口另通过 Computer Use 实际按键验收。
+
+## 文稿图标（2026-11-01）
+
+文稿树标题前的图标使用独立 20px 热区，16px 图标水平 / 垂直居中；悬停或键盘聚焦显示居中带指向箭头的 Change icon 气泡，portal 避免列表裁切，靠近窗口边缘时避让；滚动、Escape、离开或打开选择器时收起。点击仅打开选择器，不切换当前文稿或发起拖动。选择器只有 Emoji / Upload 两个页签和右侧 Remove；Remove 恢复默认文稿图标。Emoji 提供离线常用分类、中英文关键词搜索、随机选择与方向键浏览，不依赖在线服务，也并非完整 Unicode 图库。
+
+上传支持 PNG / JPEG / WebP / GIF，最大 5 MiB；检查文件签名与实际解码，原件进入现有 asset 存储，缺失图片显示默认图标。文稿树、正文标题和正文的子文稿入口保持一致。正文标题区未设置图标时，Add Icon 默认隐藏，悬停标题区域时在上方出现；离开后隐藏，键盘聚焦入口 / 选择器打开时保持可见，无 hover 的触屏设备常显；设置后在标题左侧显示 32px Emoji 或图片，点击复用相同选择器。移除后恢复 Add Icon，标题文字与正文内容不变；添加、移除前后标题行垂直位置保持稳定。修改图标使用 `set_note_icon` 事务，可撤销 / 重做；资产元数据仅在没有图标或正文引用时移除，原件按现有历史策略保留。
+
+`node scripts/check-note-icons.mjs` 使用隔离 Electron profile 验证独立点击、搜索、撤销重做、上传校验、原件显示、刷新恢复、Remove、Escape 焦点及浅深色 / 窄屏；`--interactive` 在检查后保留测试窗口以便实际操作。core 与 host 单测覆盖组合 Emoji 校验、共享引用、删除、导出与 `.nomi` 独立导入。
+
+文稿列表底部空白区支持右键菜单「新建文稿」，与顶部加号一样创建根级文稿，清空搜索并进入新文稿；当前有选中文稿也不改变此规则。右键已有行继续使用该文稿的操作菜单。无文稿 / 搜索无结果时仍可从空白区创建。

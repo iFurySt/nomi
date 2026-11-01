@@ -3,6 +3,7 @@ import { readdir } from "node:fs/promises";
 import { join, basename } from "node:path";
 import {
   parseCanvasDocument,
+  validateDocumentJSON,
   CANVAS_ASSET_BYTES,
   type CanvasDocument,
   type CanvasBlock,
@@ -72,27 +73,14 @@ export async function readPackage(path: string): Promise<ReadPackage> {
   const raw = JSON.parse(
     (await read("document.json", 4 * 1024 * 1024)).toString(),
   );
-  const allowed = [
-    "format",
-    "version",
-    "kind",
-    "packageId",
-    "fileName",
-    "publishedTitle",
-    "references",
-    "childOrder",
-    "noteOrder",
-    "assetPaths",
-    "document",
-  ];
+  validateDocumentJSON(raw, 4 * 1024 * 1024);
   if (
     !raw ||
-    Object.keys(raw).some((k) => !allowed.includes(k)) ||
     raw.format !== "nomi-package" ||
     raw.version !== 1 ||
     !["note", "board"].includes(raw.kind)
   )
-    throw Error("不支持此文稿包版本或字段，原文件保持不变。");
+    throw Error("不支持此文稿包版本，原文件保持不变。");
   const object = (v: unknown) =>
     !!v && typeof v === "object" && !Array.isArray(v);
   if (
@@ -118,8 +106,6 @@ export async function readPackage(path: string): Promise<ReadPackage> {
         "utf8",
       );
     else if (block.type === "interactive") {
-      if (Object.keys(block).some((k) => !["id", "type", "source"].includes(k)))
-        throw Error("交互块文件声明无效。");
       block.program = JSON.parse(
         (await read(block.source, 2 * 1024 * 1024)).toString(),
       );
@@ -177,6 +163,7 @@ export function encodePackage(
   childOrder: string[],
   noteOrder: string[],
   originals: Map<string, Buffer>,
+  previous?: PackageManifest,
 ) {
   const files = new Map<string, Buffer>();
   const encoded: any = structuredClone(parseCanvasDocument(document));
@@ -213,6 +200,7 @@ export function encodePackage(
     files.set(path, bytes);
   }
   const manifest: PackageManifest = {
+    ...previous,
     format: "nomi-package",
     version: 1,
     kind,
@@ -454,6 +442,7 @@ export function planPackages(
       document.notes.filter((n) => !n.parentId).map((n) => n.id),
       document.notes.map((n) => n.id),
       originals,
+      previous?.board.manifest,
     ),
   });
   for (const n of document.notes) {
@@ -463,13 +452,18 @@ export function planPackages(
     const assetIds = new Set(
       blocks.flatMap((b) => ("asset" in b ? [b.asset] : [])),
     );
+    if (n.icon?.type === "image") assetIds.add(n.icon.asset);
     const { parentId: _, ...note } = n;
     const contents = new Set([n.id, ...n.blocks]);
     const placements = document.board.placements.filter((p) =>
       contents.has(p.content),
     );
     const ids = new Set(placements.map((p) => p.id));
+    const oldPackage = previous?.entries.find(
+      (e) => e.manifest.packageId === n.id,
+    );
     const doc: CanvasDocument = {
+      ...oldPackage?.document,
       schema: document.schema,
       id: document.id,
       title: n.title,
@@ -478,6 +472,7 @@ export function planPackages(
       blocks,
       assets: document.assets.filter((a) => assetIds.has(a.id)),
       board: {
+        ...oldPackage?.document.board,
         id: document.board.id,
         placements,
         ...(document.board.connectors
@@ -503,6 +498,7 @@ export function planPackages(
         document.notes.filter((c) => c.parentId === n.id).map((c) => c.id),
         [],
         originals,
+        oldPackage?.manifest,
       ),
     });
   }

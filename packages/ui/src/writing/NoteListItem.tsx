@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
-  FileText,
   FolderOpen,
   MoreHorizontal,
   Trash2,
@@ -10,6 +9,8 @@ import {
   ChevronRight,
   CornerDownRight,
 } from "lucide-react";
+import { NoteIconPicker, type ChangeNoteIcon } from "./NoteIconPicker";
+import type { CanvasRepository } from "@nomi/platform";
 import type { CanvasNote } from "@nomi/core";
 import { useNoteTitleReveal } from "./useNoteTitleReveal";
 import type { NoteDropPosition } from "./note-drop";
@@ -28,8 +29,12 @@ export function NoteListItem({
   onCreate,
   onMove,
   onReveal,
+  repository,
+  onIcon,
 }: {
   note: CanvasNote;
+  repository: CanvasRepository;
+  onIcon: ChangeNoteIcon;
   selected: boolean;
   onChoose: () => void;
   onDelete: () => void;
@@ -107,13 +112,17 @@ export function NoteListItem({
               />
             )}
           </button>
+          <NoteIconPicker
+            note={note}
+            repository={repository}
+            onChange={onIcon}
+          />
           <button
             className="notes-list-select"
             aria-current={selected ? "page" : undefined}
             aria-label={title}
             onClick={onChoose}
           >
-            <FileText size={15} />
             <span className="notes-title-viewport" ref={reveal.viewport}>
               <span className="notes-title-text" ref={reveal.text}>
                 {title}

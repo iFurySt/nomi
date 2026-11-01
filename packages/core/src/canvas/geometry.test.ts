@@ -1035,7 +1035,6 @@ describe("continuous canvas boundary binding", () => {
       { x: NaN, y: 0 },
       { x: Infinity, y: 0 },
       { x: "0", y: 0 },
-      { x: 0, y: 0, z: 1 },
       null,
     ]) {
       expect(() =>

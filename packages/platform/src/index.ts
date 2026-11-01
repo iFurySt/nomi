@@ -8,15 +8,9 @@ declare global {
   interface Window {
     nomiDesktop?: {
       requestUpdates?(
-        method: "status" | "check" | "automatic",
+        method: import("@nomi/core").UpdateAction,
         value?: boolean,
-      ): Promise<{
-        version: string;
-        available: boolean;
-        canCheck?: boolean;
-        automatic?: boolean;
-        reason?: string;
-      }>;
+      ): Promise<import("@nomi/core").UpdateStatus>;
       getRuntimeInfo(): Promise<RuntimeInfo>;
       requestDocuments?(
         method: import("@nomi/core").DocumentStorageMethod,

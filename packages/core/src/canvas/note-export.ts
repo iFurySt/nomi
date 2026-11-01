@@ -58,8 +58,10 @@ export function planNoteExport(
   const blocks = note.blocks.map((id) =>
     document.blocks.find((b) => b.id === id)!,
   );
-  const assets = document.assets.filter((a) =>
-    blocks.some((b) => "asset" in b && b.asset === a.id),
+  const assets = document.assets.filter(
+    (a) =>
+      blocks.some((b) => "asset" in b && b.asset === a.id) ||
+      (note.icon?.type === "image" && note.icon.asset === a.id),
   );
   const { parentId: _parentId, ...standaloneNote } = note;
   const snapshot: CanvasDocument = {

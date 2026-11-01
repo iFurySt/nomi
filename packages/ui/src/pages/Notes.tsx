@@ -45,6 +45,8 @@ import {
   RichMarkdownEditor,
   needsSourceEditor,
 } from "../writing/RichMarkdownEditor";
+import { NoteIcon } from "../writing/NoteIcon";
+import { NoteIconPicker, type ChangeNoteIcon } from "../writing/NoteIconPicker";
 import { NotesLibrary, noteMoveTargets } from "../writing/NotesLibrary";
 import { ResizableNotesLayout } from "../writing/ResizableNotesLayout";
 import { writingRows, type WritingRow } from "../writing/writingRows";
@@ -667,11 +669,26 @@ export function Notes({ profile }: { profile: string }) {
   const experiments = doc.blocks.filter(
     (b) => b.type === "interactive" && !note?.blocks.includes(b.id),
   );
+  const changeIcon: ChangeNoteIcon = (id, icon, upload) =>
+    data.edit(
+      [
+        {
+          type: "set_note_icon",
+          id,
+          icon,
+          ...(upload ? { asset: upload.asset } : {}),
+        },
+      ],
+      undefined,
+      upload ? [upload] : [],
+    );
   return (
     <ResizableNotesLayout profile={profile}>
       <NotesLibrary
         profile={profile}
         document={doc}
+        repository={data.repository}
+        onIcon={changeIcon}
         selected={note?.id}
         query={query}
         onQuery={setQuery}
@@ -809,40 +826,52 @@ export function Notes({ profile }: { profile: string }) {
                     ))}
                   </nav>
                 )}
-                <input
-                  className="writing-title"
-                  aria-label="文稿标题"
-                  placeholder="未命名文稿"
-                  value={note.title}
-                  onBlur={endEditing}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Enter" || event.nativeEvent.isComposing)
-                      return;
-                    const first = rows.find((row) =>
-                      editors.current.has(row.block.id),
-                    );
-                    const editor = first && editors.current.get(first.block.id);
-                    if (!editor || editor.isDestroyed) return;
-                    event.preventDefault();
-                    editor.commands.focus("start");
-                  }}
-                  onChange={(e) =>
-                    attempt(() =>
-                      data.edit(
-                        [
-                          {
-                            type: "rename_note",
-                            id: note.id,
-                            title: e.target.value,
-                          },
-                        ],
-                        `title:${note.id}`,
-                        [],
-                        { debounce: true },
-                      ),
-                    )
-                  }
-                />
+                <header className="writing-heading" data-has-icon={!!note.icon}>
+                  <NoteIconPicker
+                    note={note}
+                    repository={data.repository}
+                    onChange={changeIcon}
+                    variant="heading"
+                  />
+                  <input
+                    className="writing-title"
+                    aria-label="文稿标题"
+                    placeholder="未命名文稿"
+                    value={note.title}
+                    onBlur={endEditing}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key !== "Enter" ||
+                        event.nativeEvent.isComposing
+                      )
+                        return;
+                      const first = rows.find((row) =>
+                        editors.current.has(row.block.id),
+                      );
+                      const editor =
+                        first && editors.current.get(first.block.id);
+                      if (!editor || editor.isDestroyed) return;
+                      event.preventDefault();
+                      editor.commands.focus("start");
+                    }}
+                    onChange={(e) =>
+                      attempt(() =>
+                        data.edit(
+                          [
+                            {
+                              type: "rename_note",
+                              id: note.id,
+                              title: e.target.value,
+                            },
+                          ],
+                          `title:${note.id}`,
+                          [],
+                          { debounce: true },
+                        ),
+                      )
+                    }
+                  />
+                </header>
                 {rows.map((row) => {
                   const block = row.block,
                     id = block.id;
@@ -1011,7 +1040,7 @@ export function Notes({ profile }: { profile: string }) {
                       .filter((child) => child.parentId === note.id)
                       .map((child) => (
                         <button key={child.id} onClick={() => choose(child.id)}>
-                          <FileText size={15} />
+                          <NoteIcon note={child} repository={data.repository} />
                           <span>{child.title || "未命名文稿"}</span>
                           <ChevronRight size={13} />
                         </button>

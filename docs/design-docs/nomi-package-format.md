@@ -36,7 +36,7 @@ Nomi/
 
 ## document.json
 
-字段由 `packages/host/src/nomi-package.ts` 校验，未支持的字段 / 主版本拒绝写回，不静默丢弃。示例见 [可打开的样例](nomi-package-example/README.md)。
+字段由 `packages/host/src/nomi-package.ts` 校验。自 0.1.1 起，同一版本的附加 JSON 字段忽略其语义并原样保留，已知字段继续校验；未知主版本 / 内容类型拒绝写回，不静默丢弃。示例见 [可打开的样例](nomi-package-example/README.md)。
 
 | 字段 | 含义 |
 | --- | --- |
@@ -66,6 +66,22 @@ Markdown 存储块：
 ```
 
 读取时还原为 `program`。图片 / 文件 / 形状、Asset metadata、Placement、Connector 等继续现有 IR 定义，保留图片说明、连线类型 / 端点 / 手动路径及样式。路径拒绝绝对路径、空片段、`..` 和 symlink 逃逸；原件校验字节数与 SHA-256。
+
+## 可选文稿图标（2026-11-01）
+
+`document.notes[0].icon` 可省略；无图标时展示默认文稿符号。两种值如下：
+
+```json
+{ "type": "emoji", "value": "📚" }
+```
+
+```json
+{ "type": "image", "asset": "icon.study" }
+```
+
+Emoji 必须是单个 Unicode 字素，支持组合人物、肤色、旗帜。图片引用必须在 `document.assets` 中存在，MIME 为 PNG / JPEG / WebP / GIF，并有相应 `assetPaths` 与 `assets/` 原件。即使正文没有引用这张图片，包也会携带图标原件；导出和独立导入保留它，导入时重新映射 Asset ID。AI 修改 Emoji 可直接替换该字段；移除图标删除 `icon`，不写 `null`。添加图片仍按先原件、后元数据和引用的顺序操作。
+
+这是 draft-1 的可选字段扩展；无 icon 的旧包无需迁移。0.1.0 的封闭字段校验会拒绝带 icon 的包，需要升级到 0.1.1；不能通过修改 feed 修复旧二进制。0.1.1 起，manifest、document、Note / Block / 布局上的附加 JSON 元数据在读取、普通编辑和文件包重组时保留。逐篇包独有的 document / board 元数据继续留在原包，不与工作区元数据混合。未知字段不参与渲染、资源路径解析或能力执行，仍受大小、深度和安全键限制。改变必需语义、新内容类型或新交互程序能力必须有相应 schema / 能力版本；不能依靠附加字段绕过解释器校验。
 
 ## AI 直接编辑规则
 

@@ -395,3 +395,105 @@ it("reads sibling ordering from package childOrder and retains complete deletion
   }
   expect(saved).toBe(true);
 });
+
+it("keeps note icons in standalone packages and remaps image IDs on import", async () => {
+  const f = await fixture(false);
+  const bytes = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jAusAAAAASUVORK5CYII=",
+    "base64",
+  );
+  const asset = {
+    id: "icon.portable",
+    name: "icon.png",
+    mime: "image/png",
+    bytes: bytes.length,
+    sha256: packageHash(bytes),
+  };
+  f.doc.assets.push(asset);
+  f.doc.notes[0].icon = { type: "image", asset: asset.id };
+  f.doc.notes[1].icon = { type: "emoji", value: "🧑🏽‍💻" };
+  await f.store.save({ ...f.input, assets: [{ asset, bytes }] });
+  expect((await f.load()).notes).toEqual(f.doc.notes);
+  const a = await readPackage(join(f.tree, "A.nomi"));
+  expect(a.assets.get(asset.id)).toEqual(bytes);
+  const copy = join(f.path, "Icon.nomi");
+  await cp(a.path, copy, { recursive: true });
+  await rm(f.root, { recursive: true });
+  const target = new DocumentStore(
+    join(f.path, "target.json"),
+    join(f.path, "target"),
+  );
+  await target.importPackage(copy);
+  const loaded = (await target.load("local-device", "document.home"))!;
+  const imported = loaded.notes.find((n) => n.icon?.type === "image")!;
+  expect(imported.icon!.type).toBe("image");
+  if (imported.icon?.type !== "image") throw Error("Image icon missing");
+  expect(imported.icon.asset).not.toBe(asset.id);
+  expect(
+    (await target.asset("local-device", "document.home", imported.icon.asset))
+      ?.bytes,
+  ).toEqual(new Uint8Array(bytes));
+  expect(
+    loaded.notes.some((n) => n.icon?.type === "emoji" && n.icon.value === "🧑🏽‍💻"),
+  ).toBe(true);
+});
+
+it("retains future manifest and document fields through external reads, editing, moving and reopening", async () => {
+  const f = await fixture();
+  for (const name of ["A.nomi", "画布.nomi"]) {
+    const path = join(f.tree, name, "document.json");
+    const raw = JSON.parse(await readFile(path, "utf8"));
+    raw.futureManifest = { label: name };
+    raw.document.futureDocument = { label: name };
+    raw.document.board.futureBoard = { label: name };
+    raw.document.notes[0].futureNote = { label: "retained" };
+    raw.document.blocks[0].futureBlock = { label: "retained" };
+    await writeFile(path, JSON.stringify(raw));
+  }
+  const loaded = await f.load();
+  const edited = applyCanvasCommands(loaded, loaded.revision, [
+    {
+      type: "set_markdown",
+      id: loaded.notes[0].blocks[0],
+      source: "Edited with future metadata",
+    },
+    { type: "rename_note", id: loaded.notes[0].id, title: "Renamed" },
+  ]);
+  await f.put(edited, loaded.revision);
+  for (const [name, original] of [
+    ["Renamed.nomi", "A.nomi"],
+    ["画布.nomi", "画布.nomi"],
+  ]) {
+    const raw = JSON.parse(
+      await readFile(join(f.tree, name, "document.json"), "utf8"),
+    );
+    expect(raw.futureManifest).toEqual({ label: original });
+    expect(raw.document.futureDocument).toEqual({ label: original });
+    expect(raw.document.board.futureBoard).toEqual({ label: original });
+    expect(raw.document.notes[0].futureNote).toEqual({ label: "retained" });
+    expect(raw.document.blocks[0].futureBlock).toEqual({ label: "retained" });
+  }
+  expect(
+    await new DocumentStore(f.config, f.root).load(f.input.profile, f.doc.id),
+  ).toEqual(edited);
+  // No revision churn on unchanged reads, and package-local metadata survives subsequent writes.
+  expect(await f.load()).toEqual(edited);
+});
+
+it("retains extension fields on interactive file declarations without relaxing the program", async () => {
+  const f = await fixture();
+  const path = join(f.tree, "画布.nomi", "document.json");
+  const raw = JSON.parse(await readFile(path, "utf8"));
+  const block = raw.document.blocks.find((b: any) => b.type === "interactive");
+  block.futureDescription = { text: "Learning" };
+  await writeFile(path, JSON.stringify(raw));
+  const loaded = await f.load();
+  expect(loaded.blocks.find((b) => b.id === block.id)).toHaveProperty(
+    "futureDescription",
+    block.futureDescription,
+  );
+  const saved = JSON.parse(await readFile(path, "utf8"));
+  expect(
+    saved.document.blocks.find((b: any) => b.id === block.id).futureDescription,
+  ).toEqual(block.futureDescription);
+});

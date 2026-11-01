@@ -291,6 +291,7 @@ async function createWindow() {
     );
     app.quit();
   }
+  return window;
 }
 
 const smokeTimeout = smoke
@@ -329,7 +330,22 @@ if (primaryInstance)
                   label: "Nomi",
                   submenu: [
                     { role: "about" as const },
-                    { label: "检查更新…", click: () => updates.check() },
+                    {
+                      label: "检查更新…",
+                      click: async () => {
+                        const window =
+                          BrowserWindow.getAllWindows()[0] ??
+                          (await createWindow());
+                        if (window) {
+                          window.show();
+                          window.focus();
+                          await window.webContents.executeJavaScript(
+                            "location.hash = '/settings/general'",
+                          );
+                        }
+                        updates.check();
+                      },
+                    },
                     { type: "separator" as const },
                     { role: "services" as const },
                     { type: "separator" as const },

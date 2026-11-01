@@ -128,6 +128,7 @@ run("xcrun", [
   "Sparkle",
   "-Wl,-rpath,@loader_path/../Frameworks",
   join(root, "apps/desktop/native/sparkle.mm"),
+  join(root, "apps/desktop/native/update-driver.mm"),
   "-o",
   join(resources, "sparkle.node"),
 ]);

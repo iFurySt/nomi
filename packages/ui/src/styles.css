@@ -176,7 +176,7 @@ svg {
 }
 .app-shell {
   --sidebar-width: 248px;
-  --rail-width: 76px;
+  --rail-width: 52px;
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -209,7 +209,7 @@ svg {
   flex: 0 0 var(--rail-width);
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 4px 6px 0;
 }
 .rail-button {
@@ -258,9 +258,140 @@ svg {
   font-size: 14px;
   font-weight: 500;
 }
-.rail-profile {
+.rail-footer {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
   margin-top: auto;
-  margin-bottom: 4px;
+  padding-bottom: 4px;
+}
+.rail-profile {
+  width: 36px;
+  height: 36px;
+}
+.rail-profile .profile-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
+.rail-profile .profile-avatar svg {
+  width: 16px;
+  height: 16px;
+}
+.tool-rail {
+  position: relative;
+  z-index: 30;
+}
+.rail-tip {
+  position: relative;
+}
+.rail-tip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #202123;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+  pointer-events: none;
+  visibility: hidden;
+}
+.rail-tip:hover::after,
+.rail-tip:focus-visible::after {
+  visibility: visible;
+}
+.rail-tip[data-state="open"]::after {
+  visibility: hidden;
+}
+.update-glyph {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #3478f6;
+  color: white;
+}
+.update-glyph > svg:not(.update-ring) {
+  width: 16px;
+  height: 16px;
+}
+.update-ring {
+  width: 24px;
+  height: 24px;
+  transform: rotate(-90deg);
+}
+.update-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+.update-ring-track {
+  stroke: rgb(255 255 255 / 25%);
+}
+.update-ring-value {
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+.update-ring.spinning {
+  animation: update-spin 1.2s linear infinite;
+}
+@keyframes update-spin {
+  to {
+    transform: rotate(270deg);
+  }
+}
+.update-popover {
+  z-index: 130;
+  width: 260px;
+  max-width: calc(100vw - 24px);
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--canvas);
+  color: var(--text);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 14%);
+  font-size: 13px;
+}
+.update-popover strong {
+  display: block;
+  padding-right: 20px;
+}
+.update-popover p {
+  margin: 8px 0 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.update-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.update-popover-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 20px;
+}
+.update-popover-close:hover {
+  background: var(--interaction-hover);
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-ring.spinning {
+    animation-duration: 3s;
+  }
 }
 .mobile-profile {
   display: none;
@@ -2522,17 +2653,17 @@ kbd {
 
 /* Global navigation lives in the outer rail; the document sidebar selects stocks. */
 .app-shell {
-  --rail-width: 76px;
+  --rail-width: 52px;
 }
 .rail-brand {
-  height: 44px;
+  height: 40px;
   display: grid;
   place-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
 }
 .rail-brand .brand-mark {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
 }
 .rail-brand .brand > span {
   display: none;
@@ -2544,8 +2675,8 @@ kbd {
   width: 100%;
 }
 .rail-button {
-  width: 64px;
-  height: 56px;
+  width: 40px;
+  height: 40px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -2554,8 +2685,16 @@ kbd {
   font-size: 10px;
   font-weight: 500;
 }
+.tool-rail .rail-button {
+  width: 36px;
+  height: 36px;
+}
+.tool-rail .rail-button > svg {
+  width: 20px;
+  height: 20px;
+}
 .rail-search {
-  margin-top: 6px;
+  margin-top: 2px;
 }
 .stock-sidebar {
   padding: 24px 8px 12px;

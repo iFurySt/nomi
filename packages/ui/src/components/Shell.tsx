@@ -1,3 +1,4 @@
+import { UpdateIndicator } from "./UpdateIndicator";
 import {
   PanelsTopLeft,
   FileText,
@@ -45,14 +46,14 @@ function AppNavigation({
         <a
           key={target}
           href={`#/${target}`}
-          className={`rail-button ${page === target ? "selected" : ""}`}
-          title={pageLabels[target]}
+          className={`rail-button ${mobile ? "" : "rail-tip"} ${page === target ? "selected" : ""}`}
+          data-tooltip={mobile ? undefined : pageLabels[target]}
           aria-label={pageLabels[target]}
           aria-current={page === target ? "page" : undefined}
           onClick={onNavigate}
         >
           <Icon size={21} strokeWidth={1.7} />
-          <span>{pageLabels[target]}</span>
+          {mobile && <span>{pageLabels[target]}</span>}
         </a>
       ))}
     </nav>
@@ -304,18 +305,20 @@ export function Shell({ children }: { children: ReactNode }) {
           <AppNavigation />
           <span className="rail-separator" />
           <button
-            className="rail-button rail-search"
+            className="rail-button rail-search rail-tip"
             aria-label="Search the workspace"
-            title="Search"
+            data-tooltip="Search"
             onClick={() => {
               setSearch("");
               setSearchOpen(true);
             }}
           >
             <Search size={20} />
-            <span>Search</span>
           </button>
-          <ProfileMenu />
+          <div className="rail-footer">
+            <UpdateIndicator />
+            <ProfileMenu />
+          </div>
         </div>
         <div className="workspace-panel">
           <aside className="sidebar" id="workspace-sidebar">

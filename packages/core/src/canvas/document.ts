@@ -2,10 +2,14 @@ import { noteSubtreeIds } from "./note-tree";
 import { parseInteractiveProgram } from "../interactive/validate";
 import { temperatureProgram } from "../interactive/index";
 import type { InteractiveProgram } from "../interactive/types";
+export type NoteIcon =
+  { type: "emoji"; value: string } | { type: "image"; asset: string };
+const emojiSegments = new Intl.Segmenter("en", { granularity: "grapheme" });
 export interface CanvasNote {
   id: string;
   title: string;
   parentId?: string;
+  icon?: NoteIcon;
   blocks: string[];
 }
 export const CANVAS_SHAPES = [
@@ -169,10 +173,6 @@ const record = (v: unknown): Record<string, any> => {
   if (!v || typeof v !== "object" || Array.isArray(v)) bad("应为对象。");
   return v as Record<string, any>;
 };
-const keys = (v: Record<string, any>, allowed: string[]) => {
-  if (Object.keys(v).some((k) => !allowed.includes(k)))
-    bad("包含未支持的字段。");
-};
 const list = (v: unknown, max = 200): any[] => {
   if (!Array.isArray(v) || v.length > max) bad("对象数量超出画布上限。");
   return v as any[];
@@ -192,18 +192,11 @@ const finite = (v: unknown, lo: number, hi: number) => {
   if (typeof v !== "number" || !Number.isFinite(v) || v < lo || v > hi)
     bad("坐标或尺寸超出范围。");
 };
-export function parseCanvasDocument(raw: unknown): CanvasDocument {
-  return validateCanvasDocument(raw, true);
-}
-function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
-  if (typeof raw === "string") {
-    if (raw.length > CANVAS_DOCUMENT_BYTES) bad("文档超过 2 MiB。");
-    try {
-      raw = JSON.parse(raw);
-    } catch {
-      bad("文档不是合法 JSON。");
-    }
-  }
+/** Shared JSON safety budget; extension fields never become executable capabilities. */
+export function validateDocumentJSON(
+  raw: unknown,
+  maxBytes = CANVAS_DOCUMENT_BYTES,
+): void {
   // Reject non-JSON values / unsafe keys before cloning or interpreting nested programs.
   let visited = 0;
   const json = (v: unknown, depth = 0): void => {
@@ -228,21 +221,24 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
     }
   };
   json(raw);
-  if (
-    new TextEncoder().encode(JSON.stringify(raw)).length > CANVAS_DOCUMENT_BYTES
-  )
-    bad("文档超过 2 MiB。");
+  if (new TextEncoder().encode(JSON.stringify(raw)).length > maxBytes)
+    bad("文档超过 JSON 大小限制。");
+}
+export function parseCanvasDocument(raw: unknown): CanvasDocument {
+  return validateCanvasDocument(raw, true);
+}
+function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
+  if (typeof raw === "string") {
+    if (raw.length > CANVAS_DOCUMENT_BYTES) bad("文档超过 2 MiB。");
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      bad("文档不是合法 JSON。");
+    }
+  }
+  validateDocumentJSON(raw);
+  // Additive fields are opaque data: retain them for forward-compatible saves.
   const p = record(raw);
-  keys(p, [
-    "schema",
-    "id",
-    "title",
-    "revision",
-    "notes",
-    "blocks",
-    "assets",
-    "board",
-  ]);
   if (p.schema !== "nomi-document-ir/draft-1")
     bad("不支持此文档版本，原内容保持不变。");
   id(p.id);
@@ -260,7 +256,6 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
   const assetIds = new Set<string>();
   for (const a of assets) {
     const asset = record(a);
-    keys(asset, ["id", "name", "mime", "bytes", "sha256", "width", "height"]);
     identity(asset.id);
     assetIds.add(asset.id);
     text(asset.name, 255);
@@ -278,10 +273,8 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
     identity(b.id);
     contentIds.add(b.id);
     if (b.type === "markdown") {
-      keys(b, ["id", "type", "source"]);
       text(b.source, 200000);
     } else if (b.type === "shape") {
-      keys(b, ["id", "type", "shape", "text", "tone", "shapeStyle"]);
       if (
         !CANVAS_SHAPES.includes(b.shape) ||
         !["neutral", "sage", "sand", "blue"].includes(b.tone)
@@ -290,18 +283,6 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
       text(b.text, 4000);
       if (b.shapeStyle !== undefined) {
         const s = record(b.shapeStyle);
-        keys(s, [
-          "fill",
-          "fillOpacity",
-          "stroke",
-          "strokeOpacity",
-          "strokeWidth",
-          "strokeStyle",
-          "rotation",
-          "flipX",
-          "flipY",
-          "text",
-        ]);
         for (const k of ["fill", "stroke"])
           if (
             s[k] !== undefined &&
@@ -324,19 +305,6 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
             bad("形状翻转无效。");
         if (s.text !== undefined) {
           const t = record(s.text);
-          keys(t, [
-            "color",
-            "size",
-            "bold",
-            "italic",
-            "underline",
-            "strike",
-            "align",
-            "link",
-            "verticalAlign",
-            "rotate",
-            "list",
-          ]);
           if (t.color !== undefined && !/^#[a-fA-F0-9]{6}$/.test(t.color))
             bad("形状文字颜色无效。");
           if (t.size !== undefined) finite(t.size, 10, 96);
@@ -366,15 +334,8 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
         }
       }
     } else if (b.type === "interactive") {
-      keys(b, ["id", "type", "program"]);
       parseInteractiveProgram(b.program);
     } else if (b.type === "image" || b.type === "file") {
-      keys(
-        b,
-        b.type === "image"
-          ? ["id", "type", "asset", "caption"]
-          : ["id", "type", "asset"],
-      );
       if (b.caption !== undefined) text(b.caption, 2000);
       if (!assetIds.has(b.asset)) bad("附件引用不存在。");
       if (
@@ -389,7 +350,28 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
   const notes = list(p.notes, 100);
   for (const entry of notes) {
     const n = record(entry);
-    keys(n, ["id", "title", "blocks", "parentId"]);
+    if (n.icon !== undefined) {
+      const icon = record(n.icon);
+      if (icon.type === "emoji") {
+        text(icon.value, 64);
+        if (
+          Array.from(emojiSegments.segment(icon.value)).length !== 1 ||
+          !/[\p{Extended_Pictographic}\p{Regional_Indicator}\u20e3]/u.test(
+            icon.value,
+          )
+        )
+          bad("文稿图标需要一个 Emoji。");
+      } else if (icon.type === "image") {
+        const asset = assets.find((a) => a.id === icon.asset);
+        if (
+          !asset ||
+          !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(
+            asset.mime,
+          )
+        )
+          bad("文稿图标图片引用无效。");
+      } else bad("不支持此文稿图标类型。");
+    }
     if (n.parentId !== undefined) id(n.parentId);
     identity(n.id);
     contentIds.add(n.id);
@@ -413,20 +395,9 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
     }
   }
   const board = record(p.board);
-  keys(board, ["id", "placements", "connectors"]);
   identity(board.id);
   for (const entry of list(board.placements)) {
     const place = record(entry);
-    keys(place, [
-      "id",
-      "content",
-      "x",
-      "y",
-      "width",
-      "height",
-      "locked",
-      "group",
-    ]);
     identity(place.id);
     if (!contentIds.has(place.content)) bad("摆放引用不存在。");
     finite(place.x, -1e6, 1e6);
@@ -444,30 +415,9 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
   if (board.connectors !== undefined)
     for (const entry of list(board.connectors, 400)) {
       const c = record(entry);
-      keys(c, [
-        "id",
-        "from",
-        "to",
-        "routing",
-        "style",
-        "startArrow",
-        "endArrow",
-        "label",
-        "startHead",
-        "endHead",
-        "color",
-        "opacity",
-        "width",
-        "aboveShapes",
-        "lineJumps",
-        "locked",
-        "waypoints",
-        "labelStyle",
-      ]);
       identity(c.id);
       const point = (v: unknown) => {
         const p = record(v);
-        keys(p, ["x", "y"]);
         finite(p.x, -1e6, 1e6);
         finite(p.y, -1e6, 1e6);
       };
@@ -477,7 +427,6 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
       };
       for (const endpoint of [c.from, c.to]) {
         const e = record(endpoint);
-        keys(e, ["placement", "side", "point", "anchor"]);
         if (!["n", "e", "s", "w"].includes(e.side)) bad("连接端点无效。");
         if (e.point !== undefined) {
           if (e.placement !== undefined || e.anchor !== undefined)
@@ -489,7 +438,6 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
           bad("连接端点无效。");
         if (e.anchor !== undefined) {
           const anchor = record(e.anchor);
-          keys(anchor, ["x", "y"]);
           finite(anchor.x, 0, 1);
           finite(anchor.y, 0, 1);
         }
@@ -513,16 +461,6 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
       if (c.waypoints !== undefined) list(c.waypoints, 32).forEach(point);
       if (c.labelStyle !== undefined) {
         const l = record(c.labelStyle);
-        keys(l, [
-          "color",
-          "size",
-          "bold",
-          "italic",
-          "underline",
-          "strike",
-          "align",
-          "link",
-        ]);
         if (l.color !== undefined) color(l.color);
         if (l.size !== undefined) finite(l.size, 10, 48);
         for (const flag of ["bold", "italic", "underline", "strike"])
@@ -555,6 +493,12 @@ export type CanvasCommand =
   | { type: "add_note"; note: CanvasNote }
   | { type: "delete_note"; id: string }
   | { type: "move_note"; id: string; parentId: string | null; before?: string }
+  | {
+      type: "set_note_icon";
+      id: string;
+      icon: NoteIcon | null;
+      asset?: CanvasAsset;
+    }
   | { type: "rename_note"; id: string; title: string }
   | { type: "set_note_blocks"; id: string; blocks: string[] }
   | { type: "set_shape"; block: Extract<CanvasBlock, { type: "shape" }> }
@@ -736,6 +680,24 @@ export function applyCanvasCommands(
         else delete image.caption;
         break;
       }
+      case "set_note_icon": {
+        const note =
+          next.notes.find((n) => n.id === command.id) ?? bad("文稿已不存在。");
+        const previous =
+          note.icon?.type === "image" ? note.icon.asset : undefined;
+        if (command.asset) next.assets.push(command.asset);
+        if (command.icon) note.icon = structuredClone(command.icon);
+        else delete note.icon;
+        if (
+          previous &&
+          !next.notes.some(
+            (n) => n.icon?.type === "image" && n.icon.asset === previous,
+          ) &&
+          !next.blocks.some((b) => "asset" in b && b.asset === previous)
+        )
+          next.assets = next.assets.filter((a) => a.id !== previous);
+        break;
+      }
       case "rename_note": {
         const n =
           next.notes.find((n) => n.id === command.id) ?? bad("笔记已不存在。");
@@ -780,6 +742,9 @@ export function applyCanvasCommands(
             .filter((p) => deletedNotes.has(p.content))
             .map((p) => p.id),
         );
+        const deletedIcons = next.notes
+          .filter((n) => deletedNotes.has(n.id))
+          .flatMap((n) => (n.icon?.type === "image" ? [n.icon.asset] : []));
         next.notes = next.notes.filter((n) => !deletedNotes.has(n.id));
         next.board.placements = next.board.placements.filter(
           (p) => !placements.has(p.id),
@@ -800,13 +765,17 @@ export function applyCanvasCommands(
         next.blocks = next.blocks.filter(
           (b) => !removed.some((r) => r.id === b.id),
         );
-        const candidateAssets = new Set(
-          removed.flatMap((b) => ("asset" in b ? [b.asset] : [])),
-        );
+        const candidateAssets = new Set([
+          ...deletedIcons,
+          ...removed.flatMap((b) => ("asset" in b ? [b.asset] : [])),
+        ]);
         next.assets = next.assets.filter(
           (a) =>
             !candidateAssets.has(a.id) ||
-            next.blocks.some((b) => "asset" in b && b.asset === a.id),
+            next.blocks.some((b) => "asset" in b && b.asset === a.id) ||
+            next.notes.some(
+              (n) => n.icon?.type === "image" && n.icon.asset === a.id,
+            ),
         );
         break;
       }

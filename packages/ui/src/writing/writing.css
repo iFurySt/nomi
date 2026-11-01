@@ -1445,7 +1445,12 @@ body.notes-tree-dragging * {
 .notes-tree-end {
   min-height: 48px;
   position: relative;
-  flex-shrink: 0;
+  flex: 1 0 48px;
+}
+.notes-tree-end:focus-visible {
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+  border-radius: 6px;
 }
 .notes-library nav[data-root-drop] .notes-tree-end::before {
   content: "";
@@ -1480,6 +1485,298 @@ body.notes-tree-dragging * {
 }
 
 /* The window toolbar controls the document list, without unmounting the editor. */
-.notes-shell.sidebar-collapsed .notes-workspace {grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);}
+.notes-shell.sidebar-collapsed .notes-workspace {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
 .notes-shell.sidebar-collapsed .notes-library,
-.notes-shell.sidebar-collapsed .notes-library-resizer {display: none;}
+.notes-shell.sidebar-collapsed .notes-library-resizer {
+  display: none;
+}
+
+/* Icon editing has its own hit target; only the title starts a tree drag. */
+.notes-library nav .notes-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  margin: 0 5px 0 2px;
+  border-radius: 4px;
+  background: transparent;
+}
+.notes-library nav .notes-icon-button:hover,
+.notes-library nav .notes-icon-button:focus-visible,
+.notes-library nav .notes-icon-button[data-state="open"] {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.note-icon-hint {
+  position: fixed;
+  z-index: 140;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #202123;
+  color: white;
+  white-space: nowrap;
+  font: 400 12px/20px var(--font-sans, sans-serif);
+  pointer-events: none;
+}
+.note-icon-hint::after {
+  content: "";
+  position: absolute;
+  left: var(--hint-arrow-x);
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 1px;
+}
+.note-icon-hint[data-side="top"]::after {
+  bottom: -4px;
+}
+.note-icon-hint[data-side="bottom"]::after {
+  top: -4px;
+}
+.note-icon-image {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+}
+.note-icon-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 3px;
+}
+.note-icon-picker {
+  z-index: 130;
+  width: 354px;
+  max-width: calc(100vw - 24px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 35px rgb(0 0 0 / 14%);
+  font-size: 13px;
+  overflow: hidden;
+}
+.note-icon-picker header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+.note-icon-picker [role="tablist"] {
+  display: flex;
+  gap: 16px;
+}
+.note-icon-picker [role="tab"] {
+  padding: 12px 0 10px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+}
+.note-icon-picker [role="tab"][aria-selected="true"] {
+  border-color: var(--text);
+  color: var(--text);
+}
+.note-icon-remove {
+  color: var(--muted);
+  padding: 6px;
+  border-radius: 5px;
+}
+.note-icon-remove:hover:not(:disabled) {
+  background: var(--interaction-hover);
+  color: var(--text);
+}
+.note-emoji-search {
+  display: flex;
+  gap: 7px;
+  padding: 10px 12px;
+}
+.note-emoji-search label {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+}
+.note-emoji-search label:focus-within {
+  border-color: var(--muted);
+}
+.note-emoji-search input {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  width: 100%;
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+.note-emoji-search > button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.note-emoji-results {
+  height: 260px;
+  max-height: calc(100dvh - 260px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 10px 10px;
+}
+.note-emoji-results small {
+  display: block;
+  padding: 5px 3px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.note-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 1px;
+}
+.note-emoji-grid button {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  font-size: 23px;
+  line-height: 1;
+}
+.note-emoji-grid button:hover,
+.note-emoji-grid button:focus-visible,
+.note-emoji-grid button[aria-pressed="true"] {
+  background: var(--interaction-hover);
+}
+.note-icon-picker footer {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  padding: 7px 10px;
+}
+.note-icon-picker footer button {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  font-size: 18px;
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+.note-icon-picker footer button:hover,
+.note-icon-picker footer button[aria-pressed="true"] {
+  background: var(--interaction-hover);
+  filter: none;
+  opacity: 1;
+}
+.note-icon-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 30px 12px;
+  color: var(--muted);
+}
+.note-icon-upload button {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-radius: 7px;
+  padding: 7px 16px;
+}
+.note-icon-upload p,
+.note-emoji-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+.note-icon-error {
+  padding: 8px 12px;
+  color: var(--negative);
+  font-size: 12px;
+}
+
+/* A document's icon is shared by its title and the navigation tree. */
+.writing-heading {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 32px 0 22px;
+}
+.writing-heading[data-has-icon="true"] {
+  grid-template-columns: 40px minmax(0, 1fr);
+}
+.writing-heading .writing-title {
+  min-width: 0;
+  padding: 0;
+}
+.notes-main .writing-add-icon {
+  position: absolute;
+  top: 0;
+  left: -6px;
+  height: 24px;
+  padding: 3px 6px;
+  color: var(--muted);
+  gap: 5px;
+}
+.notes-main .writing-add-icon {
+  opacity: 0;
+  pointer-events: none;
+}
+.writing-heading:hover .writing-add-icon,
+.notes-main .writing-add-icon:focus-visible,
+.notes-main .writing-add-icon[data-state="open"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: none) {
+  .notes-main .writing-add-icon {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+.notes-main .writing-heading-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 45px;
+  padding: 0;
+  border-radius: 6px;
+}
+.writing-heading-icon .note-icon-image {
+  width: 32px;
+  height: 32px;
+  font-size: 32px;
+}
+.writing-heading-icon .note-icon-image svg {
+  width: 32px;
+  height: 32px;
+}
+.notes-main .writing-heading-icon[data-state="open"],
+.notes-main .writing-add-icon[data-state="open"] {
+  background: var(--surface-muted);
+}
+@media (max-width: 600px) {
+  .notes-main .writing-heading-icon {
+    height: 38px;
+  }
+}

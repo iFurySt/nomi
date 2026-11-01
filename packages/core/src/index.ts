@@ -9,3 +9,5 @@ export * from "./interactive/index";
 export * from "./canvas/index";
 export * from "./document-storage";
 export * from "./settings";
+
+export * from "./updates";

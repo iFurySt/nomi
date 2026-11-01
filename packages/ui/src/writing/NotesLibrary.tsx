@@ -1,8 +1,11 @@
+import type { CanvasRepository } from "@nomi/platform";
+import type { ChangeNoteIcon } from "./NoteIconPicker";
 import { documentDirectoryAvailable, documentRequest } from "@nomi/platform";
 import { useWorkspace } from "../workspace-context";
 import { useEffect, useRef, useState } from "react";
 import { FileText, Plus } from "lucide-react";
 import { createPortal } from "react-dom";
+import * as ContextMenu from "@radix-ui/react-context-menu";
 import {
   noteAncestors,
   noteSubtreeIds,
@@ -24,8 +27,12 @@ export function NotesLibrary({
   onMove,
   onDropMove,
   onDelete,
+  repository,
+  onIcon,
 }: {
   profile: string;
+  repository: CanvasRepository;
+  onIcon: ChangeNoteIcon;
   document: CanvasDocument;
   selected?: string;
   query: string;
@@ -183,6 +190,8 @@ export function NotesLibrary({
           <NoteListItem
             key={note.id}
             note={note}
+            repository={repository}
+            onIcon={onIcon}
             selected={note.id === selected}
             depth={depth}
             expanded={open}
@@ -218,8 +227,33 @@ export function NotesLibrary({
             }
           />
         ))}
-        {!rows.length && <p className="notes-search-empty">没有找到文稿</p>}
-        <div className="notes-tree-end" aria-hidden="true" />
+        <ContextMenu.Root>
+          <ContextMenu.Trigger asChild>
+            <div
+              className="notes-tree-end"
+              aria-label="文稿列表空白区域"
+              tabIndex={0}
+            >
+              {!rows.length && (
+                <p className="notes-search-empty">没有找到文稿</p>
+              )}
+            </div>
+          </ContextMenu.Trigger>
+          <ContextMenu.Portal>
+            <ContextMenu.Content
+              className="dropdown-menu notes-context-menu"
+              aria-label="文稿列表操作"
+            >
+              <ContextMenu.Item
+                className="dropdown-item"
+                onSelect={() => onCreate()}
+              >
+                <Plus size={15} />
+                新建文稿
+              </ContextMenu.Item>
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        </ContextMenu.Root>
       </nav>
       {treeDrag.drag &&
         createPortal(

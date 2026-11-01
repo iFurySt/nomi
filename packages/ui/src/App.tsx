@@ -1,3 +1,4 @@
+import { UpdateProvider } from "./update-context";
 import {
   lazy,
   Suspense,
@@ -92,49 +93,51 @@ export function App() {
     return () => clearTimeout(toastTimer.current);
   }, [notify]);
   return (
-    <ChatGPTProvider>
-      <CanvasDocumentSession>
-        <WorkspaceContext.Provider
-          value={{
-            workspace,
-            resolvedTheme,
-            update,
-            page,
-            navigate,
-            settingsSection,
-            notify,
-            storageError,
-          }}
-        >
-          <a
-            className="skip-link"
-            href="#main-content"
-            onClick={(event) => {
-              event.preventDefault();
-              document.getElementById("main-content")?.focus();
+    <UpdateProvider>
+      <ChatGPTProvider>
+        <CanvasDocumentSession>
+          <WorkspaceContext.Provider
+            value={{
+              workspace,
+              resolvedTheme,
+              update,
+              page,
+              navigate,
+              settingsSection,
+              notify,
+              storageError,
             }}
           >
-            Skip to content
-          </a>
-          <Shell>
-            {(page === "canvas" || page === "notes") && (
-              <Suspense
-                fallback={<SkeletonRows label="正在打开文稿" rows={4} />}
-              >
-                <NotesWorkspace page={page} />
-              </Suspense>
-            )}
-            {page === "settings" && <Settings />}
-          </Shell>
-          <div
-            className={`toast ${toast ? "visible" : ""}`}
-            role="status"
-            aria-live="polite"
-          >
-            {toast}
-          </div>
-        </WorkspaceContext.Provider>
-      </CanvasDocumentSession>
-    </ChatGPTProvider>
+            <a
+              className="skip-link"
+              href="#main-content"
+              onClick={(event) => {
+                event.preventDefault();
+                document.getElementById("main-content")?.focus();
+              }}
+            >
+              Skip to content
+            </a>
+            <Shell>
+              {(page === "canvas" || page === "notes") && (
+                <Suspense
+                  fallback={<SkeletonRows label="正在打开文稿" rows={4} />}
+                >
+                  <NotesWorkspace page={page} />
+                </Suspense>
+              )}
+              {page === "settings" && <Settings />}
+            </Shell>
+            <div
+              className={`toast ${toast ? "visible" : ""}`}
+              role="status"
+              aria-live="polite"
+            >
+              {toast}
+            </div>
+          </WorkspaceContext.Provider>
+        </CanvasDocumentSession>
+      </ChatGPTProvider>
+    </UpdateProvider>
   );
 }

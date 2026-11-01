@@ -505,6 +505,9 @@ export class DocumentStore {
       ...n,
       id: fresh(n.id),
       blocks: n.blocks.map(fresh),
+      ...(n.icon?.type === "image"
+        ? { icon: { ...n.icon, asset: fresh(n.icon.asset) } }
+        : {}),
       ...(n.parentId ? { parentId: fresh(n.parentId) } : {}),
     }));
     const blocks = source.blocks.map((b) => ({
