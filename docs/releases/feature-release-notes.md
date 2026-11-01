@@ -2,7 +2,7 @@
 
 ## 2026-11
 
-桌面 0.1.0 收敛为 Canvas / 文稿，移除 Data 与金融服务，支持侧栏折叠、签名公证 DMG 和 Sparkle 更新。
+[桌面 0.1.0](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.1.0) 已发布：Canvas / 文稿，移除 Data 与金融服务，支持内侧文稿列表折叠、Apple Silicon / Intel 签名公证 DMG 和 Sparkle 更新检查。
 
 | 日期 | 功能域 | 用户价值 | 变更摘要 |
 | --- | --- | --- | --- |

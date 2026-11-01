@@ -15,7 +15,7 @@ Nomi 是个人一站式工作台：把学习、笔记、信息 hub、知识、�
 
 ## macOS 下载
 
-[Nomi 0.1.0 安装包](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.1.0)：选择 Apple Silicon（arm64）或 Intel（x64），需要 macOS 13 或更新版本。打开 DMG，将 Nomi 拖入 Applications。应用已签名并通过 Apple 公证；Settings → General 可检查更新和设置自动检查。
+[Nomi 0.1.0 安装包](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.1.0)：选择 Apple Silicon（arm64）或 Intel（x64），需要 macOS 13 或更新版本。打开 DMG，将 Nomi 拖入 Applications；首次启动请允许访问文稿文件夹。应用已签名并通过 Apple 公证；Settings → General 可检查更新和设置自动检查。
 
 ## 桌面本地运行
 

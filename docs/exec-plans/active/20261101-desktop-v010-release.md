@@ -17,8 +17,13 @@
 - [x] 查清导航、Data / Go 服务与发布依赖，确定 Sparkle 接入和签名配置。
 - [x] 删除无关运行代码、收敛设置 / 路由 / 依赖，修复文稿侧栏折叠及恢复。
 - [x] 独立 app / DMG 构建、Sparkle / appcast 与 CI release 工作流。
-- [ ] 回归、实际 App 与 DMG 验收、文档 / history，完成具备凭据的发布步骤。
+- [x] 回归、实际 App 与 DMG 验收、文档 / history，完成具备凭据的公开发布。
+- [ ] 正式版首次 Documents 授权后，确认现有文稿恢复。系统授权窗口需要用户手动允许，Computer Use 不允许操作该系统窗口；不得绕过。
 
 ## 验证
 
 类型、单测、Notes / Canvas / IME、目录落盘回归；发行包不依赖 checkout，无 Go 数据子进程；侧栏折叠不丢选区 / 数据；DMG 挂载、签名 / 公证验证与更新检查。缺少外部发布配置时明确报告具体阻塞，不伪称已发布或已验证更新安装。
+
+## 发布结果
+
+`desktop-v0.1.0` 已固定并公开，两个架构的 [Release CI](https://github.com/iFurySt/nomi/actions/runs/41308518487) 全绿。公开 DMG 重新下载、签名 / 公证 / Gatekeeper / Ed25519 校验通过，安装到 Applications 并启动；原生 Sparkle 实测返回 0.1.0 已是最新版本。只剩用户首次系统目录授权后的真实文稿恢复确认，不修改用户正文。

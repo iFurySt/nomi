@@ -55,3 +55,9 @@ Repository variable `DESKTOP_SIGN_IDENTITY` 指定身份名称。构建只使用
 - 0.1.0 是首版；“检测到无更新”验证不等于真实跨版本替换，后续版本需补一次签名升级、退出保存和重新打开原文稿的完整验收。
 
 参考：[Sparkle programmatic setup](https://sparkle-project.org/documentation/programmatic-setup/)、[发布与签名](https://sparkle-project.org/documentation/publishing/)、[Electron 自动更新边界](https://www.electronjs.org/docs/latest/tutorial/updates)。
+
+## 0.1.0 发布验收
+
+[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.1.0) 已由 [双架构流水线](https://github.com/iFurySt/nomi/actions/runs/41308518487) 发布，源码 tag 固定为 `desktop-v0.1.0`。Apple Silicon / Intel 均通过类型、单测、IME、签名、公证、stapling 和独立 App / Sparkle 初始化验证。
+
+从公开地址重新下载 arm64 DMG，SHA-256、DMG / App 公证票据、Gatekeeper 和 Ed25519 签名验证通过；两个架构的 appcast 签名均已验证。已安装到 Applications 并实际启动，原生 Sparkle 显示“0.1.0 已是最新版本”，[截图](generated/verification/nomi-sparkle-up-to-date-2026-11-01.png)。首次启动需在 macOS 系统提示中允许访问 Documents；未响应授权时文稿读取会等待。
