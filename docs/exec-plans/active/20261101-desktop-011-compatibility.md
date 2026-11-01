@@ -22,3 +22,7 @@
 ## 本机验证
 
 从 desktop-v0.1.0 的 parser 和合成 icon 文稿复现相同错误。38 文件 / 285 单测、类型、构建、桌面 smoke、IME、文稿图标、更新 UI / host / native driver、make ci 全部通过。Computer Use 退出已安装旧版后启动新构建，文稿列表、图标和正文恢复，显示已保存；未修改用户文章，安装的 0.1.0 二进制保留。
+
+## CI 修正
+
+第一次发布 run 的 Intel IME 回归在固定 600ms 重载断言失败，arm64 已通过应用校验。将回归改为等待实际保存状态与 IndexedDB 正文、did-finish-load 和选中篇正文恢复，分别报告持久化 / 加载失败；CI VM 使用软件渲染以避免 EGL 初始化失败。0.1.1 尚未公开，修正测试后更新待发布 tag 重新构建，不替换已发布 DMG。

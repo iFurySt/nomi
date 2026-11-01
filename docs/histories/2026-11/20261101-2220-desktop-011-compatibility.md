@@ -30,3 +30,5 @@
 - `packages/host/src/nomi-package.ts`
 - `packages/host/src/nomi-package.test.ts`
 - `docs/design-docs/nomi-package-format.md`
+
+Intel 发布 runner 暴露 IME 测试的固定延时断言；改为验证真实持久化、加载事件与正文恢复，并在无 GPU 的 CI VM 使用软件渲染。没有放宽输入法内容断言或跳过测试。

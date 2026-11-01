@@ -37,6 +37,8 @@ async function checkIME({ output, disableGuard }) {
   const { app, BrowserWindow } = require("electron");
   const { writeFileSync } = require("node:fs");
   const { join } = require("node:path");
+  // CI VMs may have no EGL display; IME semantics do not require a GPU.
+  if (process.env.CI) app.disableHardwareAcceleration();
   app.setPath("userData", join(output, "profile"));
   await app.whenReady();
   const win = new BrowserWindow({
@@ -54,6 +56,13 @@ async function checkIME({ output, disableGuard }) {
     win.webContents.executeJavaScript(`(${fn})(${JSON.stringify(data)})`);
   const assert = (condition, message) => {
     if (!condition) throw Error(message);
+  };
+  const until = async (predicate, message) => {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      if (await predicate()) return;
+      await wait(50);
+    }
+    throw Error(message);
   };
   const key = async (keyCode, modifiers = []) => {
     for (const type of ["keyDown", "keyUp"])
@@ -228,13 +237,46 @@ async function checkIME({ output, disableGuard }) {
       window.imeEditor.commands.focus();
       window.imeEditor.commands.blur();
     });
-    await wait(850);
+    const savedNoteId = await run(
+      () =>
+        document.querySelector('[data-note-row][aria-selected="true"]').dataset
+          .noteRow,
+    );
+    await until(
+      () =>
+        run(async (noteId) => {
+          if (!document.querySelector('[data-save-state="saved"]'))
+            return false;
+          const persisted = await window.canvasFixture
+            .repository("local-device")
+            .load();
+          const note = persisted?.notes.find((n) => n.id === noteId);
+          return note?.blocks.some((id) =>
+            persisted.blocks.some(
+              (b) =>
+                b.id === id &&
+                b.type === "markdown" &&
+                b.source.trim() === "在A",
+            ),
+          );
+        }, savedNoteId),
+      "Committed text was not persisted before reload",
+    );
     win.webContents.debugger.detach();
-    await win.reload();
-    await wait(600);
-    assert(
-      await run(() => document.querySelector(".tiptap")?.textContent === "在A"),
-      "Committed text did not survive reload",
+    await new Promise((resolve) => {
+      win.webContents.once("did-finish-load", resolve);
+      win.reload();
+    });
+    await until(
+      () =>
+        run(
+          (noteId) =>
+            document.querySelector('[data-note-row][aria-selected="true"]')
+              ?.dataset.noteRow === noteId &&
+            document.querySelector(".tiptap")?.textContent === "在A",
+          savedNoteId,
+        ),
+      "Persisted text did not restore into the selected note after reload",
     );
     writeFileSync(
       join(output, "report.json"),
@@ -271,7 +313,7 @@ async function checkIME({ output, disableGuard }) {
 }
 await writeFile(
   join(output, "main.cjs"),
-  `(${checkIME})(${JSON.stringify({ output, disableGuard: process.env.NOMI_IME_DISABLE_GUARD === "1" })});setTimeout(()=>require('electron').app.exit(1),30000);`,
+  `(${checkIME})(${JSON.stringify({ output, disableGuard: process.env.NOMI_IME_DISABLE_GUARD === "1" })});setTimeout(()=>require('electron').app.exit(1),60000);`,
 );
 const child = spawn(require("electron"), [join(output, "main.cjs")], {
   stdio: "inherit",
