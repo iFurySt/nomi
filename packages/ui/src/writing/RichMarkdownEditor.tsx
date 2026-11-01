@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import {
+  memo,
+  useMemo,
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+} from "react";
 import { useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/core";
 import { Fragment, Slice } from "@tiptap/pm/model";
@@ -14,6 +21,7 @@ import { WritingBlockMath } from "./WritingMath";
 import { FormulaPopover, type FormulaSession } from "./FormulaPopover";
 import { withoutTableBreaks } from "./tableMarkdown";
 import { WritingCodeBlock } from "./CodeBlock";
+import { WritingComposition } from "./WritingComposition";
 import { TableKit } from "@tiptap/extension-table";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
@@ -41,7 +49,42 @@ export function needsSourceEditor(source: string) {
     )
   );
 }
-export function RichMarkdownEditor({
+type WritingEditorProps = Parameters<typeof RichMarkdownEditorContent>[0];
+const MemoWritingEditor = memo(RichMarkdownEditorContent);
+export function RichMarkdownEditor(props: WritingEditorProps) {
+  const latest = useRef(props);
+  latest.current = props;
+  const callbacks = useMemo(
+    () => ({
+      onChange: (...args: Parameters<WritingEditorProps["onChange"]>) =>
+        latest.current.onChange(...args),
+      onBlur: () => latest.current.onBlur(),
+      onActivate: () => latest.current.onActivate(),
+      onBoundary: (...args: Parameters<WritingEditorProps["onBoundary"]>) =>
+        latest.current.onBoundary(...args),
+      onCanvas: () => latest.current.onCanvas(),
+      onEditor: (...args: Parameters<WritingEditorProps["onEditor"]>) =>
+        latest.current.onEditor(...args),
+      onInsert: (...args: Parameters<WritingEditorProps["onInsert"]>) =>
+        latest.current.onInsert(...args),
+      onBlockDrag: (...args: Parameters<WritingEditorProps["onBlockDrag"]>) =>
+        latest.current.onBlockDrag(...args),
+      onBlockDragEnd: () => latest.current.onBlockDragEnd(),
+      onBlockMove: (...args: Parameters<WritingEditorProps["onBlockMove"]>) =>
+        latest.current.onBlockMove(...args),
+    }),
+    [],
+  );
+  return (
+    <MemoWritingEditor
+      {...callbacks}
+      source={props.source}
+      placeholder={props.placeholder}
+      hideBlockTools={props.hideBlockTools}
+    />
+  );
+}
+function RichMarkdownEditorContent({
   source,
   onChange,
   onBlur,
@@ -96,6 +139,7 @@ export function RichMarkdownEditor({
   const [link, setLink] = useState<{ href: string; range: TextRange }>();
   const editor = useEditor({
     extensions: [
+      WritingComposition,
       StarterKit.configure({
         codeBlock: false,
         dropcursor: { class: "writing-native-dropcursor" },

@@ -1,0 +1,63 @@
+.document-directory-row {
+  flex-wrap: wrap;
+}
+.document-directory-row > div:first-child {
+  flex: 1 1 240px;
+}
+.document-directory-control {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.document-directory-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 320px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--secondary);
+  cursor: pointer;
+}
+.document-directory-path:hover,
+.document-directory-path:focus-visible {
+  background: var(--interaction-hover);
+}
+.document-directory-path svg {
+  flex-shrink: 0;
+}
+.document-directory-path span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+.document-directory-path:disabled {
+  cursor: default;
+}
+.document-directory-control .button {
+  flex-shrink: 0;
+}
+@media (max-width: 700px) {
+  .setting-row.document-directory-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .setting-row.document-directory-row > div:first-child {
+    flex: 0 1 auto;
+  }
+  .setting-row.document-directory-row p {
+    max-width: none;
+  }
+  .setting-control.document-directory-control {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+  }
+  .document-directory-path {
+    max-width: none;
+  }
+}

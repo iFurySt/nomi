@@ -1,5 +1,5 @@
 import { ChatGPTContent } from "./chatgpt-content";
-import type { AgentRuntime } from "./codex-runtime";
+import type { AgentRuntime } from "./agent-runtime";
 import {
   safeChatSourceURL,
   citedMarkdown,

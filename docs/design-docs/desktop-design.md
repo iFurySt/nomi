@@ -382,8 +382,8 @@ Each section uses a 14px title and a 14px rounded bordered group. Rows have 12px
 vertical padding, a 58px minimum height, 14px labels and optional 12px functional descriptions. Controls
 align right: neutral switches, selects, compact buttons, and inline inputs. Tables
 or cards must not overflow on mobile; use the existing drawer for categories.
-Settings represents real local controls and has no Demo badge. Appearance is the
-default category; omit General and duplicate service/status rows. Appearance
+Settings represents real local controls and has no Demo badge. General is the
+default category and precedes Appearance, with the document-directory setting and native folder picker. Avoid duplicate service/status rows. Appearance
 contains one Visual style group and a Mode row with three compact app previews:
 System (split light/dark), Light, Dark. Use a neutral selected outline, shared
 hover tint, named radio semantics and arrow-key selection. Preview names appear

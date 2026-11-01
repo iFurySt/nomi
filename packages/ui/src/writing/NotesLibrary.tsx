@@ -1,5 +1,8 @@
+import { documentDirectoryAvailable, documentRequest } from "@nomi/platform";
+import { useWorkspace } from "../workspace-context";
 import { useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
+import { createPortal } from "react-dom";
 import {
   noteAncestors,
   noteSubtreeIds,
@@ -7,6 +10,8 @@ import {
   type CanvasNote,
 } from "@nomi/core";
 import { NoteListItem } from "./NoteListItem";
+import { useNoteTreeDrag } from "./useNoteTreeDrag";
+import type { NoteDropMove } from "./note-drop";
 
 export function NotesLibrary({
   profile,
@@ -17,6 +22,7 @@ export function NotesLibrary({
   onChoose,
   onCreate,
   onMove,
+  onDropMove,
   onDelete,
 }: {
   profile: string;
@@ -27,8 +33,10 @@ export function NotesLibrary({
   onChoose: (id: string) => void;
   onCreate: (parentId?: string) => void;
   onMove: (id: string) => void;
+  onDropMove: (id: string, move: NoteDropMove) => void;
   onDelete: (id: string) => void;
 }) {
+  const { notify } = useWorkspace();
   const notes = document.notes;
   const storageKey = `nomi:notes:${profile}:expanded`;
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -67,6 +75,11 @@ export function NotesLibrary({
       else next.add(id);
       return next;
     });
+  const treeDrag = useNoteTreeDrag(nav, notes, onDropMove, (id) =>
+    setExpanded((current) =>
+      current.has(id) ? current : new Set([...current, id]),
+    ),
+  );
   const groups = new Map<string | undefined, CanvasNote[]>();
   for (const note of notes)
     groups.set(note.parentId, [...(groups.get(note.parentId) || []), note]);
@@ -114,7 +127,7 @@ export function NotesLibrary({
     row?.querySelector<HTMLButtonElement>(".notes-list-select")?.focus();
   };
   return (
-    <aside className="notes-library" aria-label="文稿列表">
+    <aside className="notes-library" id="notes-library" aria-label="文稿列表">
       <header>
         <h1>文稿</h1>
         <button
@@ -136,6 +149,13 @@ export function NotesLibrary({
         ref={nav}
         role="tree"
         aria-label="文稿层级"
+        data-tree-dragging={!!treeDrag.drag || undefined}
+        data-root-drop={
+          (treeDrag.drag?.drop && !treeDrag.drag.drop.row) || undefined
+        }
+        onPointerDown={treeDrag.onPointerDown}
+        onClickCapture={treeDrag.onClickCapture}
+        onDragStart={(event) => event.preventDefault()}
         onKeyDown={(event) => {
           if (!(event.target as HTMLElement).closest(".notes-list-select"))
             return;
@@ -167,15 +187,52 @@ export function NotesLibrary({
             depth={depth}
             expanded={open}
             hasChildren={children}
+            dragging={treeDrag.drag?.id === note.id}
+            dropPosition={
+              treeDrag.drag?.drop?.row === note.id
+                ? treeDrag.drag.drop.position
+                : undefined
+            }
+            dropDepth={
+              treeDrag.drag?.drop?.move.parentId
+                ? noteAncestors(notes, treeDrag.drag.drop.move.parentId)
+                    .length + 1
+                : 0
+            }
             onToggle={() => toggle(note.id)}
             onChoose={() => onChoose(note.id)}
             onCreate={() => onCreate(note.id)}
             onMove={() => onMove(note.id)}
             onDelete={() => onDelete(note.id)}
+            onReveal={
+              documentDirectoryAvailable()
+                ? (children) => {
+                    void documentRequest("reveal-note", {
+                      profile,
+                      documentId: document.id,
+                      id: note.id,
+                      children,
+                    }).catch((e) => notify(e.message));
+                  }
+                : undefined
+            }
           />
         ))}
         {!rows.length && <p className="notes-search-empty">没有找到文稿</p>}
+        <div className="notes-tree-end" aria-hidden="true" />
       </nav>
+      {treeDrag.drag &&
+        createPortal(
+          <div
+            className="notes-tree-drag-preview"
+            style={{ left: treeDrag.drag.x + 14, top: treeDrag.drag.y + 14 }}
+            aria-hidden="true"
+          >
+            <FileText size={15} />
+            {treeDrag.drag.title}
+          </div>,
+          window.document.body,
+        )}
     </aside>
   );
 }

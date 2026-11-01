@@ -561,6 +561,370 @@ async function checks(phase) {
       nativeSidebarResize: true,
     };
   }
+  if (phase === "tree-drag-prepare") {
+    const create = async (name, parent) => {
+      if (parent) noteRow(parent).querySelector(".notes-row-add").click();
+      else document.querySelector('[aria-label="新建文稿"]').click();
+      await until(() => title()?.value === "未命名文稿");
+      input(title(), name);
+      await wait(35);
+      return new URLSearchParams(location.hash.split("?")[1]).get("note");
+    };
+    const a = await create("拖动源文稿");
+    const child = await create("拖动子文稿", a);
+    const leaf = await create("拖动叶文稿", child);
+    const peer = await create("拖动同级文稿 C", a);
+    const b = await create("拖动目标文稿");
+    window.canvasFixture.treeDragIds = { a, b, child, leaf, peer };
+    title().blur();
+    document.getElementById("main-content").focus();
+    await until(
+      () => document.querySelector(".notes-save").dataset.saveState === "saved",
+    );
+    window.canvasFixture.treeDragBlocks = JSON.stringify(
+      (await saved()).blocks,
+    );
+    return;
+  }
+  if (phase.startsWith("tree-drag-points-")) {
+    const kind = phase.slice("tree-drag-points-".length);
+    const { a, b, child, leaf, peer } = window.canvasFixture.treeDragIds;
+    const tree = document.querySelector(".notes-library nav");
+    if (kind === "expand") {
+      noteRow(a).querySelector(".notes-row-toggle").click();
+      await until(() => noteRow(a).getAttribute("aria-expanded") === "false");
+    }
+    tree.scrollTop = tree.scrollHeight;
+    await wait(40);
+    const boundary = kind.startsWith("boundary-");
+    const source = boundary
+      ? kind === "boundary-external"
+        ? b
+        : peer
+      : kind === "invalid" || kind === "expand"
+        ? b
+        : a;
+    const sourceRect = noteRow(source)
+      .querySelector(".notes-list-select")
+      .getBoundingClientRect();
+    const bounds = tree.getBoundingClientRect();
+    assert(
+      sourceRect.top >= bounds.top && sourceRect.bottom <= bounds.bottom,
+      "Drag source is offscreen",
+    );
+    const target = noteRow(
+      boundary
+        ? kind === "boundary-before"
+          ? child
+          : a
+        : kind === "invalid"
+          ? leaf
+          : kind === "expand"
+            ? a
+            : b,
+    ).getBoundingClientRect();
+    let x = Math.round(target.left + 70),
+      y = Math.round(target.top + target.height / 2);
+    if (kind === "boundary-before") y = Math.round(target.top + 3);
+    else if (boundary) y = Math.round(target.bottom - 3);
+    if (kind === "reorder" || kind === "cancel") y = Math.round(target.top + 3);
+    if (kind === "after" || kind === "noop") y = Math.round(target.bottom - 3);
+    if (kind === "root") {
+      const last = [...tree.querySelectorAll("[data-note-row]")]
+        .at(-1)
+        .getBoundingClientRect();
+      y = Math.round(Math.min(bounds.bottom - 10, last.bottom + 15));
+    }
+    if (kind === "outside") x = Math.round(bounds.right + 100);
+    if (kind === "scroll") y = Math.round(bounds.top + 5);
+    window.canvasFixture.treeDragRevision = (await saved()).revision;
+    window.canvasFixture.treeDragScroll = tree.scrollTop;
+    return {
+      from: {
+        x: Math.round(sourceRect.left + 65),
+        y: Math.round(sourceRect.top + sourceRect.height / 2),
+      },
+      to: { x, y },
+    };
+  }
+  if (phase.startsWith("tree-drag-preview-")) {
+    const kind = phase.slice("tree-drag-preview-".length);
+    await until(() => document.querySelector(".notes-tree-drag-preview"));
+    assert(
+      (await saved()).revision === window.canvasFixture.treeDragRevision,
+      "Drag preview wrote content",
+    );
+    const marker = document.querySelector("[data-note-drop], [data-root-drop]");
+    if (["invalid", "noop", "outside"].includes(kind))
+      assert(!marker, "Invalid/no-op target offers a drop");
+    else if (kind === "expand")
+      await until(
+        () =>
+          noteRow(window.canvasFixture.treeDragIds.a).getAttribute(
+            "aria-expanded",
+          ) === "true",
+      );
+    else if (kind === "scroll")
+      await until(
+        () =>
+          document.querySelector(".notes-library nav").scrollTop <
+          window.canvasFixture.treeDragScroll - 20,
+      );
+    else assert(marker, "No tree drop feedback");
+    if (kind.startsWith("boundary-")) {
+      const { a, child } = window.canvasFixture.treeDragIds;
+      assert(
+        marker.dataset.noteRow === (kind === "boundary-before" ? child : a),
+        "Child-gap marker jumped to the subtree end",
+      );
+      assert(
+        marker.dataset.noteDrop ===
+          (kind === "boundary-before" ? "before" : "after"),
+        "Child-gap marker is on the wrong edge",
+      );
+      assert(
+        parseFloat(getComputedStyle(marker, "::after").left) === 32,
+        "Child-gap marker lost child indentation",
+      );
+    }
+    return;
+  }
+  if (phase.startsWith("tree-drag-result-")) {
+    const kind = phase.slice("tree-drag-result-".length);
+    const { a, b, child, leaf, peer } = window.canvasFixture.treeDragIds;
+    await until(
+      () =>
+        !document.querySelector(".notes-tree-drag-preview") &&
+        !document.body.classList.contains("notes-tree-dragging"),
+    );
+    await until(
+      () => document.querySelector(".notes-save").dataset.saveState === "saved",
+    );
+    const doc = await saved(),
+      source = doc.notes.find((n) => n.id === a);
+    assert(
+      JSON.stringify(doc.blocks) === window.canvasFixture.treeDragBlocks,
+      "Tree drag rewrote content",
+    );
+    assert(
+      doc.notes.find((n) => n.id === child).parentId === a &&
+        doc.notes.find((n) => n.id === leaf).parentId === child,
+      "Tree drag broke descendants",
+    );
+    if (kind.startsWith("boundary-")) {
+      const dragged = kind === "boundary-external" ? b : peer;
+      assert(
+        doc.revision === window.canvasFixture.treeDragRevision + 1,
+        "Child-gap drop did not commit once",
+      );
+      assert(
+        doc.notes.find((n) => n.id === dragged).parentId === a,
+        "Child-gap drop used root instead of parent",
+      );
+      const children = doc.notes
+        .filter((n) => n.parentId === a)
+        .map((n) => n.id);
+      assert(
+        children[0] === dragged && children[1] === child,
+        "Child-gap drop appended after C instead of before B",
+      );
+      return { expandedParentDrop: true };
+    }
+    if (
+      ["invalid", "noop", "outside", "cancel", "expand", "scroll"].includes(
+        kind,
+      )
+    ) {
+      assert(
+        doc.revision === window.canvasFixture.treeDragRevision,
+        "Cancelled/no-op drag wrote history",
+      );
+    } else {
+      assert(
+        doc.revision === window.canvasFixture.treeDragRevision + 1,
+        "Drop did not commit exactly once",
+      );
+      assert(
+        source.parentId === (kind === "nest" ? b : undefined),
+        "Drop committed the wrong parent",
+      );
+      const roots = doc.notes.filter((n) => !n.parentId).map((n) => n.id);
+      if (kind === "reorder")
+        assert(
+          roots.indexOf(a) + 1 === roots.indexOf(b),
+          "Before drop ignored sibling order",
+        );
+      if (kind === "after")
+        assert(
+          roots.indexOf(b) + 1 === roots.indexOf(a),
+          "After drop ignored sibling order",
+        );
+      if (kind === "root")
+        assert(roots.at(-1) === a, "Root end drop did not promote");
+    }
+    return {
+      nativeNoteTreeDrag: true,
+      noteDragSubtree: true,
+      noteDragOrder: true,
+      noteDragCancel: true,
+    };
+  }
+  if (phase === "tree-drag-boundary-undone") {
+    const { a, b, child, peer } = window.canvasFixture.treeDragIds;
+    await until(async () => {
+      const doc = await saved();
+      return (
+        doc.notes
+          .filter((n) => n.parentId === a)
+          .map((n) => n.id)
+          .join("|") === [child, peer].join("|") &&
+        !doc.notes.find((n) => n.id === b).parentId
+      );
+    });
+    return;
+  }
+  if (phase === "tree-drag-undone" || phase === "tree-drag-redone") {
+    const { a, b } = window.canvasFixture.treeDragIds;
+    await until(
+      async () =>
+        (await saved()).notes.find((n) => n.id === a)?.parentId ===
+        (phase === "tree-drag-redone" ? b : undefined),
+    );
+    return;
+  }
+  const revealRow = () => noteRow(window.canvasFixture.titleRevealId);
+  if (phase === "title-reveal-prepare") {
+    document.querySelector('[aria-label="新建文稿"]').click();
+    await until(() => title()?.value === "未命名文稿");
+    input(
+      title(),
+      "长标题完整阅读体验：学习、笔记、知识与交互实验都可以放在自己的文稿树里——到这里完整结束",
+    );
+    await wait(40);
+    window.canvasFixture.titleRevealId = new URLSearchParams(
+      location.hash.split("?")[1],
+    ).get("note");
+    title().blur();
+    document.getElementById("main-content").focus();
+    await until(
+      () => document.querySelector(".notes-save").dataset.saveState === "saved",
+    );
+    window.canvasFixture.titleRevealRevision = (await saved()).revision;
+    revealRow().scrollIntoView({ block: "nearest" });
+    return;
+  }
+  if (phase === "title-reveal-idle") {
+    const row = revealRow(),
+      viewport = row.querySelector(".notes-title-viewport"),
+      tools = row.querySelector(".notes-row-actions");
+    await until(
+      () =>
+        !row.dataset.actionsVisible && getComputedStyle(tools).opacity === "0",
+    );
+    assert(
+      getComputedStyle(tools).position === "absolute" &&
+        getComputedStyle(tools).pointerEvents === "none",
+      "Hidden row actions reserve layout or intercept the title",
+    );
+    assert(
+      row.getBoundingClientRect().right -
+        viewport.getBoundingClientRect().right <
+        8,
+      "Idle title still reserves trailing action space",
+    );
+    assert(
+      !row.querySelector(".notes-title-text").getAnimations().length,
+      "Idle row title is moving",
+    );
+    window.canvasFixture.titleIdleWidth = viewport.clientWidth;
+    const rect = row.getBoundingClientRect();
+    return {
+      x: Math.round(rect.left + 55),
+      y: Math.round(rect.top + rect.height / 2),
+    };
+  }
+  if (phase === "title-reveal-hover") {
+    const row = revealRow(),
+      label = row.querySelector(".notes-title-text");
+    await until(
+      () => row.dataset.actionsVisible && label.getAnimations().length,
+    );
+    assert(
+      row.querySelector(".notes-title-viewport").clientWidth ===
+        window.canvasFixture.titleIdleWidth,
+      "Hover causes title layout to jump",
+    );
+    await until(
+      () =>
+        getComputedStyle(row.querySelector(".notes-row-actions")).opacity ===
+        "1",
+    );
+    const animation = label.getAnimations()[0],
+      timing = animation.effect.getTiming();
+    assert(
+      timing.iterations === 1 && timing.fill === "forwards",
+      "Title animation repeats or snaps back",
+    );
+    return;
+  }
+  if (phase === "title-reveal-end") {
+    const row = revealRow(),
+      label = row.querySelector(".notes-title-text"),
+      frame = row.querySelector(".notes-title-viewport");
+    label.getAnimations()[0].finish();
+    await until(() => frame.dataset.scrolledEnd === "true");
+    const tail = document.createRange();
+    tail.selectNodeContents(label);
+    tail.setStart(label.firstChild, label.textContent.length - 1);
+    assert(
+      tail.getBoundingClientRect().right <=
+        row.querySelector(".notes-row-actions").getBoundingClientRect().left -
+          2,
+      "End of title is covered by action buttons",
+    );
+    const left = label.getBoundingClientRect().left;
+    await wait(120);
+    assert(
+      Math.abs(label.getBoundingClientRect().left - left) < 0.1,
+      "Title does not remain stopped at its tail",
+    );
+    assert(
+      (await saved()).revision === window.canvasFixture.titleRevealRevision,
+      "Reading a title changed document content",
+    );
+    return;
+  }
+  if (phase === "title-reveal-reduced") {
+    const row = revealRow(),
+      label = row.querySelector(".notes-title-text"),
+      frame = row.querySelector(".notes-title-viewport");
+    await until(
+      () => !label.getAnimations().length && frame.title === label.textContent,
+    );
+    return;
+  }
+  if (phase === "title-reveal-reset") {
+    const row = revealRow(),
+      label = row.querySelector(".notes-title-text"),
+      frame = row.querySelector(".notes-title-viewport");
+    await until(
+      () => !row.dataset.actionsVisible && !label.getAnimations().length,
+    );
+    assert(
+      !frame.dataset.scrolledEnd &&
+        Math.abs(
+          label.getBoundingClientRect().left -
+            frame.getBoundingClientRect().left,
+        ) < 1,
+      "Leaving the row did not restore the title start",
+    );
+    return {
+      overlayRowActions: true,
+      titleRevealOnce: true,
+      titleTailUncovered: true,
+      titleRevealReset: true,
+    };
+  }
   if (phase === "dogfood-title-prepare") {
     const search = document.querySelector('[aria-label="搜索文稿"]');
     input(search, "no-matching-note-dogfood");
@@ -702,10 +1066,18 @@ async function checks(phase) {
     const rect = document
       .querySelector('.writing-block-gutter [aria-label="添加内容"]')
       .getBoundingClientRect();
-    return {
+    const point = {
       x: Math.round(rect.left + rect.width / 2),
       y: Math.round(rect.top + rect.height / 2),
     };
+    assert(
+      document
+        .elementFromPoint(point.x, point.y)
+        ?.closest('[aria-label="添加内容"]'),
+      "Quiet plus pointer target is covered or outside the viewport: " +
+        JSON.stringify(point),
+    );
+    return point;
   }
   if (phase === "quiet-plus-hover") {
     await until(() => document.querySelector(".writing-block-menu"));
@@ -1271,8 +1643,16 @@ async function checks(phase) {
       .querySelector(".notes-scroll")
       .getBoundingClientRect();
     assert(
-      outline.left < pane.left && outline.right <= pane.left + 1,
-      "Mobile outline does not stay in its left rail",
+      outline.left >= pane.left &&
+        outline.right <=
+          document.querySelector(".tiptap").getBoundingClientRect().left &&
+        Math.abs(
+          pane.left -
+            document
+              .querySelector(".notes-writing-area")
+              .getBoundingClientRect().left,
+        ) < 1,
+      "Mobile overlay outline reserved space or crossed the content margin",
     );
     return true;
   }
@@ -1407,7 +1787,76 @@ async function checks(phase) {
     await until(() => document.querySelector('[role="menu"]'));
     return { nativeBlockDrag: true };
   }
+  if (phase === "selection-navigation") {
+    const snapshot = await saved();
+    const originalId = new URLSearchParams(location.hash.split("?")[1]).get(
+      "note",
+    );
+    const key = "nomi:notes:local-device:selected";
+    const [first, second] = snapshot.notes;
+    const selectedId = () =>
+      document.querySelector("[data-note-row][data-selected]")?.dataset.noteRow;
+    const open = async (id) => {
+      location.hash = "/notes?note=" + encodeURIComponent(id);
+      await until(
+        () => selectedId() === id && localStorage.getItem(key) === id,
+      );
+    };
+    const canvas = async () => {
+      document.querySelector('.rail-destinations a[href="#/canvas"]').click();
+      await until(
+        () => !title() && document.querySelector('[aria-label="编辑文档 DSL"]'),
+      );
+    };
+    const notes = async (id) => {
+      document.querySelector('.rail-destinations a[href="#/notes"]').click();
+      await until(
+        () => selectedId() === id && localStorage.getItem(key) === id,
+      );
+    };
+    await open(second.id);
+    await canvas();
+    assert(
+      localStorage.getItem(key) === second.id,
+      "Leaving Notes erased selection",
+    );
+    await notes(second.id);
+    await canvas();
+    await open(first.id);
+    assert(
+      selectedId() === first.id,
+      "Explicit note link did not override remembered selection",
+    );
+    await open(second.id);
+    window.history.back();
+    await until(
+      () => selectedId() === first.id && localStorage.getItem(key) === first.id,
+    );
+    window.history.forward();
+    await until(
+      () =>
+        selectedId() === second.id && localStorage.getItem(key) === second.id,
+    );
+    await canvas();
+    localStorage.setItem(key, "deleted-note");
+    await notes(first.id);
+    assert(
+      (await saved()).revision === snapshot.revision,
+      "Selection navigation changed document revision",
+    );
+    await open(originalId);
+    return {
+      rememberedNote: true,
+      explicitNotePriority: true,
+      noteHistory: true,
+      missingNoteFallback: true,
+    };
+  }
   if (phase === "restored") {
+    assert(
+      title()?.value === "空行插入预览",
+      "Last selected note lost after reload",
+    );
     const savedWidth = Number(
       localStorage.getItem("nomi:notes:local-device:library-width"),
     );
@@ -1621,6 +2070,23 @@ async function checks(phase) {
     await wait(40);
     checkpoint("outline-table");
     const outlineEditor = await create("目录与表格预览");
+    const outlineGeometry = () =>
+      [title(), outlineEditor].map((el) => {
+        const rect = el.getBoundingClientRect();
+        return { left: rect.left, width: rect.width };
+      });
+    const withoutOutline = outlineGeometry();
+    const assertStableOutline = (phase) => {
+      const current = outlineGeometry();
+      assert(
+        current.every(
+          (rect, i) =>
+            Math.abs(rect.left - withoutOutline[i].left) < 1 &&
+            Math.abs(rect.width - withoutOutline[i].width) < 1,
+        ),
+        `Unpinned outline moved/resized content (${phase})`,
+      );
+    };
     paste(
       outlineEditor,
       "",
@@ -1642,6 +2108,7 @@ async function checks(phase) {
       "Styled Markdown table paste failed",
     );
     const outline = document.querySelector(".writing-outline");
+    assertStableOutline("first heading appeared");
     checkTasks();
     const checkbox = outlineEditor.querySelector('input[type="checkbox"]');
     checkbox.click();
@@ -1651,9 +2118,8 @@ async function checks(phase) {
     );
     assert(
       outline.getBoundingClientRect().right <=
-        document.querySelector(".notes-scroll").getBoundingClientRect().left +
-          1,
-      "Collapsed outline is not on the left",
+        outlineEditor.getBoundingClientRect().left,
+      "Collapsed outline is not inside the left content margin",
     );
     outline.dispatchEvent(
       new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }),
@@ -1661,6 +2127,7 @@ async function checks(phase) {
     await until(
       () => outline.querySelectorAll('[role="navigation"] button').length === 3,
     );
+    assertStableOutline("hover expanded");
     const sectionLinks = outline.querySelectorAll('[role="navigation"] button');
     assert(
       sectionLinks[1].dataset.level === "3",
@@ -1685,6 +2152,10 @@ async function checks(phase) {
     document.querySelector('[aria-label="固定目录"]').click();
     await until(() => outline.dataset.pinned);
     assert(
+      outlineGeometry()[0].left > withoutOutline[0].left + 1,
+      "Pinned outline did not reserve layout space",
+    );
+    assert(
       getComputedStyle(outline.querySelector(".writing-outline-panel"))
         .borderRightWidth === "0px",
       "Pinned outline still has a vertical divider",
@@ -1700,10 +2171,16 @@ async function checks(phase) {
       new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
     );
     await until(() => !document.querySelector(".writing-outline-panel"));
+    assertStableOutline("unpin and collapse");
     document.querySelector(".notes-scroll").scrollTop = 0;
     checkpoint("list-items");
     const listEditor = await create("列表项拖动回归");
     await until(() => !document.querySelector(".writing-outline"));
+    assert(
+      Math.abs(title().getBoundingClientRect().left - withoutOutline[0].left) <
+        1,
+      "Hiding outline shifted the document title",
+    );
     paste(
       listEditor,
       "<ul><li>A</li><li>B</li><li>C</li></ul><p>separator</p><ol><li>X</li><li>Y</li></ol><p>tail</p>",
@@ -2788,7 +3265,7 @@ win.setSize(390,980);await win.webContents.executeJavaScript(check('image-lightb
 `;
 const main = `const {app,BrowserWindow,clipboard}=require('electron');const {execFileSync}=require('node:child_process');const {join,dirname}=require('node:path');const {writeFileSync,readFileSync,mkdirSync}=require('node:fs');const {unzipSync}=require(${JSON.stringify(require.resolve("fflate", { paths: [join(root, "packages/ui")] }))});app.setPath('userData',join(${JSON.stringify(output)},'profile'));
 app.whenReady().then(async()=>{const win=new BrowserWindow({show:false,width:1360,height:1050,webPreferences:{sandbox:true,contextIsolation:true,backgroundThrottling:false}});win.webContents.on('console-message',event=>{if(event.message.startsWith('notes-check:')||event.level===3)console.log(event.message.slice(0,800));});const {allowsClipboardWrite}=require(join(${JSON.stringify(output)},'permissions.cjs'));const expectedUrl=require('node:url').pathToFileURL(join(${JSON.stringify(output)},'index.html')).href;win.webContents.session.setPermissionRequestHandler((contents,permission,callback,details)=>callback(allowsClipboardWrite(permission,{...details,mainFrameUrl:contents.mainFrame.url,expectedUrl})));win.webContents.session.setPermissionCheckHandler((contents,permission,_origin,details)=>!!contents&&allowsClipboardWrite(permission,{...details,mainFrameUrl:contents.mainFrame.url,expectedUrl}));let downloaded,csvDownloaded;win.webContents.session.on('will-download',(_e,item)=>{const csv=item.getFilename()==='table.csv';item.setSavePath(join(${JSON.stringify(output)},csv?'table.csv':'article.zip'));item.once('done',()=>{if(csv)csvDownloaded=true;else downloaded=true;});});
-try {await win.loadFile(join(${JSON.stringify(output)},'index.html'));const check=phase=>'('+${JSON.stringify(checks.toString())}+')('+JSON.stringify(phase)+')';const report=await win.webContents.executeJavaScript(check('initial'));if(!await win.webContents.executeJavaScript("(async()=> (await navigator.permissions.query({name:'clipboard-write'})).state==='granted' && (await navigator.permissions.query({name:'clipboard-read'})).state==='denied')()"))throw Error('Clipboard permission boundary failed');report.clipboardWritePolicy=true;
+try {await win.loadFile(join(${JSON.stringify(output)},'index.html'));const check=phase=>'('+${JSON.stringify(checks.toString())}+')('+JSON.stringify(phase)+')';const report=await win.webContents.executeJavaScript(check('initial'));Object.assign(report,await win.webContents.executeJavaScript(check('selection-navigation')));if(!await win.webContents.executeJavaScript("(async()=> (await navigator.permissions.query({name:'clipboard-write'})).state==='granted' && (await navigator.permissions.query({name:'clipboard-read'})).state==='denied')()"))throw Error('Clipboard permission boundary failed');report.clipboardWritePolicy=true;
 const runImageChecks=async()=>{win.show();app.focus({steal:true});win.focus();${imageChecks}};
 if(process.env.NOMI_CHECK_NOTE_IMAGES==='1') {await runImageChecks();writeFileSync(join(${JSON.stringify(output)},'report.json'),JSON.stringify({...report,scope:'image-interactions'},null,2));console.log(JSON.stringify(report));app.exit(0);return;}
 
@@ -2796,10 +3273,34 @@ if(process.env.NOMI_CHECK_NOTION_CLIPBOARD==='1'){await win.webContents.executeJ
 win.show();app.focus({steal:true});win.focus();await new Promise(r=>setTimeout(r,80));
 const hierarchyKey=async(redo=false)=>{for(const type of ['keyDown','keyUp'])win.webContents.sendInputEvent({type,keyCode:'Z',modifiers:redo?['meta','shift']:['meta']});await new Promise(r=>setTimeout(r,60));};
 await win.webContents.executeJavaScript(check('hierarchy-prepare'));await hierarchyKey();await win.webContents.executeJavaScript(check('hierarchy-move-undone'));await hierarchyKey(true);await win.webContents.executeJavaScript(check('hierarchy-move-redone'));await win.webContents.executeJavaScript(check('hierarchy-delete'));await hierarchyKey();const sidebarPoint=await win.webContents.executeJavaScript(check('hierarchy-restored-width-target'));win.webContents.debugger.attach('1.3');await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseMoved',...sidebarPoint});await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',buttons:1,clickCount:1,...sidebarPoint});for(let i=1;i<=6;i++){await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseMoved',button:'left',buttons:1,x:sidebarPoint.x+15*i,y:sidebarPoint.y});await new Promise(r=>setTimeout(r,20));}await win.webContents.executeJavaScript(check('hierarchy-width-in-progress'));await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',buttons:0,clickCount:1,x:sidebarPoint.x+90,y:sidebarPoint.y});win.webContents.debugger.detach();Object.assign(report,await win.webContents.executeJavaScript(check('hierarchy-width-result')));writeFileSync(join(${JSON.stringify(output)},'notes-hierarchy.png'),(await win.webContents.capturePage()).toPNG());
+await win.webContents.executeJavaScript(check('tree-drag-prepare'));
+const treeDrag = async (kind, cancel = false) => {
+  const points = await win.webContents.executeJavaScript(check('tree-drag-points-' + kind));
+  win.webContents.debugger.attach('1.3');
+  await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', {enabled:true});
+  const pointer = (type, point, down) => win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type, ...point, button: down ? 'left' : 'none', buttons: down ? 1 : 0, clickCount: type === 'mousePressed' || type === 'mouseReleased' ? 1 : 0 });
+  await pointer('mouseMoved', points.from, false);
+  await pointer('mousePressed', points.from, true);
+  for (let i = 1; i <= 10; i++) {
+    await pointer('mouseMoved', {x: Math.round(points.from.x + (points.to.x - points.from.x) * i / 10), y: Math.round(points.from.y + (points.to.y - points.from.y) * i / 10)}, true);
+    await new Promise(r => setTimeout(r, 15));
+  }
+  await win.webContents.executeJavaScript(check('tree-drag-preview-' + kind));
+  if (kind === 'boundary-after') writeFileSync(join(${JSON.stringify(output)},'notes-tree-child-gap.png'),(await win.webContents.capturePage()).toPNG());
+  if (kind === 'nest') writeFileSync(join(${JSON.stringify(output)},'notes-tree-drag.png'),(await win.webContents.capturePage()).toPNG());
+  if (cancel) { win.webContents.sendInputEvent({type:'keyDown',keyCode:'Escape'}); win.webContents.sendInputEvent({type:'keyUp',keyCode:'Escape'}); }
+  await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseReleased',...points.to,button:'left',buttons:0,clickCount:1});
+  win.webContents.debugger.detach();
+  Object.assign(report, await win.webContents.executeJavaScript(check('tree-drag-result-' + kind)));
+};
+for(const kind of ['boundary-after','boundary-before','boundary-external']) { await treeDrag(kind); await hierarchyKey(); await win.webContents.executeJavaScript(check('tree-drag-boundary-undone')); }
+await treeDrag('nest'); await hierarchyKey(); await win.webContents.executeJavaScript(check('tree-drag-undone')); await hierarchyKey(true); await win.webContents.executeJavaScript(check('tree-drag-redone'));
+await treeDrag('invalid'); await treeDrag('cancel', true); await treeDrag('outside'); await treeDrag('root'); await treeDrag('reorder'); await treeDrag('after'); await treeDrag('noop'); await treeDrag('expand', true); await treeDrag('scroll', true);
+await win.webContents.executeJavaScript(check('title-reveal-prepare'));win.webContents.sendInputEvent({type:'mouseMove',x:1100,y:80});const titlePoint=await win.webContents.executeJavaScript(check('title-reveal-idle'));writeFileSync(join(${JSON.stringify(output)},'notes-title-idle.png'),(await win.webContents.capturePage()).toPNG());win.webContents.sendInputEvent({type:'mouseMove',...titlePoint});await win.webContents.executeJavaScript(check('title-reveal-hover'));writeFileSync(join(${JSON.stringify(output)},'notes-title-hover.png'),(await win.webContents.capturePage()).toPNG());await win.webContents.executeJavaScript(check('title-reveal-end'));writeFileSync(join(${JSON.stringify(output)},'notes-title-end.png'),(await win.webContents.capturePage()).toPNG());win.webContents.debugger.attach('1.3');await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await win.webContents.executeJavaScript(check('title-reveal-reduced'));await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[]});win.webContents.debugger.detach();win.webContents.sendInputEvent({type:'mouseMove',x:1100,y:80});Object.assign(report,await win.webContents.executeJavaScript(check('title-reveal-reset')));
 await win.webContents.executeJavaScript(check('dogfood-title-prepare'));for(const type of ['keyDown','keyUp'])win.webContents.sendInputEvent({type,keyCode:'Enter'});await win.webContents.executeJavaScript(check('dogfood-title-result'));win.webContents.insertText('替换');await win.webContents.executeJavaScript(check('dogfood-replaced'));
 const writingHistoryKey=async(redo=false)=>{for(const type of ['keyDown','keyUp'])win.webContents.sendInputEvent({type,keyCode:'Z',modifiers:redo?['meta','shift']:['meta']});await new Promise(r=>setTimeout(r,50));};await writingHistoryKey();await win.webContents.executeJavaScript(check('dogfood-undo-selection'));await writingHistoryKey(true);await win.webContents.executeJavaScript(check('dogfood-redo-selection'));await writingHistoryKey();await win.webContents.executeJavaScript(check('dogfood-undo-selection'));win.webContents.insertText('续');Object.assign(report,await win.webContents.executeJavaScript(check('dogfood-continued')));
 const tailPoints=await win.webContents.executeJavaScript(check('tail-prepare'));for(const point of tailPoints){win.webContents.sendInputEvent({type:'mouseMove',...point});win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...point});win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...point});await win.webContents.executeJavaScript(check('tail-clicked'));}win.webContents.insertText('继续输入');Object.assign(report,await win.webContents.executeJavaScript(check('tail-typed')));
-win.show();win.focus();await new Promise(r=>setTimeout(r,80));
+win.show();app.focus({steal:true});win.focus();await new Promise(r=>setTimeout(r,80));
 const quietPoint=await win.webContents.executeJavaScript(check('quiet-input-prepare'));win.webContents.sendInputEvent({type:'mouseMove',...quietPoint});const plusPoint=await win.webContents.executeJavaScript(check('quiet-plus-target'));win.webContents.sendInputEvent({type:'mouseMove',...plusPoint});await win.webContents.executeJavaScript(check('quiet-plus-hover'));for(const type of ['mouseMove','mouseDown','mouseUp'])win.webContents.sendInputEvent({type,button:'left',clickCount:1,...quietPoint});win.webContents.insertText('静');await win.webContents.executeJavaScript(check('quiet-input-hidden'));win.webContents.sendInputEvent({type:'keyDown',keyCode:'Backspace'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'Backspace'});await win.webContents.executeJavaScript(check('quiet-delete-hidden'));win.webContents.sendInputEvent({type:'mouseMove',x:quietPoint.x-10,y:quietPoint.y});await new Promise(r=>setTimeout(r,150));const secondRow=await win.webContents.executeJavaScript(check('quiet-pointer-restored'));win.webContents.insertText('静');await new Promise(r=>setTimeout(r,80));if(await win.webContents.executeJavaScript("!!document.querySelector('.writing-block-gutter')"))throw Error('Typing in an existing paragraph left the gutter visible');win.webContents.sendInputEvent({type:'mouseMove',...secondRow});await new Promise(r=>setTimeout(r,150));Object.assign(report,await win.webContents.executeJavaScript(check('quiet-row-restored')));writeFileSync(join(${JSON.stringify(output)},'notes-quiet-gutter.png'),(await win.webContents.capturePage()).toPNG());
 const edge=await win.webContents.executeJavaScript(check('selection-edge-prepare'));win.webContents.debugger.attach('1.3');for(const offset of [0,3]){await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseMoved',x:edge.x+offset,y:edge.y});await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',buttons:1,clickCount:1,x:edge.x+offset,y:edge.y});for(let i=1;i<=8;i++){await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseMoved',button:'left',buttons:1,x:Math.round(edge.x+offset+(edge.toX-edge.x-offset)*i/8),y:Math.round(edge.y+(edge.toY-edge.y)*i/8)});await new Promise(r=>setTimeout(r,15));}await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',buttons:0,clickCount:1,x:edge.toX,y:edge.toY});Object.assign(report,await win.webContents.executeJavaScript(check('selection-edge-result')));win.webContents.sendInputEvent({type:'keyDown',keyCode:'Right'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'Right'});await new Promise(r=>setTimeout(r,180));}win.webContents.debugger.detach();
 const menuPoints=await win.webContents.executeJavaScript(check('menu-pointer-prepare'));
@@ -2835,7 +3336,7 @@ const child = spawn(require("electron"), [join(output, "main.cjs")], {
   env,
   stdio: "inherit",
 });
-const timer = setTimeout(() => child.kill("SIGKILL"), 65000);
+const timer = setTimeout(() => child.kill("SIGKILL"), 90000);
 const code = await new Promise((r) => child.once("exit", (c) => r(c ?? 1)));
 clearTimeout(timer);
 await rm(join(output, "profile"), { recursive: true, force: true });
@@ -2851,6 +3352,11 @@ if (code === 0) {
         "notes-desktop.png",
         "notes-quiet-gutter.png",
         "notes-hierarchy.png",
+        "notes-tree-drag.png",
+        "notes-tree-child-gap.png",
+        "notes-title-idle.png",
+        "notes-title-hover.png",
+        "notes-title-end.png",
         "notes-dark.png",
         "notes-context.png",
         "notes-block-menu.png",

@@ -5,13 +5,6 @@ export const workspaceShortcuts = [
   { action: "forward", label: "Go forward", key: "]", display: "]" },
   { action: "sidebar", label: "Toggle sidebar", key: "b", display: "B" },
   { action: "settings", label: "Settings", key: ",", display: "," },
-  {
-    action: "newChat",
-    label: "New chat",
-    key: "n",
-    display: "N",
-    desktopOnly: true,
-  },
   { action: "help", label: "Keyboard shortcuts", key: "/", display: "/" },
 ] as const;
 

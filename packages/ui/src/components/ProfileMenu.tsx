@@ -1,12 +1,6 @@
 import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import {
-  ArrowUpRight,
-  Gauge,
-  GitFork,
-  Settings,
-  UserRound,
-} from "lucide-react";
+import { ArrowUpRight, GitFork, Settings, UserRound } from "lucide-react";
 import { NOMI_REPOSITORY_URL } from "@nomi/core";
 import { useWorkspace } from "../workspace-context";
 import { useChatGPT } from "../chatgpt-context";
@@ -82,16 +76,7 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
             </span>
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="workspace-menu-separator" />
-          {connected && (
-            <DropdownMenu.Item
-              className="dropdown-item"
-              disabled={busy}
-              onSelect={() => navigate("usage")}
-            >
-              <Gauge size={17} strokeWidth={1.7} />
-              Usage
-            </DropdownMenu.Item>
-          )}
+
           <DropdownMenu.Item
             className="dropdown-item"
             onSelect={() => navigate("settings")}

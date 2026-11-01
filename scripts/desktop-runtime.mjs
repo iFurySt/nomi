@@ -26,7 +26,7 @@ export function desktopRuntime() {
   const identity = JSON.stringify({
     version,
     iconHash: createHash("sha256").update(readFileSync(icon)).digest("hex"),
-    schema: 4,
+    schema: 5,
     entryPath: join(root, "apps/desktop/dist/main.cjs"),
     applicationVersion: JSON.parse(
       readFileSync(join(root, "apps/desktop/package.json"), "utf8"),
@@ -81,6 +81,37 @@ export function desktopRuntime() {
       `Set :${key} ${value}`,
       plist,
     ]);
+  // Register a directory document package, not an executable application bundle.
+  for (const key of ["UTExportedTypeDeclarations", "CFBundleDocumentTypes"]) {
+    try {
+      execFileSync("/usr/libexec/PlistBuddy", ["-c", `Delete :${key}`, plist], {
+        stdio: "pipe",
+      });
+    } catch {}
+  }
+  const declarations = [
+    "Add :UTExportedTypeDeclarations array",
+    "Add :UTExportedTypeDeclarations:0 dict",
+    "Add :UTExportedTypeDeclarations:0:UTTypeIdentifier string com.ifuryst.nomi.document",
+    "Add :UTExportedTypeDeclarations:0:UTTypeDescription string Nomi Document",
+    "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo array",
+    "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo:0 string com.apple.package",
+    "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo:1 string public.composite-content",
+    "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification dict",
+    "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension array",
+    "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0 string nomi",
+    "Add :CFBundleDocumentTypes array",
+    "Add :CFBundleDocumentTypes:0 dict",
+    "Add :CFBundleDocumentTypes:0:CFBundleTypeName string Nomi Document",
+    "Add :CFBundleDocumentTypes:0:CFBundleTypeRole string Editor",
+    "Add :CFBundleDocumentTypes:0:LSHandlerRank string Owner",
+    "Add :CFBundleDocumentTypes:0:LSTypeIsPackage bool true",
+    "Add :CFBundleDocumentTypes:0:CFBundleTypeIconFile string nomi.icns",
+    "Add :CFBundleDocumentTypes:0:LSItemContentTypes array",
+    "Add :CFBundleDocumentTypes:0:LSItemContentTypes:0 string com.ifuryst.nomi.document",
+  ];
+  for (const command of declarations)
+    execFileSync("/usr/libexec/PlistBuddy", ["-c", command, plist]);
   const iconset = join(root, "apps/desktop/dist/nomi.iconset");
   mkdirSync(iconset, { recursive: true });
   for (const size of [16, 32, 128, 256, 512]) {

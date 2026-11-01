@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react";
 import tailwind from "@tailwindcss/vite";
 import { noteRuntimeVitePlugin } from "../../scripts/note-export-runtime.mjs";
 import { pdfAssetsVitePlugin } from "../../scripts/pdf-assets.mjs";
-import { dataPlugin } from "./data-plugin.ts";
 
 export default defineConfig(({ command }) => ({
   base: "./",
@@ -29,7 +28,6 @@ export default defineConfig(({ command }) => ({
   },
   preview: { host: "127.0.0.1" },
   plugins: [
-    dataPlugin(),
     noteRuntimeVitePlugin(),
     pdfAssetsVitePlugin(),
     react(),

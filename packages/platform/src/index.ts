@@ -7,17 +7,23 @@ export interface RuntimeInfo {
 declare global {
   interface Window {
     nomiDesktop?: {
+      requestUpdates?(
+        method: "status" | "check" | "automatic",
+        value?: boolean,
+      ): Promise<{
+        version: string;
+        available: boolean;
+        canCheck?: boolean;
+        automatic?: boolean;
+        reason?: string;
+      }>;
       getRuntimeInfo(): Promise<RuntimeInfo>;
-      requestData(
-        method: import("@nomi/core").DataMethod,
-        params?: unknown,
-      ): Promise<unknown>;
-      requestChatGPT?(
-        method: import("@nomi/core").ChatGPTMethod,
+      requestDocuments?(
+        method: import("@nomi/core").DocumentStorageMethod,
         params?: unknown,
       ): Promise<import("@nomi/core").ChatGPTResult<unknown>>;
-      requestArena?(
-        method: import("@nomi/core").ArenaMethod,
+      requestChatGPT?(
+        method: import("@nomi/core").ChatGPTMethod,
         params?: unknown,
       ): Promise<import("@nomi/core").ChatGPTResult<unknown>>;
       onChatGPTDelta(
@@ -37,21 +43,7 @@ export async function getRuntimeInfo(): Promise<RuntimeInfo> {
   );
 }
 export * from "./storage";
-
-export * from "./data-service";
-
-export * from "./stock-directory";
-
-export * from "./stock-logos";
-
-export * from "./stock-collection";
-export * from "./stock-research";
 export * from "./chatgpt";
-
-export * from "./fund-logos";
-
-export * from "./arena";
-
 export * from "./learning";
-
 export * from "./canvas";
+export * from "./document-directory";

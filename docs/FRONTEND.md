@@ -5,7 +5,7 @@ Nomi 当前同时维护 Electron 桌面工作台与原生 SwiftUI iPhone beta。
 ## Electron / Web
 
 - `apps/desktop` 与 `apps/web` 组合 `packages/ui` 的同一 React renderer；共享契约在 core，host 能力通过 platform 适配。
-- 桌面迁入自 AIFi 当前工作区，保留现有布局、导航、主题、设置与金融页面作为继续开发的基础，避免迁入时重做成熟交互。
+- 桌面迁入自 AIFi 当前工作区，复用布局、主题和编辑能力；0.1.0 主入口收敛为 Canvas / 文稿，删除金融页面、Learn 独立页与 Data 设置。
 - 桌面运行、ChatGPT 登录、测试、数据目录与迁入边界以 [DESKTOP.md](DESKTOP.md) 为准；设计细节参考 [桌面设计基线](design-docs/desktop-design.md)。
 - `pnpm dev:desktop` 启动开发桌面；`pnpm build && pnpm desktop` 验证构建版本；ChatGPT 能力只在桌面开放。
 - 可见文字、助手定位和新模块围绕个人工作台展开；当前本地金融工具不应被描述成已经可读所有个人或家庭资料。

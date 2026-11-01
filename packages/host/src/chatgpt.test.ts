@@ -81,7 +81,7 @@ async function authorized(
   recordUsage?: (
     record: import("../../core/src/usage").UsageRecord,
   ) => Promise<unknown>,
-  agent?: import("./codex-runtime").AgentRuntime,
+  agent?: import("./agent-runtime").AgentRuntime,
 ) {
   const s = store();
   await s.transaction((v) => {
@@ -880,7 +880,7 @@ it("opens user-selected public HTTPS sources and rejects local or credential-bea
 it("desktop runtime dispatch preserves OAuth, admission and accounting without direct inference", async () => {
   const records: any[] = [],
     events: any[] = [];
-  const agent: import("./codex-runtime").AgentRuntime = {
+  const agent: import("./agent-runtime").AgentRuntime = {
     run: vi.fn(async (r, token, _signal, emit, usage) => {
       expect(token).toBe("synthetic-access");
       expect(r.profileId).toBe("profile-1");

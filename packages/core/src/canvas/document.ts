@@ -193,6 +193,9 @@ const finite = (v: unknown, lo: number, hi: number) => {
     bad("坐标或尺寸超出范围。");
 };
 export function parseCanvasDocument(raw: unknown): CanvasDocument {
+  return validateCanvasDocument(raw, true);
+}
+function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
   if (typeof raw === "string") {
     if (raw.length > CANVAS_DOCUMENT_BYTES) bad("文档超过 2 MiB。");
     try {
@@ -538,7 +541,7 @@ export function parseCanvasDocument(raw: unknown): CanvasDocument {
       }
       text(c.label, 200);
     }
-  return structuredClone(p) as CanvasDocument;
+  return (clone ? structuredClone(p) : p) as CanvasDocument;
 }
 export type CanvasCommand =
   | {
@@ -595,6 +598,29 @@ export function applyCanvasCommands(
   if (document.revision !== baseRevision)
     bad("文档已经改变，请重新读取后应用。");
   if (!commands.length || commands.length > 600) bad("修改数量无效。");
+  // Text edits keep unrelated blocks/programs stable for the renderer and Undo.
+  // Still run the full validator, including size limits and embedded programs.
+  if (commands.every((command) => command.type === "set_markdown")) {
+    const replacements = new Map<string, CanvasBlock>();
+    for (const command of commands) {
+      const block = document.blocks.find((b) => b.id === command.id);
+      if (block?.type !== "markdown") bad("文本块已不存在。");
+      replacements.set(command.id, {
+        ...block!,
+        source: command.source,
+      } as CanvasBlock);
+    }
+    return validateCanvasDocument(
+      {
+        ...document,
+        revision: document.revision + 1,
+        blocks: document.blocks.map(
+          (block) => replacements.get(block.id) ?? block,
+        ),
+      },
+      false,
+    );
+  }
   const next = structuredClone(document);
   for (const command of commands) {
     const place = () =>

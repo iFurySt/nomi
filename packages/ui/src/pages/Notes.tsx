@@ -55,9 +55,19 @@ import "../writing/writing.css";
 export function Notes({ profile }: { profile: string }) {
   const data = useCanvasDocument(profile),
     doc = data.document;
-  const [selected, setSelected] = useState(
-    () => new URLSearchParams(location.hash.split("?")[1]).get("note") ?? "",
-  );
+  const selectionKey = `nomi:notes:${profile}:selected`;
+  const readSelection = () => {
+    const requested = new URLSearchParams(location.hash.split("?")[1]).get(
+      "note",
+    );
+    if (requested) return requested;
+    try {
+      return localStorage.getItem(selectionKey) ?? "";
+    } catch {
+      return "";
+    }
+  };
+  const [selected, setSelected] = useState(readSelection);
   const [activeText, setActiveText] = useState("");
   const [deleted, setDeleted] = useState<{ id: string; revision: number }>();
   const editors = useRef(new Map<string, Editor>());
@@ -96,13 +106,23 @@ export function Notes({ profile }: { profile: string }) {
     void data.flush();
   };
   useEffect(() => {
-    const update = () =>
-      setSelected(
-        new URLSearchParams(location.hash.split("?")[1]).get("note") ?? "",
-      );
+    const update = () => {
+      // Leaving Notes must not reset the selection before the view unmounts.
+      if (location.hash.split("?")[0] === "#/notes")
+        setSelected(readSelection());
+    };
     window.addEventListener("hashchange", update);
     return () => window.removeEventListener("hashchange", update);
-  }, []);
+  }, [selectionKey]);
+  useEffect(() => {
+    if (!doc || location.hash.split("?")[0] !== "#/notes") return;
+    try {
+      if (note) localStorage.setItem(selectionKey, note.id);
+      else localStorage.removeItem(selectionKey);
+    } catch {
+      // View preferences are optional and must never block writing.
+    }
+  }, [selectionKey, doc, note?.id]);
   useEffect(() => {
     const history = (event: KeyboardEvent) => {
       if (
@@ -305,9 +325,11 @@ export function Notes({ profile }: { profile: string }) {
       setDeletingNote(id);
     else attempt(() => deleteNote(id));
   }
-  function moveNote(id: string, parentId: string | null) {
+  function moveNote(id: string, parentId: string | null, before?: string) {
     data.endGroup();
-    data.edit([{ type: "move_note", id, parentId }]);
+    data.edit([
+      { type: "move_note", id, parentId, ...(before ? { before } : {}) },
+    ]);
     setMovingNote(undefined);
     setQuery("");
     choose(id);
@@ -658,6 +680,9 @@ export function Notes({ profile }: { profile: string }) {
           attempt(() => createNote("", "未命名文稿", parentId))
         }
         onMove={setMovingNote}
+        onDropMove={(id, move) =>
+          attempt(() => moveNote(id, move.parentId, move.before))
+        }
         onDelete={requestDelete}
       />
       <div className="notes-main">
@@ -672,12 +697,12 @@ export function Notes({ profile }: { profile: string }) {
             {data.saveError ? <TriangleAlert size={15} /> : <Check size={15} />}
           </span>
         </header>
-        {(error || data.saveError || message) && (
+        {(error || data.saveError || message || data.externalNotice) && (
           <div
             className="notes-notice"
             role={error || data.saveError ? "alert" : "status"}
           >
-            {error || data.saveError || message}
+            {error || data.saveError || message || data.externalNotice}
             {deleted && deleted.revision === doc.revision && (
               <button
                 onClick={() => {
@@ -690,6 +715,11 @@ export function Notes({ profile }: { profile: string }) {
               </button>
             )}
             {data.saveError && <button onClick={data.retry}>重试保存</button>}
+            {data.saveError && data.canReloadFromDisk && (
+              <button onClick={() => void data.reloadFromDisk()}>
+                读取磁盘版本（保留当前草稿）
+              </button>
+            )}
           </div>
         )}
         <div

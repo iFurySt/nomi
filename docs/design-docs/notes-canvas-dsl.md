@@ -12,6 +12,8 @@ Nomi DSL 是声明式文档语言，定义 Note、内容块、画布、摆放、
 
 ## 文档包
 
+2026-10-31 新提案将 `.nomi` 扩展名用于外层目录文件包，包内入口建议为 `document.json`，与本节历史示例的内部 `document.nomi` 命名不同。当前 JSON IR、KDL 文本前端及容器版本的边界见 [.nomi 文件包设计](nomi-document-package.md)；第一版已实现，准确字段见 [.nomi v1 实现契约](nomi-package-format.md)。
+
 ```text
 <document-folder>/
   document.nomi

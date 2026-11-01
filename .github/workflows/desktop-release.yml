@@ -1,0 +1,120 @@
+name: Desktop release
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing desktop-vX.Y.Z tag to build
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.19.0
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.13.1
+      - name: Validate version and install
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_ARCH: ${{ matrix.arch }}
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("apps/desktop/package.json")); if(process.env.RELEASE_TAG!==`desktop-v${p.version}` || process.arch!==process.env.RELEASE_ARCH) throw Error("Release tag/architecture mismatch");'
+          pnpm install --frozen-lockfile
+      - name: Validate application
+        run: |
+          pnpm check
+          pnpm test
+          pnpm build
+          pnpm --filter @nomi/desktop smoke
+          pnpm smoke:notes-ime
+      - name: Import signing credentials
+        env:
+          CERTIFICATE: ${{ secrets.DESKTOP_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DESKTOP_CERTIFICATE_PASSWORD }}
+          ASC_PRIVATE_KEY: ${{ secrets.DESKTOP_ASC_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          keychain_password=$(openssl rand -hex 32)
+          echo "::add-mask::$keychain_password"
+          keychain="$RUNNER_TEMP/nomi-signing.keychain-db"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          security import "$RUNNER_TEMP/developer-id.p12" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          printf '%s' "$ASC_PRIVATE_KEY" > "$RUNNER_TEMP/notary.p8"
+          rm "$RUNNER_TEMP/developer-id.p12"
+      - name: Build signed and notarized DMG
+        env:
+          NOMI_SIGN_IDENTITY: ${{ vars.DESKTOP_SIGN_IDENTITY }}
+          ASC_KEY_PATH: ${{ runner.temp }}/notary.p8
+          ASC_KEY_ID: ${{ secrets.DESKTOP_ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.DESKTOP_ASC_ISSUER_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.DESKTOP_SPARKLE_PRIVATE_KEY }}
+        run: node scripts/package-desktop.mjs
+      - name: Verify standalone release
+        run: .artifacts/desktop-release/${{ matrix.arch }}/Nomi.app/Contents/MacOS/Electron --update-smoke
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: desktop-${{ matrix.arch }}
+          if-no-files-found: error
+          path: |
+            .artifacts/desktop-release/${{ matrix.arch }}/*.dmg
+            .artifacts/desktop-release/${{ matrix.arch }}/*.sha256
+            .artifacts/desktop-release/${{ matrix.arch }}/appcast-*.xml
+      - name: Remove credentials
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/nomi-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/notary.p8" "$RUNNER_TEMP/developer-id.p12"
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: artifacts
+      - name: Publish installation files, then update feeds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^desktop-v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" --verify-tag --draft --title "Nomi ${RELEASE_TAG#desktop-v}" --notes 'Canvas 和文稿。下载对应架构的 DMG，拖入 Applications。支持 Sparkle 自动更新。'
+          # Published versioned assets are immutable: never replace an installed update's signed bytes.
+          gh release upload "$RELEASE_TAG" artifacts/*.dmg artifacts/*.sha256
+          gh release edit "$RELEASE_TAG" --draft=false --latest
+          gh release view desktop-updates >/dev/null 2>&1 || gh release create desktop-updates --title 'Desktop update feeds' --notes 'Stable Sparkle feed location. Download installers from versioned desktop releases.' --latest=false
+          gh release upload desktop-updates artifacts/appcast-*.xml --clobber

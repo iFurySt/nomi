@@ -1,31 +1,6 @@
 import { validChatReplyDetails, type ChatReplyDetails } from "./chat-content";
-export type WorkspacePage =
-  | "canvas"
-  | "notes"
-  | "learn"
-  | "stocks"
-  | "agents"
-  | "research"
-  | "watchlist"
-  | "arena"
-  | "portfolio"
-  | "library"
-  | "settings"
-  | "usage";
-export const workspacePages: WorkspacePage[] = [
-  "canvas",
-  "notes",
-  "learn",
-  "stocks",
-  "agents",
-  "research",
-  "watchlist",
-  "arena",
-  "portfolio",
-  "library",
-  "settings",
-  "usage",
-];
+export type WorkspacePage = "canvas" | "notes" | "settings";
+export const workspacePages: WorkspacePage[] = ["canvas", "notes", "settings"];
 export type Cadence = "Daily" | "Weekly" | "On demand";
 export type Theme = "system" | "light" | "dark";
 export interface Agent {

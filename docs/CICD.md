@@ -57,3 +57,7 @@ iOS 发布的固定信息：
 ## 桌面本地验证
 
 `pnpm install --frozen-lockfile` 后运行 `pnpm check`、`pnpm test`、`pnpm check:desktop-go`、`pnpm build` 和 `pnpm smoke:desktop`。`pnpm smoke:desktop` 包含默认 Canvas 与 Learn 回归，`pnpm smoke:learning` / `pnpm smoke:canvas` 可单独运行；有 swiftc 的机器可额外运行 `pnpm check:interactive-native`。ChatGPT / Codex / MCP 合成检查见 `docs/DESKTOP.md`。`make ci` 继续保持轻量仓库门禁，不代表执行全部桌面测试；桌面打包、签名、公证和自动分发留待实际发布需求。
+
+## Desktop release
+
+`desktop-v*` 自动构建 Apple Silicon / Intel DMG，签名、公证和隔离 smoke 后发布。凭据配置、稳定 appcast 地址与恢复方式见 [DESKTOP_RELEASE.md](DESKTOP_RELEASE.md)。此流水线不执行 server 部署。

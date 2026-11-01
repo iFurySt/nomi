@@ -1,4 +1,8 @@
 import {
+  documentRequest,
+  documentDirectoryAvailable,
+} from "./document-directory";
+import {
   parseCanvasDocument,
   CANVAS_ASSET_BYTES,
   type CanvasDocument,
@@ -10,6 +14,8 @@ export interface CanvasAssetWrite {
   blob: Blob;
 }
 export interface CanvasRepository {
+  externalChanges?: boolean;
+  backup?(document: CanvasDocument, assets: CanvasAssetWrite[]): Promise<void>;
   load(): Promise<CanvasDocument | undefined>;
   save(
     document: CanvasDocument,
@@ -85,7 +91,7 @@ export async function canvasImageMime(blob: Blob): Promise<string | undefined> {
   return undefined;
 }
 /** Atomic metadata + originals; local profile scope is not a server access grant. */
-export function createCanvasRepository(
+export function createIndexedDBCanvasRepository(
   profile: string,
   documentId = "document.home",
 ): CanvasRepository {
@@ -213,4 +219,84 @@ export function writeCanvasCamera(
   } catch {
     return false;
   }
+}
+
+/** Desktop owns durable files; IndexedDB is a preserved migration source only. */
+export function createCanvasRepository(
+  profile: string,
+  documentId = "document.home",
+): CanvasRepository {
+  const legacy = createIndexedDBCanvasRepository(profile, documentId);
+  if (!documentDirectoryAvailable()) return legacy;
+  const scope = { profile, documentId };
+  return {
+    externalChanges: true,
+    async backup(document, assets) {
+      await documentRequest("backup", {
+        ...scope,
+        document,
+        baseRevision: null,
+        assets: await Promise.all(
+          assets.map(async ({ asset, blob }) => ({
+            asset,
+            bytes: new Uint8Array(await blob.arrayBuffer()),
+          })),
+        ),
+      });
+    },
+    async load() {
+      const saved = await documentRequest<CanvasDocument | undefined>(
+        "load",
+        scope,
+      );
+      if (saved) return parseCanvasDocument(saved);
+      const previous = await legacy.load();
+      if (!previous) return;
+      const assets = await Promise.all(
+        previous.assets.map(async (asset) => {
+          const blob = await legacy.asset(asset.id);
+          if (!blob) throw Error("迁移失败：缺少附件原件，原数据已保留。");
+          return { asset, bytes: new Uint8Array(await blob.arrayBuffer()) };
+        }),
+      );
+      try {
+        await documentRequest("save", {
+          ...scope,
+          document: previous,
+          assets,
+          baseRevision: null,
+        });
+      } catch (error) {
+        // A concurrent mount may have completed the same migration first.
+        const winner = await documentRequest<CanvasDocument | undefined>(
+          "load",
+          scope,
+        );
+        if (winner) return parseCanvasDocument(winner);
+        throw error;
+      }
+      return previous;
+    },
+    async save(document, assets, baseRevision) {
+      await documentRequest("save", {
+        ...scope,
+        document,
+        baseRevision,
+        assets: await Promise.all(
+          assets.map(async ({ asset, blob }) => ({
+            asset,
+            bytes: new Uint8Array(await blob.arrayBuffer()),
+          })),
+        ),
+      });
+    },
+    async asset(id) {
+      const result = await documentRequest<
+        { bytes: Uint8Array; mime: string } | undefined
+      >("asset", { ...scope, id });
+      return result
+        ? new Blob([new Uint8Array(result.bytes)], { type: result.mime })
+        : undefined;
+    },
+  };
 }

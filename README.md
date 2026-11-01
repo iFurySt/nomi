@@ -8,14 +8,14 @@ Nomi 是个人一站式工作台：把学习、笔记、信息 hub、知识、�
 
 ## 当前状态
 
-- **Electron 桌面工作台**：从 AIFi 当前工作区迁入，保留成熟的布局、导航、主题、搜索、设置、本地存储、ChatGPT 登录、多账号、模型选择、Codex 对话与使用记录。现有股票研究、观察列表、组合与虚拟 Arena 暂时保留，后续按 Nomi 需求裁剪。
+- **Electron 桌面 0.1.0**：Canvas 与文稿，支持 Markdown / LaTeX、图片、文件、表格、交互内容与 `.nomi` 文件包。macOS DMG 和 Sparkle 更新见 [发布说明](docs/DESKTOP_RELEASE.md)。保留 ChatGPT 连接以供后续文稿 AI 扩展；已移除金融页面与桌面 Go 服务。
 - **iOS + Go server private beta**：已有家庭账号、一次性邀请、成员档案、资料上传、异步整理与带来源引用的连续对话。原件和长期上下文在独立 household filesystem workspace，权限与任务在 Postgres。
-- **画布与笔记**：默认 Canvas 承载笔记、公式、图片 / 文件和交互块，结构与附件原件存本机 IndexedDB，摄像机与个人参数单独保存。
-- **交互学习**：声明式 IR 驱动控件、LaTeX、曲线与本地计算，可从 Learn 进入；不依赖模型请求。完整笔记产品能力、信息 hub、跨领域知识与完整财富管理仍待扩展。桌面和 server 的身份、数据及 AI 执行路径当前独立，尚无跨端同步。
+- **画布与笔记**：默认 Canvas 承载笔记、公式、图片 / 文件和交互块，桌面结构与附件原件保存为本机 `.nomi` 文件包，浏览器预览使用 IndexedDB，摄像机与个人参数单独保存。
+- **交互学习**：声明式 IR 驱动控件、LaTeX、曲线与本地计算，可在 Canvas / 文稿中嵌入；不依赖模型请求。完整笔记产品能力、信息 hub、跨领域知识与完整财富管理仍待扩展。桌面和 server 的身份、数据及 AI 执行路径当前独立，尚无跨端同步。
 
 ## 桌面本地运行
 
-需要 Node.js 24+、pnpm 10+ 和 Go 1.26.1+；依赖版本以 lockfile 为准。
+需要 Node.js 24+ 和 pnpm 10+；依赖版本以 lockfile 为准。
 
 ```sh
 pnpm install --frozen-lockfile
@@ -28,7 +28,6 @@ pnpm desktop
 ```sh
 pnpm check
 pnpm test
-pnpm check:desktop-go
 pnpm smoke:desktop
 pnpm check:interactive-native # 需要 swiftc
 make ci
@@ -68,7 +67,7 @@ xcodebuild -project apps/ios/Nomi.xcodeproj \
 - [家庭资料 beta 范围](docs/product-specs/family-private-beta.md)
 - [安全](docs/SECURITY.md) · [部署](docs/DEPLOYMENT.md)
 
-Server 通过 `server-v*` tag 发布到 GHCR 并部署 amoylab；桌面迁入不触发发布。
+Server 通过 `server-v*` tag 发布到 GHCR 并部署 amoylab；桌面通过 `desktop-v*` tag 自动构建签名、公证的 DMG 与 Sparkle feed。
 
 ## 许可证
 

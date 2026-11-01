@@ -135,5 +135,6 @@ export const InteractiveBlock = memo(
     a.profile === b.profile &&
     a.documentId === b.documentId &&
     a.blockId === b.blockId &&
-    JSON.stringify(a.program) === JSON.stringify(b.program),
+    (a.program === b.program ||
+      JSON.stringify(a.program) === JSON.stringify(b.program)),
 );

@@ -9,6 +9,39 @@ import {
   type CanvasResizeDirection,
 } from "./document";
 describe("canvas document semantics", () => {
+  it("shares untouched content during text edits without mutating undo snapshots", () => {
+    const before = createCanvasDocument();
+    const frozen = structuredClone(before);
+    const target = before.blocks.find((block) => block.type === "markdown")!;
+    const next = applyCanvasCommands(before, before.revision, [
+      { type: "set_markdown", id: target.id, source: "新的正文" },
+      { type: "set_markdown", id: target.id, source: "最终正文" },
+    ]);
+    expect(before).toEqual(frozen);
+    expect(next.blocks.find((block) => block.id === target.id)).toMatchObject({
+      source: "最终正文",
+    });
+    expect(next.notes).toBe(before.notes);
+    expect(next.board).toBe(before.board);
+    for (const block of before.blocks.filter((block) => block.id !== target.id))
+      expect(next.blocks.find((candidate) => candidate.id === block.id)).toBe(
+        block,
+      );
+    expect(parseCanvasDocument(next)).toEqual(next);
+    expect(() =>
+      applyCanvasCommands(before, before.revision, [
+        { type: "set_markdown", id: target.id, source: "x".repeat(300_000) },
+      ]),
+    ).toThrow();
+    expect(before).toEqual(frozen);
+    const invalid = structuredClone(before);
+    invalid.board.placements[0].width = -1;
+    expect(() =>
+      applyCanvasCommands(invalid, invalid.revision, [
+        { type: "set_markdown", id: target.id, source: "仍须校验整个文档" },
+      ]),
+    ).toThrow();
+  });
   it("accepts empty optional titles and legacy auto heights without rewriting either", () => {
     const original = createCanvasDocument();
     const next = applyCanvasCommands(original, original.revision, [

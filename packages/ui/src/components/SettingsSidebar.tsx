@@ -1,13 +1,5 @@
 import { useState } from "react";
-import {
-  Sun,
-  Database,
-  Plug,
-  KeyRound,
-  RefreshCw,
-  Search,
-  Sparkles,
-} from "lucide-react";
+import { Sun, Settings2, Search, Sparkles } from "lucide-react";
 import type { SettingsSection } from "@nomi/core";
 import { useWorkspace } from "../workspace-context";
 export const settingItems: {
@@ -16,12 +8,9 @@ export const settingItems: {
   group: string;
   icon: typeof Sun;
 }[] = [
+  { id: "general", label: "General", group: "Personal", icon: Settings2 },
   { id: "appearance", label: "Appearance", group: "Personal", icon: Sun },
   { id: "chatgpt", label: "ChatGPT", group: "Personal", icon: Sparkles },
-  { id: "sources", label: "Data sources", group: "Data", icon: Plug },
-  { id: "keys", label: "API keys", group: "Data", icon: KeyRound },
-  { id: "sync", label: "Sync", group: "Data", icon: RefreshCw },
-  { id: "storage", label: "Storage", group: "Data", icon: Database },
 ];
 export function SettingsSidebar({ onSelect }: { onSelect?: () => void }) {
   const { settingsSection } = useWorkspace();
@@ -39,7 +28,7 @@ export function SettingsSidebar({ onSelect }: { onSelect?: () => void }) {
         />
       </label>
       <nav aria-label="Settings categories">
-        {["Personal", "Data"].map((group) => (
+        {["Personal"].map((group) => (
           <div className="settings-nav-group" key={group}>
             <small>{group}</small>
             {settingItems

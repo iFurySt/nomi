@@ -1,0 +1,78 @@
+{
+  "format": "nomi-package",
+  "version": 1,
+  "kind": "note",
+  "packageId": "note.start",
+  "fileName": "学习计划.nomi",
+  "publishedTitle": "学习计划",
+  "references": {},
+  "childOrder": [
+    "note.questions"
+  ],
+  "noteOrder": [],
+  "assetPaths": {
+    "asset.example": "assets/972c76a4c46efd8f6a8bccb21148b1ec73bf6a931f6d7a7aed9a3074d6377d72.bin"
+  },
+  "document": {
+    "schema": "nomi-document-ir/draft-1",
+    "id": "document.home",
+    "title": "学习计划",
+    "revision": 1,
+    "notes": [
+      {
+        "id": "note.start",
+        "title": "学习计划",
+        "blocks": [
+          "text.start",
+          "interactive.temperature",
+          "file.example"
+        ]
+      }
+    ],
+    "blocks": [
+      {
+        "id": "text.start",
+        "type": "markdown",
+        "source": "text/text.start.md"
+      },
+      {
+        "id": "interactive.temperature",
+        "type": "interactive",
+        "source": "interactive/interactive.temperature.nomi-ui.json"
+      },
+      {
+        "id": "file.example",
+        "type": "file",
+        "asset": "asset.example"
+      }
+    ],
+    "assets": [
+      {
+        "id": "asset.example",
+        "name": "说明.txt",
+        "mime": "text/plain",
+        "bytes": 33,
+        "sha256": "972c76a4c46efd8f6a8bccb21148b1ec73bf6a931f6d7a7aed9a3074d6377d72"
+      }
+    ],
+    "board": {
+      "id": "board.main",
+      "placements": [
+        {
+          "id": "place.start",
+          "content": "note.start",
+          "x": 0,
+          "y": 0,
+          "width": 430
+        },
+        {
+          "id": "place.temperature",
+          "content": "interactive.temperature",
+          "x": 500,
+          "y": 0,
+          "width": 700
+        }
+      ]
+    }
+  }
+}

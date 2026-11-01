@@ -1,7 +1,6 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
-await import("./build-data-service.mjs");
 const root = fileURLToPath(new URL("../", import.meta.url));
 const web = spawn(
   process.execPath,

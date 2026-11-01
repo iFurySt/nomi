@@ -5,13 +5,13 @@
 ## 默认控制项
 
 - 所有 GitHub Actions 都固定到不可变的 commit SHA，而不是漂移的版本标签。
-- 当前保留的自动化发布只覆盖 `apps/server` Docker 镜像构建、GHCR 推送和 amoylab 部署。
+- 当前自动化发布覆盖桌面签名 / 公证 DMG（见 `DESKTOP_RELEASE.md`）和 `apps/server` Docker 镜像构建、GHCR 推送和 amoylab 部署。
 - 通用 release、SBOM、provenance、Dependency Review 和 OSV 扫描暂不保留占位 workflow；重新接入时必须绑定真实构建产物、依赖清单和明确失败策略。
 
 ## 桌面依赖与来源
 
 - Node / pnpm 版本和 pnpm lockfile 纳入版本管理；`pnpm install --frozen-lockfile` 安装迁入的精确依赖。
-- Codex runtime 固定 `0.160.0`，构建携带 `third_party/codex` 的 Apache-2.0 声明；升级需重新验证协议。
+- 桌面不再分发 Codex CLI。Sparkle 2.10.1 固定官方 SHA-256，随 App 携带许可；发布文件 Ed25519 签名并经 Apple 公证。
 - 迁入的 AIFi 代码及修改保留 AGPL-3.0-only；根目录 `NOTICE` 与 `LICENSE.aifi` 明确范围，既有 MIT Nomi 代码不混标。
 - 不复制源仓库二进制、node_modules、账号凭据或个人数据；桌面构建在本仓库重新生成。
 

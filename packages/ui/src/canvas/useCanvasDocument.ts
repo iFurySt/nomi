@@ -21,6 +21,7 @@ function useCanvasDocumentState(profile: string) {
   const [document, setDocument] = useState<CanvasDocument>();
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [externalNotice, setExternalNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [, renderHistory] = useState(0);
@@ -147,6 +148,80 @@ function useCanvasDocumentState(profile: string) {
       delayed.cancel();
     };
   }, [delayed]);
+  const acceptExternal = (saved: CanvasDocument) => {
+    base.current = saved.revision;
+    current.current = saved;
+    setDocument(saved);
+    history.current = { undo: [], redo: [] };
+    renderHistory((n) => n + 1);
+  };
+  useEffect(() => {
+    if (!repository.externalChanges) return;
+    let cancelled = false,
+      checking = false;
+    const refresh = async () => {
+      if (checking || !current.current || pending.current || running.current)
+        return;
+      checking = true;
+      const before = current.current;
+      try {
+        const saved = await repository.load();
+        if (
+          !cancelled &&
+          current.current === before &&
+          !pending.current &&
+          !running.current &&
+          saved
+        ) {
+          if (saved.revision !== base.current) {
+            acceptExternal(saved);
+            setExternalNotice("");
+          }
+          setSaveError("");
+        }
+      } catch (e) {
+        if (!cancelled) setSaveError((e as Error).message);
+      } finally {
+        checking = false;
+      }
+    };
+    const onFocus = () => {
+      void refresh();
+    };
+    const timer = setInterval(() => {
+      if (window.document.visibilityState === "visible") void refresh();
+    }, 1500);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [repository]);
+  const reloadFromDisk = async () => {
+    if (!repository.backup) return;
+    delayed.cancel();
+    if (inFlight.current) await inFlight.current;
+    const before = current.current;
+    if (!before) return;
+    try {
+      await repository.backup(before, [...originals.current.values()]);
+      const saved = await repository.load();
+      if (!saved) throw Error("磁盘文稿不存在，当前编辑已保留。");
+      if (current.current !== before)
+        throw Error("正在继续编辑，请暂停输入后重新读取。");
+      pending.current = undefined;
+      originals.current.clear();
+      acceptExternal(saved);
+      setDirty(false);
+      setSaveError("");
+      setExternalNotice(
+        "已读取磁盘版本，原编辑已备份到文稿目录的 .nomi-history 中。",
+      );
+    } catch (e) {
+      setSaveError((e as Error).message);
+    }
+  };
   const install = (doc: CanvasDocument, debounce = false) => {
     current.current = doc;
     setDocument(doc);
@@ -218,6 +293,9 @@ function useCanvasDocumentState(profile: string) {
     repository: viewRepository,
     loadError,
     saveError,
+    externalNotice,
+    canReloadFromDisk: !!repository.backup,
+    reloadFromDisk,
     saving,
     dirty,
     flush: () => persistRef.current(),

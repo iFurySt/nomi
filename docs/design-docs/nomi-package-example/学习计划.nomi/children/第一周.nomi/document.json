@@ -1,0 +1,47 @@
+{
+  "format": "nomi-package",
+  "version": 1,
+  "kind": "note",
+  "packageId": "note.questions",
+  "fileName": "第一周.nomi",
+  "publishedTitle": "第一周",
+  "references": {},
+  "childOrder": [],
+  "noteOrder": [],
+  "assetPaths": {},
+  "document": {
+    "schema": "nomi-document-ir/draft-1",
+    "id": "document.home",
+    "title": "第一周",
+    "revision": 1,
+    "notes": [
+      {
+        "id": "note.questions",
+        "title": "第一周",
+        "blocks": [
+          "text.questions"
+        ]
+      }
+    ],
+    "blocks": [
+      {
+        "id": "text.questions",
+        "type": "markdown",
+        "source": "text/text.questions.md"
+      }
+    ],
+    "assets": [],
+    "board": {
+      "id": "board.main",
+      "placements": [
+        {
+          "id": "place.questions",
+          "content": "note.questions",
+          "x": 0,
+          "y": 410,
+          "width": 430
+        }
+      ]
+    }
+  }
+}

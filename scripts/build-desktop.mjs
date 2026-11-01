@@ -4,8 +4,6 @@ import { resolve } from "node:path";
 import { copyFileSync, mkdirSync } from "node:fs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-await import("./build-data-service.mjs");
-await import("./bundle-codex.mjs");
 await build({
   entryPoints: {
     main: resolve(root, "apps/desktop/src/main.ts"),

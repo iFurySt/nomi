@@ -3,13 +3,13 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "nomiDesktop",
   Object.freeze({
+    requestUpdates: (method: string, value?: boolean) =>
+      ipcRenderer.invoke("nomi:updates", method, value),
     getRuntimeInfo: () => ipcRenderer.invoke("nomi:runtime-info"),
-    requestData: (method: string, params?: unknown) =>
-      ipcRenderer.invoke("nomi:data", method, params),
+    requestDocuments: (method: string, params?: unknown) =>
+      ipcRenderer.invoke("nomi:documents", method, params),
     requestChatGPT: (method: string, params?: unknown) =>
       ipcRenderer.invoke("nomi:chatgpt", method, params),
-    requestArena: (method: string, params?: unknown) =>
-      ipcRenderer.invoke("nomi:arena", method, params),
     onChatGPTDelta: (
       callback: (event: { requestId: string; text: string }) => void,
     ) => {

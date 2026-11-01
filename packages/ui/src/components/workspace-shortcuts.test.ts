@@ -24,9 +24,9 @@ describe("workspace shortcuts", () => {
       ).toBe(action);
     }
   });
-  it("preserves browser New Window while offering desktop New Chat", () => {
+  it("does not intercept removed Chat shortcuts", () => {
     expect(workspaceShortcut(key("n"), false)).toBeUndefined();
-    expect(workspaceShortcut(key("n"), true)).toBe("newChat");
+    expect(workspaceShortcut(key("n"), true)).toBeUndefined();
   });
   it("ignores typing, composition and additional modifiers", () => {
     for (const extras of [

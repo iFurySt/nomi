@@ -2,7 +2,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "../../packages/ui/src/App";
-import { emptyResearch } from "@nomi/core";
 import { createCanvasRepository } from "@nomi/platform";
 import "../../packages/ui/src/styles.css";
 import { createCanvasExampleImage } from "../../packages/ui/src/canvas/examples";
@@ -84,9 +83,6 @@ window.nomiDesktop = {
     version: "fixture",
     platform: "darwin",
   }),
-  requestData: async () => {
-    throw Error("No data bridge.");
-  },
 };
 const put = IDBObjectStore.prototype.put;
 IDBObjectStore.prototype.put = function (value: any, key?: IDBValidKey) {
@@ -97,20 +93,6 @@ IDBObjectStore.prototype.put = function (value: any, key?: IDBValidKey) {
 };
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App
-      directory={{
-        search: async (query) => ({
-          scope: "candidates",
-          snapshotId: "fixture",
-          offset: query.offset,
-          total: 0,
-          items: [],
-        }),
-        get: async () => ({ snapshotId: "fixture", item: null }),
-      }}
-      logos={{ get: async () => null }}
-      fundLogos={{ get: async () => null }}
-      stockResearch={{ get: async (symbol) => emptyResearch(symbol) }}
-    />
+    <App />
   </React.StrictMode>,
 );

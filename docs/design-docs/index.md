@@ -15,6 +15,11 @@
 
 ## 笔记与无限画布
 
+- [长文与混排性能](notes-performance.md)：可重复 Electron 压测、实测结果、文本结构共享 / 渲染隔离和下一阶段边界。
+
+- [.nomi 文稿文件包提案](nomi-document-package.md)：目录作为单个文稿、包内 DSL / 资产、嵌套子文稿、外部 AI 编辑及迁移的设计基线。
+- [.nomi v1 实现契约](nomi-package-format.md)：当前字段、目录结构、AI 编辑规则、共享引用与首版边界。
+
 - [文稿编辑与文章导出](notes-authoring.md)：Canvas 同源 Note 的富文本 / Markdown 视图、公式、交互实验、附件、Markdown / Jekyll 包和离线阅读运行时。
 
 - [画布主工作区实现](canvas-workspace-runtime.md)：默认 Canvas、世界坐标、长笔记、附件 / 原件、交互块、撤销与 IndexedDB 恢复。

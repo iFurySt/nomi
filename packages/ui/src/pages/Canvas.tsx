@@ -2824,10 +2824,15 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
           })}
         </aside>
       )}
-      {(message || data.saveError) && (
+      {(message || data.saveError || data.externalNotice) && (
         <div className="canvas-message" role="alert">
-          {message || data.saveError}
+          {message || data.saveError || data.externalNotice}
           {data.saveError && <button onClick={data.retry}>重试保存</button>}
+          {data.saveError && data.canReloadFromDisk && (
+            <button onClick={() => void data.reloadFromDisk()}>
+              读取磁盘版本（保留当前草稿）
+            </button>
+          )}
           <button aria-label="关闭提示" onClick={() => setMessage("")}>
             <X size={14} />
           </button>

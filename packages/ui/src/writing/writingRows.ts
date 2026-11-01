@@ -18,9 +18,10 @@ export function writingRows(
       after,
       draft: true,
     });
+  const blocks = new Map(document.blocks.map((block) => [block.id, block]));
   let previous: CanvasBlock | undefined;
   for (const id of note.blocks) {
-    const block = document.blocks.find((b) => b.id === id)!;
+    const block = blocks.get(id)!;
     if (
       block.type === "markdown" &&
       !block.source.trim() &&

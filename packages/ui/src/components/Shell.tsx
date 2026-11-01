@@ -1,43 +1,24 @@
-import { SkeletonRows } from "./Skeleton";
 import {
   PanelsTopLeft,
   FileText,
-  FlaskConical,
-  Bot,
-  MessageCircle,
-  Star,
-  PieChart,
-  Trophy,
-  BookOpen,
   Search,
   Menu,
   Sun,
   Moon,
   FolderOpen,
-  ChartNoAxesCombined,
   ArrowLeft,
   ArrowRight,
   PanelLeft,
   Settings,
-  Gauge,
-  SquarePen,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import {
-  workspacePages,
-  stockHref,
-  stockDisplayName,
-  validDirectorySymbol,
-} from "@nomi/core";
+import { workspacePages } from "@nomi/core";
 import { useWorkspace, pageLabels } from "../workspace-context";
 import { IconButton, Logo, Modal } from "./primitives";
 import type { ReactNode, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useWorkspaceHistory } from "./useWorkspaceHistory";
 import { ProfileMenu } from "./ProfileMenu";
-import { ChatSidebar } from "./ChatSidebar";
 import { SettingsSidebar } from "./SettingsSidebar";
-import { useDirectorySearch } from "../stock-directory-context";
-import { StockSidebar } from "./StockSidebar";
 import {
   workspaceShortcut,
   workspaceShortcuts,
@@ -46,14 +27,6 @@ import {
 const destinations = [
   { page: "canvas", icon: PanelsTopLeft },
   { page: "notes", icon: FileText },
-  { page: "learn", icon: FlaskConical },
-  { page: "stocks", icon: ChartNoAxesCombined },
-  { page: "research", icon: MessageCircle },
-  { page: "agents", icon: Bot },
-  { page: "watchlist", icon: Star },
-  { page: "arena", icon: Trophy },
-  { page: "portfolio", icon: PieChart },
-  { page: "library", icon: BookOpen },
 ] as const;
 function AppNavigation({
   mobile = false,
@@ -62,7 +35,7 @@ function AppNavigation({
   mobile?: boolean;
   onNavigate?: () => void;
 }) {
-  const { page, stockRoute } = useWorkspace();
+  const { page } = useWorkspace();
   return (
     <nav
       className={mobile ? "mobile-app-navigation" : "rail-destinations"}
@@ -71,11 +44,7 @@ function AppNavigation({
       {destinations.map(({ page: target, icon: Icon }) => (
         <a
           key={target}
-          href={
-            target === "stocks"
-              ? stockHref(stockRoute.symbol, stockRoute.tab)
-              : `#/${target}`
-          }
+          href={`#/${target}`}
           className={`rail-button ${page === target ? "selected" : ""}`}
           title={pageLabels[target]}
           aria-label={pageLabels[target]}
@@ -91,31 +60,37 @@ function AppNavigation({
 }
 export function Shell({ children }: { children: ReactNode }) {
   const {
-    workspace,
     resolvedTheme,
     update,
     page,
     navigate,
     storageError,
-    openStock,
-    stockRoute,
     settingsSection,
-    openConversation,
   } = useWorkspace();
   const desktop = !!window.nomiDesktop;
-  const drawerQuery =
-    page === "stocks" ? "(max-width: 1279px)" : "(max-width: 899px)";
+  const drawerQuery = "(max-width: 899px)";
   const PageIcon =
     destinations.find((destination) => destination.page === page)?.icon ??
-    (page === "usage" ? Gauge : Settings);
+    Settings;
   useLayoutEffect(() => {
-    if (page !== "research")
-      document
-        .getElementById("main-content")
-        ?.scrollTo({ top: 0, behavior: "instant" });
-  }, [page, stockRoute.symbol, stockRoute.tab, settingsSection]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [stockQuery, setStockQuery] = useState("");
+    document
+      .getElementById("main-content")
+      ?.scrollTo({ top: 0, behavior: "instant" });
+  }, [page, settingsSection]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("nomi.sidebar-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("nomi.sidebar-collapsed", String(sidebarCollapsed));
+    } catch {
+      /* Session-only when storage is unavailable. */
+    }
+  }, [sidebarCollapsed]);
   const routeHistory = useWorkspaceHistory();
   const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(() => {
@@ -128,12 +103,10 @@ export function Shell({ children }: { children: ReactNode }) {
     return () => query.removeEventListener("change", closeWideDrawer);
   }, [drawerQuery]);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [demoOpen, setDemoOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const searchResults = useRef<HTMLDivElement>(null);
   const modifier = shortcutModifier();
-  const directoryResults = useDirectorySearch(search, 12, 0, searchOpen);
   useEffect(() => {
     function keydown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
@@ -147,7 +120,8 @@ export function Shell({ children }: { children: ReactNode }) {
       // Preserve editor formatting and avoid changing a form behind a dialog.
       if (
         (action === "sidebar" && editing) ||
-        ((action === "newChat" || (action === "sidebar" && !mobileOpen)) &&
+        (action === "sidebar" &&
+          !mobileOpen &&
           document.querySelector('[role="dialog"],[role="alertdialog"]'))
       )
         return;
@@ -155,7 +129,6 @@ export function Shell({ children }: { children: ReactNode }) {
       if (event.repeat) return;
       setSearchOpen(action === "search" ? !searchOpen : false);
       setShortcutsOpen(action === "help" ? !shortcutsOpen : false);
-      setDemoOpen(false);
       setMobileOpen(false);
       switch (action) {
         case "search":
@@ -174,14 +147,6 @@ export function Shell({ children }: { children: ReactNode }) {
           if (matchMedia(drawerQuery).matches) setMobileOpen(!mobileOpen);
           else setSidebarCollapsed((value) => !value);
           break;
-        case "newChat":
-          openConversation(null);
-          requestAnimationFrame(() =>
-            document
-              .querySelector<HTMLTextAreaElement>(".research-composer textarea")
-              ?.focus(),
-          );
-          break;
       }
     }
     window.addEventListener("keydown", keydown);
@@ -190,7 +155,6 @@ export function Shell({ children }: { children: ReactNode }) {
     desktop,
     drawerQuery,
     navigate,
-    openConversation,
     routeHistory,
     searchOpen,
     shortcutsOpen,
@@ -233,24 +197,6 @@ export function Shell({ children }: { children: ReactNode }) {
   const matches = workspacePages.filter((p) =>
     pageLabels[p].toLowerCase().includes(search.toLowerCase()),
   );
-  const demoBadge =
-    page === "canvas" ||
-    page === "notes" ||
-    page === "learn" ||
-    page === "usage" ||
-    page === "arena" ||
-    page === "settings" ||
-    page === "stocks" ||
-    page === "watchlist" ||
-    page === "research" ? null : (
-      <button
-        className="demo-badge"
-        aria-label="About demo data"
-        onClick={() => setDemoOpen(true)}
-      >
-        Demo
-      </button>
-    );
   const toolbarActions = (
     <div className="topbar-actions">
       <button
@@ -292,7 +238,9 @@ export function Shell({ children }: { children: ReactNode }) {
           title={`${sidebarCollapsed ? "Expand" : "Collapse"} sidebar (${modifier}B)`}
           aria-keyshortcuts="Meta+b Control+b"
           aria-expanded={!sidebarCollapsed}
-          aria-controls="workspace-sidebar"
+          aria-controls={
+            page === "notes" ? "notes-library" : "workspace-sidebar"
+          }
           onClick={() => setSidebarCollapsed((value) => !value)}
         >
           <PanelLeft size={18} />
@@ -300,28 +248,19 @@ export function Shell({ children }: { children: ReactNode }) {
       </span>
       <span className="mobile-menu">
         <IconButton
-          label={page === "stocks" ? "Open stock list" : "Open navigation"}
-          title={`${page === "stocks" ? "Open stock list" : "Open navigation"} (${modifier}B)`}
+          label="Open navigation"
+          title={`Open navigation (${modifier}B)`}
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen(true)}
         >
-          {page === "stocks" ? <PanelLeft size={18} /> : <Menu size={19} />}
+          <Menu size={19} />
         </IconButton>
       </span>
-      {page === "research" && (
-        <IconButton
-          label="New chat"
-          title={`New chat (${modifier}N)`}
-          onClick={() => openConversation(null)}
-        >
-          <SquarePen size={18} />
-        </IconButton>
-      )}
     </>
   );
   return (
     <div
-      className={`app-shell ${page === "stocks" ? "stock-workspace" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${desktop ? "desktop-shell" : "web-shell"} ${page === "notes" ? "notes-shell" : page === "canvas" ? "canvas-shell" : page === "learn" ? "learning-shell" : page === "usage" ? "usage-shell" : page === "arena" ? "arena-shell" : ""}`}
+      className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${desktop ? "desktop-shell" : "web-shell"} ${page === "notes" ? "notes-shell" : page === "canvas" ? "canvas-shell" : ""}`}
     >
       {desktop && (
         <header className="window-toolbar">
@@ -349,15 +288,10 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
           <span className="window-toolbar-divider" aria-hidden="true" />
           <div className="window-title">
-            <PageIcon
-              size={18}
-              strokeWidth={1.7}
-              className={page === "research" ? "page-icon-chat" : undefined}
-            />
+            <PageIcon size={18} strokeWidth={1.7} />
             <span>Nomi</span>
             <span className="breadcrumb-divider">/</span>
             <span>{pageLabels[page]}</span>
-            {demoBadge}
           </div>
           {toolbarActions}
         </header>
@@ -385,17 +319,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
         <div className="workspace-panel">
           <aside className="sidebar" id="workspace-sidebar">
-            {page === "settings" ? (
-              <SettingsSidebar />
-            ) : page === "research" ? (
-              <ChatSidebar />
-            ) : page === "usage" ||
-              page === "arena" ||
-              page === "learn" ||
-              page === "canvas" ||
-              page === "notes" ? null : (
-              <StockSidebar query={stockQuery} onQueryChange={setStockQuery} />
-            )}
+            {page === "settings" && <SettingsSidebar />}
           </aside>
           <div className="main-shell">
             {!desktop && (
@@ -403,15 +327,8 @@ export function Shell({ children }: { children: ReactNode }) {
                 <div className="topbar-left">
                   {navigationToggle}
                   <span className="window-toolbar-divider" aria-hidden="true" />
-                  <PageIcon
-                    size={18}
-                    strokeWidth={1.7}
-                    className={
-                      page === "research" ? "page-icon-chat" : undefined
-                    }
-                  />
+                  <PageIcon size={18} strokeWidth={1.7} />
                   <span className="page-label">{pageLabels[page]}</span>
-                  {demoBadge}
                 </div>
                 {toolbarActions}
               </header>
@@ -427,7 +344,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <main
               tabIndex={-1}
               id="main-content"
-              className={`main-content ${page === "research" ? "research-main" : page === "stocks" ? "stock-main" : page === "settings" ? "settings-main" : ""}`}
+              className={`main-content ${page === "settings" ? "settings-main" : ""}`}
             >
               {children}
             </main>
@@ -435,42 +352,14 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </div>
       <Modal
-        open={demoOpen}
-        onOpenChange={setDemoOpen}
-        title="Demo data"
-        description="Stocks uses locally collected data. Chat can use your connected ChatGPT plan. Portfolio positions and agent previews are examples."
-      >
-        <div className="dialog-actions">
-          <button
-            className="button button-primary"
-            onClick={() => setDemoOpen(false)}
-          >
-            Got it
-          </button>
-        </div>
-      </Modal>
-      <Modal
         open={mobileOpen}
         onOpenChange={setMobileOpen}
-        title={page === "stocks" ? "Stocks" : "Navigation"}
-        className={page === "stocks" ? "stock-navigation-drawer" : undefined}
+        title="Navigation"
         sheet
       >
         <AppNavigation mobile onNavigate={() => setMobileOpen(false)} />
-        {page === "settings" ? (
+        {page === "settings" && (
           <SettingsSidebar onSelect={() => setMobileOpen(false)} />
-        ) : page === "research" ? (
-          <ChatSidebar onSelect={() => setMobileOpen(false)} />
-        ) : page === "usage" ||
-          page === "arena" ||
-          page === "learn" ||
-          page === "canvas" ||
-          page === "notes" ? null : (
-          <StockSidebar
-            query={stockQuery}
-            onQueryChange={setStockQuery}
-            onSelect={() => setMobileOpen(false)}
-          />
         )}
       </Modal>
       <Modal
@@ -485,7 +374,7 @@ export function Shell({ children }: { children: ReactNode }) {
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Stocks, chats, agents…"
+            placeholder="Canvas, 文稿, Settings…"
             aria-label="Search workspace content"
           />
         </label>
@@ -494,54 +383,6 @@ export function Shell({ children }: { children: ReactNode }) {
           ref={searchResults}
           onKeyDown={searchKeys}
         >
-          {directoryResults.loading && !directoryResults.data.items.length && (
-            <SkeletonRows
-              label="Loading search results"
-              rows={4}
-              className="skeleton-search"
-            />
-          )}
-          {directoryResults.error && (
-            <p className="muted" role="status">
-              {directoryResults.error}.{" "}
-              <button className="text-link" onClick={directoryResults.retry}>
-                Retry
-              </button>
-            </p>
-          )}
-          {directoryResults.data.items.map((entry) => (
-            <button
-              disabled={!validDirectorySymbol(entry.symbol)}
-              key={entry.id}
-              onClick={() => {
-                openStock(entry.symbol);
-                setSearchOpen(false);
-              }}
-            >
-              <ChartNoAxesCombined size={17} />
-              <span title={`${entry.symbol} · ${entry.name}`}>
-                {entry.symbol} ·{" "}
-                {stockDisplayName(undefined, entry.name, entry.symbol)}
-              </span>
-              <small>Stock</small>
-            </button>
-          ))}
-          {workspace.conversations
-            .filter((c) => c.title.toLowerCase().includes(search.toLowerCase()))
-            .slice(0, 6)
-            .map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  openConversation(c);
-                  setSearchOpen(false);
-                }}
-              >
-                <MessageCircle size={17} />
-                <span title={c.title}>{c.title}</span>
-                <small>Chat</small>
-              </button>
-            ))}
           {matches.map((target) => (
             <button
               key={target}
@@ -555,32 +396,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <small>Page</small>
             </button>
           ))}
-          {workspace.agents
-            .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
-            .map((agent) => (
-              <button
-                key={agent.id}
-                onClick={() => {
-                  navigate("agents");
-                  location.hash = `/agents?agent=${encodeURIComponent(agent.id)}`;
-                  setSearchOpen(false);
-                }}
-              >
-                <Bot size={17} />
-                <span title={agent.name}>{agent.name}</span>
-                <small>Agent</small>
-              </button>
-            ))}
-          {matches.length === 0 &&
-            !directoryResults.loading &&
-            !directoryResults.error &&
-            directoryResults.data.items.length === 0 &&
-            !workspace.conversations.some((c) =>
-              c.title.toLowerCase().includes(search.toLowerCase()),
-            ) &&
-            !workspace.agents.some((a) =>
-              a.name.toLowerCase().includes(search.toLowerCase()),
-            ) && <p className="muted">No matches.</p>}
+          {matches.length === 0 && <p className="muted">No matches.</p>}
         </div>
         <footer className="search-footer">
           <button

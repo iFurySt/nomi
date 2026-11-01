@@ -190,7 +190,7 @@ export function RichBlockFrame({
     document.addEventListener("mouseup", stop);
   };
   useLayoutEffect(() => {
-    if (editor.isDestroyed) return;
+    if (editor.isDestroyed || hideBlockTools) return;
     const refresh = () => update((v) => v + 1);
     editor.on("transaction", refresh);
     const followSelection = () => {
@@ -213,9 +213,11 @@ export function RichBlockFrame({
       editor.off("selectionUpdate", followSelection);
       resize.disconnect();
     };
-  }, [editor]);
+  }, [editor, hideBlockTools]);
   void version;
-  const nodes = nodePositions(editor);
+  // Typing hides the gutter; do not walk every ProseMirror DOM node just to
+  // position an invisible control (nodeDOM lookup is linear in sibling count).
+  const nodes = hideBlockTools ? [] : nodePositions(editor);
   const current = nodes[Math.min(hover, nodes.length - 1)];
   const top =
     current && wrapper.current
@@ -301,10 +303,13 @@ export function RichBlockFrame({
           (event.target as HTMLElement).closest(".writing-block-gutter")
         )
           return;
-        const index = nodes.findIndex(
+        // The first pointer move reveals the gutter in the parent. Resolve its
+        // actual row now; the hidden render deliberately has no node list.
+        const pointerNodes = hideBlockTools ? nodePositions(editor) : nodes;
+        const index = pointerNodes.findIndex(
           (node) => event.clientY < ownRect(node.element).bottom,
         );
-        setHover(index < 0 ? Math.max(0, nodes.length - 1) : index);
+        setHover(index < 0 ? Math.max(0, pointerNodes.length - 1) : index);
       }}
       onFocusCapture={(event) => {
         // React portal focus still reaches this frame. Only caret focus inside

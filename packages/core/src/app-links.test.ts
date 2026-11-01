@@ -1,10 +1,10 @@
 import { expect, it } from "vitest";
 import { NOMI_REPOSITORY_URL, isAppExternalURL } from "./app-links";
 
-it("opens only the exact project repository or existing research sources", () => {
+it("opens only the exact project repository without broad host permissions", () => {
   expect(isAppExternalURL(NOMI_REPOSITORY_URL)).toBe(true);
   expect(isAppExternalURL("https://www.sec.gov/Archives/filing.htm")).toBe(
-    true,
+    false,
   );
   for (const url of [
     "http://github.com/iFurySt/nomi",

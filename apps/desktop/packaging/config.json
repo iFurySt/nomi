@@ -1,0 +1,10 @@
+{
+  "bundleId": "com.ifuryst.nomi",
+  "sparkleVersion": "2.10.1",
+  "sparkleSHA256": "1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27",
+  "sparklePublicKey": "RjBT3ga6dLyKjIc3PWArtCnV1siKRtlLIT/h5fvo8NA=",
+  "sparkleKeyAccount": "nomi-desktop",
+  "feedBase": "https://github.com/iFurySt/nomi/releases/download/desktop-updates",
+  "downloadBase": "https://github.com/iFurySt/nomi/releases/download",
+  "minimumSystemVersion": "13.0"
+}
