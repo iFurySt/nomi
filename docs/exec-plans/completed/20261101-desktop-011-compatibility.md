@@ -13,7 +13,7 @@
 - [x] 兼容读取、文件包往返及损坏输入回归。
 - [x] 版本、设计契约、history 与发布记录同步。
 - [x] 类型、单测、构建、桌面 / 更新回归，实际重启确认。
-- [ ] 提交推送，desktop-v0.1.1 双架构发布并核对公开 feed。
+- [x] 提交推送，desktop-v0.1.1 双架构发布并核对公开 feed。
 
 ## 风险与验证
 
@@ -26,3 +26,9 @@
 ## CI 修正
 
 第一次发布 run 的 Intel IME 回归在固定 600ms 重载断言失败，arm64 已通过应用校验。将回归改为等待实际保存状态与 IndexedDB 正文、did-finish-load 和选中篇正文恢复，分别报告持久化 / 加载失败；CI VM 使用软件渲染以避免 EGL 初始化失败。0.1.1 尚未公开，修正测试后更新待发布 tag 重新构建，不替换已发布 DMG。
+
+## 发布验收
+
+`desktop-v0.1.1` 固定到 `21f6da7`；[双架构流水线](https://github.com/iFurySt/nomi/actions/runs/41315497158) 成功，[公开发布](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.1.1) 包含两个签名、公证的 DMG 和校验文件。公开 arm64 DMG 的 SHA-256、Ed25519 签名与公证票据验证通过，两份公开 appcast 的版本 / URL / 签名验证通过。
+
+Computer Use 重开已安装 0.1.0 并选择「检查更新…」，原生窗口显示 0.1.1 可用、当前版本 0.1.0；保留 Install Update 按钮让用户亲自测试安装。此轮确认更新发现与签名制品，未宣称已完成跨版本安装。截图见 `docs/generated/verification/nomi-010-detects-011-2026-11-01.png`。

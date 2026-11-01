@@ -32,3 +32,5 @@
 - `docs/design-docs/nomi-package-format.md`
 
 Intel 发布 runner 暴露 IME 测试的固定延时断言；改为验证真实持久化、加载事件与正文恢复，并在无 GPU 的 CI VM 使用软件渲染。没有放宽输入法内容断言或跳过测试。
+
+发布完成：`desktop-v0.1.1` / `21f6da7`，双架构 workflow 41315497158 成功；公开 arm64 DMG 的 checksum / Ed25519 / 公证票据与两份 feed 签名通过。本机 0.1.0 已实际显示 0.1.1 更新提示，留待用户点击安装，截图与详细证据见 Desktop 发布文档。

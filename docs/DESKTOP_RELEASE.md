@@ -75,3 +75,11 @@ node scripts/check-update-driver.mjs
 ```
 
 Host 回归检查 IPC 主 frame / URL 限制、非法操作、全窗口保存失败与成功、并发安装去重、最终退出保存和手动重试。UI fixture 只使用隔离测试状态，不下载、不安装、不访问真实文稿；检查下载 / 进度 / 取消 / 稍后 / 重启 / 错误及浅深色、窄屏截图。原生回归执行固定版本框架的 driver 回调契约（包括一次性 reply、信息型更新、无更新原因、退出重试）。这三项不能替代后续真实跨版本签名安装验收。
+
+## 0.1.1 发布验收
+
+[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.1.1) 已由 [双架构流水线](https://github.com/iFurySt/nomi/actions/runs/41315497158) 发布，tag 固定于 `21f6da7`。两个架构通过类型、285 单测、桌面 / IME / 图标 / 更新 UI、原生 driver、签名、公证与独立 App 更新初始化检查。Intel 首次尝试暴露 IME 测试固定延时问题，已改为等待实际持久化和重载恢复，CI 无 EGL 时使用软件渲染；重新构建通过。
+
+公开 arm64 DMG 的 SHA-256、Sparkle Ed25519 签名与 stapled 公证票据在下载后验证通过；两个 appcast 的签名、0.1.1 版本与下载地址均通过。真实已安装 0.1.0 的 Sparkle 窗口确认发现 0.1.1，[截图](generated/verification/nomi-010-detects-011-2026-11-01.png)。保留窗口的 Install Update 入口由用户测试下载 / 重启；该结果证明更新发现，不等同已完成跨版本安装。
+
+本版本修复新增文稿字段导致整库加载失败：已知语义继续校验，附加 JSON 元数据保留，未知版本 / 内容类型仍禁止破坏性写回。0.1.0 需要升级才能读取新增图标；本机新构建已确认文稿恢复，未修改用户正文。
