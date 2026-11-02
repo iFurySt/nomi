@@ -14,13 +14,7 @@ import {
   type BlockDrag,
   type TextSnapshot,
 } from "../writing/blockOperations";
-import {
-  Plus,
-  Check,
-  TriangleAlert,
-  FileText,
-  ChevronRight,
-} from "lucide-react";
+import { Check, TriangleAlert, FileText } from "lucide-react";
 import { WritingOutline } from "../writing/WritingOutline";
 import { Markdown } from "../canvas/Markdown";
 import {
@@ -45,7 +39,9 @@ import {
   RichMarkdownEditor,
   needsSourceEditor,
 } from "../writing/RichMarkdownEditor";
-import { NoteIcon } from "../writing/NoteIcon";
+import { NoteBreadcrumb } from "../writing/NoteBreadcrumb";
+import { NoteLink, NoteReference } from "../writing/NoteLink";
+import { NoteCollection } from "../writing/NoteCollection";
 import { NoteIconPicker, type ChangeNoteIcon } from "../writing/NoteIconPicker";
 import { NotesLibrary, noteMoveTargets } from "../writing/NotesLibrary";
 import { ResizableNotesLayout } from "../writing/ResizableNotesLayout";
@@ -98,6 +94,8 @@ export function Notes({ profile }: { profile: string }) {
   const [error, setError] = useState(""),
     [message, setMessage] = useState("");
   const [experimentOpen, setExperimentOpen] = useState(false);
+  const [referenceOpen, setReferenceOpen] = useState(false);
+  const [referenceQuery, setReferenceQuery] = useState("");
   const [formula, setFormula] = useState<string>();
   const [existingBlock, setExistingBlock] = useState("");
   const assetInput = useRef<HTMLInputElement>(null),
@@ -208,6 +206,7 @@ export function Notes({ profile }: { profile: string }) {
     asset?: CanvasAsset,
     writes: CanvasAssetWrite[] = [],
     anchor = insertion.current,
+    before: CanvasCommand[] = [],
   ) {
     const current = data.current.current!;
     const n = current.notes.find((n) => n.id === target);
@@ -240,7 +239,7 @@ export function Notes({ profile }: { profile: string }) {
         if (command.type === "add_block" && command.block.id === block.id)
           command.asset = asset;
     data.endGroup();
-    data.edit(commands, undefined, writes);
+    data.edit([...before, ...commands], undefined, writes);
     insertion.current = undefined;
   }
 
@@ -381,21 +380,23 @@ export function Notes({ profile }: { profile: string }) {
     pos?: number,
     after = true,
     replaceTo?: number,
+    replaceText?: string,
   ): BlockPoint {
     if (row.draft)
       return row.after
         ? { id: row.after, after: true }
         : { id: note!.blocks[0], after: false };
-    return { id: row.block.id, pos, after, replaceTo };
+    return { id: row.block.id, pos, after, replaceTo, replaceText };
   }
   function insertBeside(
     row: WritingRow,
     kind: InsertKind,
     pos?: number,
     replaceTo?: number,
+    replaceText?: string,
   ) {
     if (!note) return;
-    const point = pointForRow(row, pos, true, replaceTo);
+    const point = pointForRow(row, pos, true, replaceTo, replaceText);
     const source = doc?.blocks.find((b) => b.id === point.id);
     insertion.current = {
       noteId: note.id,
@@ -405,6 +406,11 @@ export function Notes({ profile }: { profile: string }) {
         ? textSnapshot(editors.current.get(point.id)!)
         : undefined,
     };
+    if (kind === "note-reference") {
+      setReferenceQuery("");
+      setReferenceOpen(true);
+      return;
+    }
     if (kind === "asset") {
       assetInput.current?.click();
       return;
@@ -704,6 +710,14 @@ export function Notes({ profile }: { profile: string }) {
       />
       <div className="notes-main">
         <header className="notes-topbar">
+          {note && (
+            <NoteBreadcrumb
+              notes={doc.notes}
+              note={note}
+              repository={data.repository}
+              onChoose={choose}
+            />
+          )}
           <span
             className="notes-save"
             data-save-state={saveState}
@@ -814,18 +828,6 @@ export function Notes({ profile }: { profile: string }) {
           >
             {note ? (
               <article className="writing-article" key={note.id}>
-                {note.parentId && (
-                  <nav className="notes-breadcrumb" aria-label="文稿路径">
-                    {noteAncestors(doc.notes, note.id).map((parent) => (
-                      <span key={parent.id}>
-                        <button onClick={() => choose(parent.id)}>
-                          {parent.title || "未命名文稿"}
-                        </button>
-                        <ChevronRight size={12} />
-                      </span>
-                    ))}
-                  </nav>
-                )}
                 <header className="writing-heading" data-has-icon={!!note.icon}>
                   <NoteIconPicker
                     note={note}
@@ -942,9 +944,15 @@ export function Notes({ profile }: { profile: string }) {
                               if (editor) editors.current.set(id, editor);
                               else editors.current.delete(id);
                             }}
-                            onInsert={(kind, pos, replaceTo) =>
+                            onInsert={(kind, pos, replaceTo, replaceText) =>
                               attempt(() =>
-                                insertBeside(row, kind, pos, replaceTo),
+                                insertBeside(
+                                  row,
+                                  kind,
+                                  pos,
+                                  replaceTo,
+                                  replaceText,
+                                ),
                               )
                             }
                             onCanvas={() => attempt(placeOnCanvas)}
@@ -993,6 +1001,13 @@ export function Notes({ profile }: { profile: string }) {
                             }
                           />
                         )
+                      ) : block.type === "note-reference" ? (
+                        <NoteReference
+                          block={block}
+                          document={doc}
+                          repository={data.repository}
+                          onChoose={choose}
+                        />
                       ) : block.type === "interactive" ? (
                         <InteractiveBlock
                           program={block.program}
@@ -1034,28 +1049,17 @@ export function Notes({ profile }: { profile: string }) {
                     </section>
                   );
                 })}
-                {!!doc.notes.some((child) => child.parentId === note.id) && (
-                  <section className="notes-children" aria-label="子文稿">
-                    {doc.notes
-                      .filter((child) => child.parentId === note.id)
-                      .map((child) => (
-                        <button key={child.id} onClick={() => choose(child.id)}>
-                          <NoteIcon note={child} repository={data.repository} />
-                          <span>{child.title || "未命名文稿"}</span>
-                          <ChevronRight size={13} />
-                        </button>
-                      ))}
-                    <button
-                      className="notes-child-create"
-                      onClick={() =>
-                        attempt(() => createNote("", "未命名文稿", note.id))
-                      }
-                    >
-                      <Plus size={15} />
-                      新建子文稿
-                    </button>
-                  </section>
-                )}
+                <NoteCollection
+                  key={note.id}
+                  notes={doc.notes}
+                  parent={note}
+                  profile={profile}
+                  repository={data.repository}
+                  onChoose={choose}
+                  onCreate={() =>
+                    attempt(() => createNote("", "未命名文稿", note.id))
+                  }
+                />
               </article>
             ) : (
               <div className="notes-empty">
@@ -1090,6 +1094,108 @@ export function Notes({ profile }: { profile: string }) {
           if (f) void importProgram(f);
         }}
       />
+      <Modal
+        open={referenceOpen}
+        onOpenChange={(open) => {
+          setReferenceOpen(open);
+          if (!open) insertion.current = undefined;
+        }}
+        title="插入文稿"
+        className="note-reference-dialog"
+      >
+        <div className="note-reference-picker">
+          <input
+            autoFocus
+            aria-label="查找文稿"
+            placeholder="搜索文稿，或输入新文稿名称…"
+            value={referenceQuery}
+            onChange={(e) => setReferenceQuery(e.target.value)}
+          />
+          <div className="note-reference-results">
+            {doc.notes
+              .filter(
+                (n) =>
+                  n.id !== note?.id &&
+                  n.title
+                    .toLocaleLowerCase()
+                    .includes(referenceQuery.toLocaleLowerCase()),
+              )
+              .map((n) => (
+                <div key={n.id} className="note-reference-result">
+                  <NoteLink
+                    note={n}
+                    repository={data.repository}
+                    onChoose={() =>
+                      attempt(() => {
+                        const owner = insertion.current?.noteId;
+                        if (!owner) throw Error("插入位置已失效，请重试。");
+                        insertContent(owner, {
+                          id: newCanvasId("reference"),
+                          type: "note-reference",
+                          documentId: doc.id,
+                          noteId: n.id,
+                          title: n.title,
+                        });
+                        setReferenceOpen(false);
+                      })
+                    }
+                  />
+                  {!!n.parentId && (
+                    <small>
+                      {noteAncestors(doc.notes, n.id)
+                        .map((n) => n.title || "未命名文稿")
+                        .join(" / ")}
+                    </small>
+                  )}
+                </div>
+              ))}
+            {!doc.notes.some(
+              (n) =>
+                n.id !== note?.id &&
+                n.title
+                  .toLocaleLowerCase()
+                  .includes(referenceQuery.toLocaleLowerCase()),
+            ) && <p className="muted">没有匹配的文稿</p>}
+          </div>
+          <button
+            className="button"
+            onClick={() =>
+              attempt(() => {
+                const owner = insertion.current?.noteId;
+                if (!owner) throw Error("插入位置已失效，请重试。");
+                const id = newCanvasId("note"),
+                  title = referenceQuery.trim().slice(0, 200) || "未命名文稿";
+                insertContent(
+                  owner,
+                  {
+                    id: newCanvasId("reference"),
+                    type: "note-reference",
+                    documentId: doc.id,
+                    noteId: id,
+                    title,
+                  },
+                  undefined,
+                  [],
+                  insertion.current,
+                  [
+                    {
+                      type: "add_note",
+                      note: { id, title, parentId: owner, blocks: [] },
+                    },
+                  ],
+                );
+                setReferenceOpen(false);
+                choose(id);
+              })
+            }
+          >
+            新建子文稿并插入
+            {referenceQuery.trim()
+              ? `「${referenceQuery.trim().slice(0, 40)}」`
+              : ""}
+          </button>
+        </div>
+      </Modal>
       <Modal
         open={!!movingNote}
         onOpenChange={(open) => !open && setMovingNote(undefined)}

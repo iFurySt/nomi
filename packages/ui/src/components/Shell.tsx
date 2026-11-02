@@ -26,8 +26,8 @@ import {
   shortcutModifier,
 } from "./workspace-shortcuts";
 const destinations = [
-  { page: "canvas", icon: PanelsTopLeft },
   { page: "notes", icon: FileText },
+  { page: "canvas", icon: PanelsTopLeft },
 ] as const;
 function AppNavigation({
   mobile = false,
@@ -46,6 +46,8 @@ function AppNavigation({
         <a
           key={target}
           href={`#/${target}`}
+          draggable={false}
+          onDragStart={(event) => event.preventDefault()}
           className={`rail-button ${mobile ? "" : "rail-tip"} ${page === target ? "selected" : ""}`}
           data-tooltip={mobile ? undefined : pageLabels[target]}
           aria-label={pageLabels[target]}
@@ -112,7 +114,7 @@ export function Shell({ children }: { children: ReactNode }) {
     function keydown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
       const action = workspaceShortcut(event, desktop);
-      if (!action) return;
+      if (!action || (action === "sidebar" && page === "settings")) return;
       const editing =
         event.target instanceof HTMLElement &&
         !!event.target.closest(
@@ -154,6 +156,7 @@ export function Shell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", keydown);
   }, [
     desktop,
+    page,
     drawerQuery,
     navigate,
     routeHistory,
@@ -231,37 +234,38 @@ export function Shell({ children }: { children: ReactNode }) {
       <ProfileMenu mobile />
     </div>
   );
-  const navigationToggle = (
-    <>
-      <span className="sidebar-toggle">
-        <IconButton
-          label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={`${sidebarCollapsed ? "Expand" : "Collapse"} sidebar (${modifier}B)`}
-          aria-keyshortcuts="Meta+b Control+b"
-          aria-expanded={!sidebarCollapsed}
-          aria-controls={
-            page === "notes" ? "notes-library" : "workspace-sidebar"
-          }
-          onClick={() => setSidebarCollapsed((value) => !value)}
-        >
-          <PanelLeft size={18} />
-        </IconButton>
-      </span>
-      <span className="mobile-menu">
-        <IconButton
-          label="Open navigation"
-          title={`Open navigation (${modifier}B)`}
-          aria-expanded={mobileOpen}
-          onClick={() => setMobileOpen(true)}
-        >
-          <Menu size={19} />
-        </IconButton>
-      </span>
-    </>
-  );
+  const navigationToggle =
+    page === "settings" ? null : (
+      <>
+        <span className="sidebar-toggle">
+          <IconButton
+            label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={`${sidebarCollapsed ? "Expand" : "Collapse"} sidebar (${modifier}B)`}
+            aria-keyshortcuts="Meta+b Control+b"
+            aria-expanded={!sidebarCollapsed}
+            aria-controls={
+              page === "notes" ? "notes-library" : "workspace-sidebar"
+            }
+            onClick={() => setSidebarCollapsed((value) => !value)}
+          >
+            <PanelLeft size={18} />
+          </IconButton>
+        </span>
+        <span className="mobile-menu">
+          <IconButton
+            label="Open navigation"
+            title={`Open navigation (${modifier}B)`}
+            aria-expanded={mobileOpen}
+            onClick={() => setMobileOpen(true)}
+          >
+            <Menu size={19} />
+          </IconButton>
+        </span>
+      </>
+    );
   return (
     <div
-      className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${desktop ? "desktop-shell" : "web-shell"} ${page === "notes" ? "notes-shell" : page === "canvas" ? "canvas-shell" : ""}`}
+      className={`app-shell ${sidebarCollapsed && page !== "settings" ? "sidebar-collapsed" : ""} ${desktop ? "desktop-shell" : "web-shell"} ${page === "notes" ? "notes-shell" : page === "canvas" ? "canvas-shell" : "settings-shell"}`}
     >
       {desktop && (
         <header className="window-toolbar">
@@ -419,7 +423,11 @@ export function Shell({ children }: { children: ReactNode }) {
       >
         <dl className="shortcut-list">
           {workspaceShortcuts
-            .filter((s) => !("desktopOnly" in s) || desktop)
+            .filter(
+              (s) =>
+                (!("desktopOnly" in s) || desktop) &&
+                (page !== "settings" || s.action !== "sidebar"),
+            )
             .map((s) => (
               <div key={s.action}>
                 <dt>{s.label}</dt>

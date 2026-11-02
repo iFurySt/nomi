@@ -1,0 +1,63 @@
+.writing-slash-menu {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px #00000018;
+  font-size: 14px;
+}
+.writing-slash-options {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  min-height: 0;
+}
+.writing-slash-group {
+  padding: 8px 10px 5px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.writing-slash-options button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  padding: 7px 10px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.writing-slash-options button[aria-selected="true"] {
+  background: var(--interaction-hover);
+}
+.writing-slash-options button svg {
+  flex: 0 0 19px;
+}
+.writing-slash-options button small {
+  margin-left: auto;
+  color: var(--muted);
+}
+.writing-slash-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 9px 12px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 10px;
+}
+.writing-slash-empty {
+  padding: 18px 10px;
+  color: var(--muted);
+}

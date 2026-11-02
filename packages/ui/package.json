@@ -17,6 +17,7 @@
     "@radix-ui/react-popover": "1.3.0",
     "@tiptap/core": "3.32.0",
     "@tiptap/extension-code-block-lowlight": "3.32.0",
+    "@tiptap/extension-heading": "3.32.0",
     "@tiptap/extension-mathematics": "3.32.0",
     "@tiptap/extension-table": "3.32.0",
     "@tiptap/extension-task-item": "3.32.0",

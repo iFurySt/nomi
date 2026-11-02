@@ -12,6 +12,8 @@ import { Fragment, Slice } from "@tiptap/pm/model";
 import { Selection, TextSelection } from "@tiptap/pm/state";
 import { normalizeClipboardHTML, plainTextSlice } from "./clipboard";
 import { notionClipboardData, restoreNotionBlanks } from "./notionClipboard";
+import { WritingHeading } from "./WritingHeading";
+import { SlashMenu } from "./SlashMenu";
 import { RichBlockFrame } from "./RichBlockFrame";
 import type { InsertKind } from "./BlockActions";
 import StarterKit from "@tiptap/starter-kit";
@@ -106,7 +108,12 @@ function RichMarkdownEditorContent({
   onBoundary: (direction: "previous" | "next") => boolean;
   onCanvas: () => void;
   onEditor: (editor: Editor | null) => void;
-  onInsert: (kind: InsertKind, pos: number, replaceTo?: number) => void;
+  onInsert: (
+    kind: InsertKind,
+    pos: number,
+    replaceTo?: number,
+    replaceText?: string,
+  ) => void;
   onBlockDrag: (
     event: DragEvent<HTMLButtonElement>,
     pos: number,
@@ -140,7 +147,9 @@ function RichMarkdownEditorContent({
   const editor = useEditor({
     extensions: [
       WritingComposition,
+      WritingHeading,
       StarterKit.configure({
+        heading: false,
         codeBlock: false,
         dropcursor: { class: "writing-native-dropcursor" },
         underline: false,
@@ -334,6 +343,11 @@ function RichMarkdownEditorContent({
         editor={editor}
         onFormat={applyFormat}
         disabled={!!math || !!link}
+      />
+      <SlashMenu
+        editor={editor}
+        onInsert={onInsert}
+        onFormula={(range) => setMath({ latex: "", block: true, range })}
       />
       <RichBlockFrame
         editor={editor}

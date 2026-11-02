@@ -124,3 +124,22 @@ File → 打开文稿包 / ⌘O、Finder 双击和 Dock 打开走同一流程：
 - `pnpm test --maxWorkers=2`：包含 `nomi-package.test.ts` 的真实文件往返、AI 修改、独立原件、共享引用、移动 / Undo、迁移 / 恢复与恶意路径测试。
 - `pnpm smoke:document-directory`：真实 Electron / preload / host / React，旧 IndexedDB 迁移、原件、包内正文修改出现在编辑器、子包、冲突备份、目录更换和布局。
 - 正式 App Computer Use：注册包外观、显示包内容、改名 / 打开、实际文字修改和退出重启，截图单独记录。
+
+
+## 文稿引用块（2026-11-02）
+
+正文可包含非递归的文稿链接，直接保存在 `document.blocks`：
+
+```json
+{
+  "id": "reference.learning",
+  "type": "note-reference",
+  "documentId": "document.home",
+  "noteId": "note.learning",
+  "title": "学习计划"
+}
+```
+
+`documentId` / `noteId` 标识目标，`title` 是创建时的可移植回退标题。引用解析到本工作区文稿时实时使用其标题和图标；目标缺失时保留占位，仍允许保存其他内容。引用不拥有目标正文、不创建 parentId、也不纳入共享内容 `references` 映射。单篇包可以携带指向包外的文稿引用；单独导入时不会自动导入或猜测目标。导入子树时只将同文档且目标在本次导入范围内的引用一起重映射，其余保留原引用。画布选区复制同理。
+
+这是新增内容类型，0.1.1 不支持，旧客户端仍拒绝写回未知内容类型；没有引用块的旧文稿不受影响。AI 可按此结构创建 / 修改引用，目标 ID 不得改为文件路径或可执行 URL。

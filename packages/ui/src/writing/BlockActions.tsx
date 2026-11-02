@@ -40,6 +40,7 @@ import {
 import type { MathAlignment } from "./mathSource";
 import { textFormats, type TextFormat } from "./SelectionToolbar";
 export type InsertKind =
+  | "note-reference"
   | "paragraph"
   | "heading1"
   | "heading2"
@@ -54,7 +55,7 @@ export type InsertKind =
   | "experiment"
   | "table"
   | "formula";
-const choices = [
+export const blockChoices = [
   ["paragraph", "正文", Type],
   ["heading1", "标题 1", Heading1],
   ["heading2", "标题 2", Heading2],
@@ -67,6 +68,7 @@ const choices = [
   ["horizontalRule", "分割线", Minus],
   ["table", "表格", Table2],
   ["formula", "公式", Sigma],
+  ["note-reference", "文稿", FileText],
   ["asset", "图片 / 附件", ImagePlus],
   ["experiment", "交互实验", FlaskConical],
 ] as const;
@@ -131,7 +133,7 @@ export function BlockActions({
       return;
     hover(false);
   };
-  const selected = choices.find((c) => c[0] === kind);
+  const selected = blockChoices.find((c) => c[0] === kind);
   const Icon =
     selected?.[2] ??
     (kind === "blockMath"
@@ -155,11 +157,16 @@ export function BlockActions({
       markdown: "Markdown",
     }[kind] ||
       "内容块");
-  const basic = choices.filter(
-    ([value]) => !["asset", "experiment", "table", "formula"].includes(value),
+  const basic = blockChoices.filter(
+    ([value]) =>
+      !["asset", "experiment", "table", "formula", "note-reference"].includes(
+        value,
+      ),
   );
-  const common = choices.filter(([value]) =>
-    ["asset", "experiment", "table", "formula"].includes(value),
+  const common = blockChoices.filter(([value]) =>
+    ["asset", "experiment", "table", "formula", "note-reference"].includes(
+      value,
+    ),
   );
   const insertChoices = (
     <>
@@ -340,10 +347,11 @@ export function BlockActions({
                       role="group"
                       aria-label="转换块类型"
                     >
-                      {choices
+                      {blockChoices
                         .filter(
                           ([value]) =>
                             ![
+                              "note-reference",
                               "asset",
                               "experiment",
                               "horizontalRule",
@@ -400,6 +408,7 @@ export function BlockActions({
                 >
                   <Trash2 size={15} />
                   {[
+                    "note-reference",
                     "image",
                     "interactive",
                     "file",

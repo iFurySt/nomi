@@ -29,7 +29,13 @@ export function selectionSnapshot(doc: CanvasDocument, ids: string[]) {
     title: "画布选区",
     revision: 1,
     notes,
-    blocks,
+    blocks: blocks.map((b) =>
+      b.type === "note-reference" &&
+      b.documentId === doc.id &&
+      notes.some((n) => n.id === b.noteId)
+        ? { ...b, documentId: "clipboard.selection" }
+        : b,
+    ),
     assets: doc.assets.filter((a) =>
       blocks.some((b) => "asset" in b && b.asset === a.id),
     ),
@@ -81,7 +87,15 @@ export function pasteSelection(
   for (const b of snapshot.blocks)
     commands.push({
       type: "add_block",
-      block: { ...structuredClone(b), id: mapped(b.id, "block") },
+      block: {
+        ...structuredClone(b),
+        id: mapped(b.id, "block"),
+        ...(b.type === "note-reference" &&
+        b.documentId === snapshot.id &&
+        snapshot.notes.some((n) => n.id === b.noteId)
+          ? { documentId: doc.id, noteId: mapped(b.noteId, "note") }
+          : {}),
+      },
     });
   for (const n of snapshot.notes)
     commands.push({

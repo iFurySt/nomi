@@ -231,7 +231,11 @@ export function RichBlockFrame({
     const range = empty
       ? { from: current.pos, to: current.end }
       : { from: current.end, to: current.end };
-    if (kind === "asset" || kind === "experiment") {
+    if (
+      kind === "asset" ||
+      kind === "experiment" ||
+      kind === "note-reference"
+    ) {
       onInsert(kind, range.from, empty ? range.to : undefined);
       return;
     }

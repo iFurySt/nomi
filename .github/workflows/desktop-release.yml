@@ -50,6 +50,9 @@ jobs:
           node scripts/ci-desktop-step.mjs pnpm build
           node scripts/ci-desktop-step.mjs pnpm --filter @nomi/desktop smoke
           node scripts/ci-desktop-step.mjs pnpm smoke:notes-ime
+          node scripts/ci-desktop-step.mjs node scripts/check-notes-navigation.mjs
+          node scripts/ci-desktop-step.mjs node scripts/check-note-collections.mjs
+          NOMI_SLASH_PRODUCTION=1 node scripts/ci-desktop-step.mjs node scripts/check-notes-slash.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-note-icons.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-update-ui.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-update-host.mjs

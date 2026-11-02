@@ -164,3 +164,44 @@ describe("canvas semantic selection clipboard", () => {
     expect(() => pasteSelection(d, s)).toThrow("原件");
   });
 });
+
+it("copies internal note references to copied targets and leaves external references intact", () => {
+  const doc = createCanvasDocument();
+  doc.blocks.push({
+    id: "ref.child",
+    type: "note-reference",
+    documentId: doc.id,
+    noteId: doc.notes[1].id,
+    title: "Target",
+  });
+  doc.notes[0].blocks.push("ref.child");
+  const places = doc.board.placements.filter((p) =>
+    doc.notes.some((n) => n.id === p.content),
+  );
+  const both = selectionSnapshot(
+    doc,
+    places.map((p) => p.id),
+  );
+  const copied = applyCanvasCommands(
+    doc,
+    doc.revision,
+    pasteSelection(doc, both).commands,
+  );
+  const copiedSource = copied.notes[doc.notes.length],
+    copiedTarget = copied.notes[doc.notes.length + 1];
+  expect(
+    copied.blocks.find(
+      (b) => copiedSource.blocks.includes(b.id) && b.type === "note-reference",
+    ),
+  ).toMatchObject({ noteId: copiedTarget.id, documentId: doc.id });
+  const onlySource = selectionSnapshot(doc, [places[0].id]);
+  const external = applyCanvasCommands(
+    doc,
+    doc.revision,
+    pasteSelection(doc, onlySource).commands,
+  );
+  expect(external.blocks.at(-1)).toMatchObject({
+    noteId: doc.notes[1].id,
+    documentId: doc.id,
+  });
+});

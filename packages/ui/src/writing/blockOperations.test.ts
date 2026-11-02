@@ -90,6 +90,42 @@ describe("writing block transactions", () => {
     ).toThrow("空行已改变");
   });
 
+  it("replaces captured slash commands atomically and rejects changed command text", () => {
+    const { doc, note } = fixture();
+    const snapshots = new Map([
+      ["writing.text", snapshot(["A", "/page", "B"])],
+    ]);
+    const point = {
+      id: "writing.text",
+      pos: 3,
+      replaceTo: 10,
+      replaceText: "/page",
+    };
+    const block = {
+      id: "slash.ref",
+      type: "note-reference" as const,
+      documentId: doc.id,
+      noteId: "missing.note",
+      title: "Page",
+    };
+    const result = applyCanvasCommands(
+      doc,
+      insertAt(doc, note, point, block, snapshots),
+    );
+    expect(
+      result.notes[0].blocks
+        .slice(0, 3)
+        .map((id) => result.blocks.find((b) => b.id === id)),
+    ).toMatchObject([
+      { source: "A" },
+      { type: "note-reference" },
+      { source: "B" },
+    ]);
+    expect(() =>
+      insertAt(doc, note, { ...point, replaceText: "/note" }, block, snapshots),
+    ).toThrow("文字已改变");
+  });
+
   it("does not measure a destroyed editor while React is replacing its view", () => {
     const editor = {
       isDestroyed: true,

@@ -71,6 +71,8 @@ try {
             </ReactMarkdown>
           ) : block.type === "interactive" ? (
             <Experiment program={block.program} />
+          ) : block.type === "note-reference" ? (
+            <p>{block.title || "未命名文稿"}（文稿引用，请在 Nomi 中打开）</p>
           ) : block.type === "shape" ? (
             <p>{block.text}</p>
           ) : (

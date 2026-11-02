@@ -497,3 +497,48 @@ it("retains extension fields on interactive file declarations without relaxing t
     saved.document.blocks.find((b: any) => b.id === block.id).futureDescription,
   ).toEqual(block.futureDescription);
 });
+
+it("round trips note reference blocks and remaps only imported targets", async () => {
+  const f = await fixture(false);
+  f.doc.blocks.push(
+    {
+      id: "ref.child",
+      type: "note-reference",
+      documentId: f.doc.id,
+      noteId: f.doc.notes[1].id,
+      title: "B",
+    },
+    {
+      id: "ref.external",
+      type: "note-reference",
+      documentId: "document.external",
+      noteId: "note.external",
+      title: "External",
+    },
+  );
+  f.doc.notes[0].blocks.push("ref.child", "ref.external");
+  await f.store.save(f.input);
+  expect((await f.load()).blocks).toEqual(f.doc.blocks);
+  const single = await readPackage(join(f.tree, "A.nomi"));
+  expect(
+    single.document.blocks.find((b) => b.id === "ref.child"),
+  ).toMatchObject({ type: "note-reference", noteId: f.doc.notes[1].id });
+  const copy = join(f.path, "Copy.nomi");
+  await cp(join(f.tree, "A.nomi"), copy, { recursive: true });
+  const root = await f.store.importPackage(copy);
+  const next = await f.load(),
+    parent = next.notes.find((n) => n.id === root)!;
+  const child = next.notes.find((n) => n.parentId === root)!;
+  const references = next.blocks.filter(
+    (b) => parent.blocks.includes(b.id) && b.type === "note-reference",
+  );
+  expect(references).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ noteId: child.id, documentId: next.id }),
+      expect.objectContaining({
+        noteId: "note.external",
+        documentId: "document.external",
+      }),
+    ]),
+  );
+});

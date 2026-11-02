@@ -1,16 +1,13 @@
 import { canvasShapeTextColor } from "@nomi/core";
 import { useId } from "react";
 import { Paperclip, ImagePlus, FlaskConical } from "lucide-react";
-import type {
-  CanvasDocument,
-  CanvasCommand,
-  CanvasNote,
-} from "@nomi/core";
+import type { CanvasDocument, CanvasCommand, CanvasNote } from "@nomi/core";
 import type { CanvasRepository } from "@nomi/platform";
 import { AssetContent } from "./AssetContent";
 export { AssetContent } from "./AssetContent";
 import { Markdown } from "./Markdown";
 import { InteractiveBlock } from "./InteractiveBlock";
+import { NoteReference } from "../writing/NoteLink";
 import { ShapeGlyph } from "./ShapeGlyph";
 export function CanvasContent({
   document,
@@ -36,6 +33,15 @@ export function CanvasContent({
   const prefix = useId();
   const block = (id: string) => {
     const b = document.blocks.find((b) => b.id === id)!;
+    if (b.type === "note-reference")
+      return (
+        <NoteReference
+          key={id}
+          block={b}
+          document={document}
+          repository={repository}
+        />
+      );
     if (b.type === "markdown")
       return editing ? (
         <div key={id} className="canvas-source-block">

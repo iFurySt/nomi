@@ -83,6 +83,12 @@ export function planNoteExport(
   const body = blocks
     .map((block) => {
       if (block.type === "markdown") return block.source;
+      if (block.type === "note-reference") {
+        warnings.push(
+          "文稿引用仅导出名称，不包含目标正文。请在 Nomi 中打开引用。",
+        );
+        return `${label(document.notes.find((n) => block.documentId === document.id && n.id === block.noteId)?.title || block.title || "未命名文稿")}（文稿引用）`;
+      }
       if (block.type === "interactive") {
         const path = assetPath(`${noteFileId(block.id)}.html`);
         return options.format === "jekyll"

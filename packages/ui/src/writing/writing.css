@@ -94,11 +94,16 @@
   background: var(--canvas);
 }
 .notes-topbar {
-  position: absolute;
-  top: 16px;
-  right: 22px;
-  z-index: 8;
-  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 8px 22px;
+}
+.notes-topbar .notes-save {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .notes-save {
@@ -1177,48 +1182,51 @@
   font-size: 12px;
 }
 .notes-breadcrumb {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px;
-  margin-bottom: 10px;
-}
-.notes-breadcrumb > span {
-  display: inline-flex;
-  align-items: center;
-  color: var(--muted);
-  min-width: 0;
-}
-.notes-main .notes-breadcrumb button {
-  max-width: 220px;
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 3px 5px;
-  font-size: 11px;
-}
-.notes-children {
-  margin-top: 32px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-.notes-main .notes-children button {
-  display: flex;
-  width: 100%;
-  justify-content: flex-start;
-  padding: 9px 6px;
-  text-align: left;
-}
-.notes-children button > span {
   flex: 1;
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.notes-breadcrumb::-webkit-scrollbar {
+  display: none;
+}
+.notes-breadcrumb ol {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: max-content;
+}
+.notes-breadcrumb li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.notes-breadcrumb-separator {
+  color: var(--border);
+}
+.notes-main .notes-breadcrumb button,
+.notes-breadcrumb-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--secondary);
+  max-width: min(220px, 45vw);
+}
+.notes-breadcrumb-current {
+  color: var(--text);
+}
+.notes-breadcrumb-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.notes-main .notes-child-create {
-  color: var(--muted);
+  min-width: 0;
 }
 .notes-move-targets {
   display: flex;
@@ -1779,4 +1787,13 @@ body.notes-tree-dragging * {
   .notes-main .writing-heading-icon {
     height: 38px;
   }
+}
+
+/* A document reference reads like a page link, not an attachment card. */
+.writing-block.writing-block-note-reference {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 8px 0;
+  background: transparent;
 }

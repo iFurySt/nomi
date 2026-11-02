@@ -20,6 +20,8 @@ export type BlockPoint = {
   pos?: number;
   after?: boolean;
   replaceTo?: number;
+  // Exact captured command text; ordinary blank-line insertion defaults to empty.
+  replaceText?: string;
 };
 export type BlockDrag = BlockPoint & { end?: number; revision: number };
 export type TextSnapshot = { doc: PMNode; serialize: (node: PMNode) => string };
@@ -62,10 +64,15 @@ export function insertAt(
       const replaced = text.doc.nodeAt(point.pos);
       if (
         replaced?.type.name !== "paragraph" ||
-        replaced.content.size !== 0 ||
+        replaced.textContent !== (point.replaceText ?? "") ||
+        replaced.content.size !== (point.replaceText ?? "").length ||
         point.pos + replaced.nodeSize !== end
       )
-        throw Error("空行已改变，请重新选择。");
+        throw Error(
+          point.replaceText
+            ? "插入位置的文字已改变，请重新选择。"
+            : "空行已改变，请重新选择。",
+        );
     }
     if (point.pos === 0 && end === text.doc.content.size && end > 0) {
       order.splice(index, 1);

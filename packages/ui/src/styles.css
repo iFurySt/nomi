@@ -265,6 +265,25 @@ svg {
   margin-top: auto;
   padding-bottom: 4px;
 }
+.profile-avatar-placeholder {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--text) 9%, var(--frame));
+  color: var(--secondary);
+}
+.rail-destinations,
+.mobile-app-navigation,
+.settings-nav-group {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+.rail-destinations a,
+.rail-destinations svg,
+.mobile-app-navigation a,
+.mobile-app-navigation svg,
+.settings-nav-link,
+.settings-nav-link svg {
+  -webkit-user-drag: none;
+}
 .rail-profile {
   width: 36px;
   height: 36px;
@@ -4853,4 +4872,41 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Settings navigation stays available even when the document sidebar is collapsed. */
+@media (max-width: 899px) {
+  .settings-shell .workspace-panel {
+    flex-direction: column;
+  }
+  .settings-shell .workspace-panel > .sidebar {
+    display: block;
+    flex: 0 0 auto;
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-shell .settings-sidebar {
+    padding: 12px 16px;
+  }
+  .settings-shell .settings-sidebar > h2,
+  .settings-shell .settings-search,
+  .settings-shell .settings-nav-group > small {
+    display: none;
+  }
+  .settings-shell .settings-nav-group {
+    display: flex;
+    gap: 4px;
+    margin: 0;
+    overflow-x: auto;
+  }
+  .settings-shell .settings-nav-link {
+    flex: 0 0 auto;
+  }
+}
+@media (max-width: 599px) {
+  .settings-shell .window-title,
+  .settings-shell .window-toolbar > .window-toolbar-divider {
+    display: none;
+  }
 }

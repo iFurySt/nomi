@@ -370,8 +370,8 @@ async function checks(phase) {
     document.querySelector(".notes-breadcrumb button").click();
     await until(() => title()?.value === "层级回归");
     assert(
-      document.querySelector(".notes-children button").textContent ===
-        "子页回归",
+      document.querySelector(".note-collection .note-link-title")
+        .textContent === "子页回归",
       "Parent page has no child navigation",
     );
     noteRow(rootId).querySelector(".notes-row-toggle").click();

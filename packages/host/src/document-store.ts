@@ -513,6 +513,11 @@ export class DocumentStore {
     const blocks = source.blocks.map((b) => ({
       ...b,
       id: fresh(b.id),
+      ...(b.type === "note-reference" &&
+      b.documentId === source.id &&
+      source.notes.some((n) => n.id === b.noteId)
+        ? { noteId: fresh(b.noteId), documentId: current.id }
+        : {}),
       ...("asset" in b ? { asset: fresh(b.asset) } : {}),
     }));
     const assets = source.assets.map((a) => ({ ...a, id: fresh(a.id) }));

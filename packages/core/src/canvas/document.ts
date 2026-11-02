@@ -61,6 +61,13 @@ export type CanvasBlock =
   | { id: string; type: "markdown"; source: string }
   | {
       id: string;
+      type: "note-reference";
+      documentId: string;
+      noteId: string;
+      title: string;
+    }
+  | {
+      id: string;
       type: "shape";
       shape: CanvasShape;
       text: string;
@@ -274,6 +281,10 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
     contentIds.add(b.id);
     if (b.type === "markdown") {
       text(b.source, 200000);
+    } else if (b.type === "note-reference") {
+      id(b.documentId);
+      id(b.noteId);
+      text(b.title, 200);
     } else if (b.type === "shape") {
       if (
         !CANVAS_SHAPES.includes(b.shape) ||

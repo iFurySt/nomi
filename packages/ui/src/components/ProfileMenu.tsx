@@ -1,6 +1,6 @@
 import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowUpRight, GitFork, Settings, UserRound } from "lucide-react";
+import { ArrowUpRight, GitFork, Settings } from "lucide-react";
 import { NOMI_REPOSITORY_URL } from "@nomi/core";
 import { useWorkspace } from "../workspace-context";
 import { useChatGPT } from "../chatgpt-context";
@@ -25,8 +25,13 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
         .toLocaleUpperCase()
     : "";
   const avatar = (
-    <span className="profile-avatar" aria-hidden="true">
-      {initials || <UserRound size={18} strokeWidth={1.8} />}
+    <span className={`profile-avatar${initials ? "" : " profile-avatar-placeholder"}`} aria-hidden="true">
+      {initials || (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4.5 20a7.5 7.5 0 0 1 15 0v.5h-15Z" />
+        </svg>
+      )}
     </span>
   );
   function signIn() {

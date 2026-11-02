@@ -41,6 +41,8 @@ export function SettingsSidebar({ onSelect }: { onSelect?: () => void }) {
                 <a
                   key={id}
                   href={`#/settings/${id}`}
+                  draggable={false}
+                  onDragStart={(event) => event.preventDefault()}
                   className={`settings-nav-link ${settingsSection === id ? "selected" : ""}`}
                   aria-current={settingsSection === id ? "page" : undefined}
                   onClick={onSelect}
