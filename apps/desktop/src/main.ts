@@ -246,7 +246,7 @@ async function createWindow() {
       const updates = await window.nomiDesktop.requestUpdates('status');
       if (${updateSmoke} && !updates.available) throw Error('Sparkle startup failed: '+updates.reason);
       const links = [...document.querySelectorAll('.rail-destinations a')].map(a=>a.getAttribute('href'));
-      if(JSON.stringify(links) !== JSON.stringify(['#/canvas','#/notes'])) throw Error('Unexpected main navigation');
+      if(JSON.stringify(links) !== JSON.stringify(['#/notes','#/canvas'])) throw Error('Unexpected main navigation');
       if(window.nomiDesktop.requestData || window.nomiDesktop.requestArena) throw Error('Legacy IPC exposed');
       document.querySelector('a[href="#/notes"]').click();
       await waitFor(()=>document.querySelector('.notes-library') && document.querySelector('.writing-article'));
