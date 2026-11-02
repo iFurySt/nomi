@@ -83,3 +83,13 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、全窗口保存失
 公开 arm64 DMG 的 SHA-256、Sparkle Ed25519 签名与 stapled 公证票据在下载后验证通过；两个 appcast 的签名、0.1.1 版本与下载地址均通过。真实已安装 0.1.0 的 Sparkle 窗口确认发现 0.1.1，[截图](generated/verification/nomi-010-detects-011-2026-11-01.png)。保留窗口的 Install Update 入口由用户测试下载 / 重启；该结果证明更新发现，不等同已完成跨版本安装。
 
 本版本修复新增文稿字段导致整库加载失败：已知语义继续校验，附加 JSON 元数据保留，未知版本 / 内容类型仍禁止破坏性写回。0.1.0 需要升级才能读取新增图标；本机新构建已确认文稿恢复，未修改用户正文。
+
+## 0.1.2 发布验收
+
+[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.1.2) 已由 [双架构流水线](https://github.com/iFurySt/nomi/actions/runs/41477619243) 发布，tag 固定于 `c9c8283`。两个架构通过类型、291 单测、桌面 / IME / 导航 / 子文稿集合 / 生产 bundle 斜杠菜单 / 图标 / 更新 UI、原生 driver、签名、公证与独立 App 更新初始化检查。修复旧导航顺序断言，并为无 EGL 的 CI smoke 使用软件渲染；ARM runner 曾因容量不足未获分配，重试失败任务后通过，复用了 Intel 成功制品。
+
+从公开 Release 重新下载的 arm64 / x64 DMG 均通过 SHA-256、Sparkle Ed25519 签名、长度与 stapled 公证票据验证；两个 appcast 的签名、0.1.2 版本和下载地址均通过。挂载 arm64 DMG 后，App 的严格深度签名、公证票据、Gatekeeper 与内嵌版本检查通过。制品校验位于 ignored `.artifacts/desktop-012-verification/`。
+
+本机开发构建的软件渲染桌面 / 更新 UI smoke 已通过。本次发布结束时 Mac 锁屏，真实窗口最终重启验收待解锁；没有替用户执行已安装版本的下载 / 重启升级，不将公开制品及更新清单验证表述为跨版本安装成功。
+
+本版本新增文稿引用块，使用后需要 0.1.2 或更新版本读取；旧版对未知内容类型的保护仍有效，避免降级写回。普通已有文稿无需手动迁移。
