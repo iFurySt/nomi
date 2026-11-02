@@ -25,6 +25,13 @@ if (status !== 0) {
     .replaceAll("%", "%25")
     .replaceAll("\r", "%0D")
     .replaceAll("\n", "%0A");
-  console.error(`::error title=Desktop step failed::${message}`);
+  const commandLabel = [command, ...args]
+    .join(" ")
+    .replaceAll("%", "%25")
+    .replaceAll("\r", "%0D")
+    .replaceAll("\n", "%0A");
+  console.error(
+    `::error title=Desktop step failed::${commandLabel}%0A${message}`,
+  );
   process.exit(status ?? 1);
 }

@@ -36,6 +36,8 @@ app.setName("Nomi");
 const devUrl = process.env.NOMI_DEV_URL;
 const updateSmoke = process.argv.includes("--update-smoke");
 const smoke = process.argv.includes("--smoke") || updateSmoke;
+// Hosted macOS runners may not expose EGL; keep screenshot checks available.
+if (smoke && process.env.CI) app.disableHardwareAcceleration();
 if (devUrl && devUrl !== "http://127.0.0.1:5173") {
   throw new Error("NOMI_DEV_URL must be the local Nomi development server.");
 }

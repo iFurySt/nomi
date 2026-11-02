@@ -35,6 +35,7 @@ await writeFile(
 const {app,BrowserWindow}=require('electron');
 const {writeFileSync}=require('node:fs');
 const assert=require('node:assert/strict');
+if(process.env.CI) app.disableHardwareAcceleration();
 app.setPath('userData',${JSON.stringify(join(output, "profile"))});
 app.whenReady().then(async()=>{
  const win=new BrowserWindow({width:1100,height:780,show:false,webPreferences:{contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});
