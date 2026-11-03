@@ -109,7 +109,13 @@ async function checkSlash({ output, report, entry }) {
       await js(
         "document.querySelectorAll('.writing-slash-menu [role=option]').length",
       ),
-      15,
+      16,
+    );
+    assert.equal(
+      await js(
+        "Array.from(document.querySelectorAll('.writing-slash-menu [role=option]')).some(el => el.textContent.trim() === '画布')",
+      ),
+      true,
     );
     await shot("menu-light");
     await key("Down");
