@@ -16,4 +16,9 @@
 - [x] 确认当前工具栏位置与共享编辑器结构。
 - [x] 实现工具栏、模板、标题与退出行为。
 - [x] 本机回归与重启验收：305 单测、类型、Canvas / 内嵌 Canvas / AI / 登录 / 独立桌面 smoke、构建和基础 CI 通过；实际窗口验证左侧菜单与 Esc 返回。
-- [ ] 提交推送，发布并验证 0.1.3。
+- [x] 提交两个会话改动并推送；0.1.3 双架构发布成功，公开 DMG / Sparkle 签名、SHA-256、公证及 Gatekeeper 通过。
+
+## 发布结果
+- [Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.1.3)，tag 固定于 `70395af`。
+- [流水线](https://github.com/iFurySt/nomi/actions/runs/41664512193) 双架构与发布任务全部通过。
+- 首次预检发现斜杠菜单旧数量断言，补齐画布选项检查后生产回归及云端检查通过；首次未发布任何安装包。
