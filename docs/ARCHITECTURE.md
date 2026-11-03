@@ -93,4 +93,8 @@ workspaces/<household-id>/
 
 ### 文稿写作视图
 
-Canvas 上方的「文稿」复用同一 CanvasDocument / Note / Block 与平台存储（桌面文件目录 / 浏览器 IndexedDB），富文本只是 Markdown 的编辑投影，交互仍通过严格 DSL 与现有 renderer 执行。文稿当前仅提供富文本写作、粘贴自适应、折叠目录、文稿作为父节点的子页导航与可调宽侧栏；模式切换、导入和导出入口已移除。底层导出契约仍在 core / platform 保留并单独验证。详见 [文稿实现](design-docs/notes-authoring.md)。
+Canvas 上方的「文稿」复用同一 CanvasDocument / Note / Block 与平台存储（桌面文件目录 / 浏览器 IndexedDB），富文本只是 Markdown 的编辑投影，交互仍通过严格 DSL 与现有 renderer 执行。文稿提供富文本写作、内容块、可双击编辑的内嵌 Canvas、粘贴自适应、折叠目录、文稿作为父节点的子页导航与可调宽侧栏。内嵌画布使用独立场景和同一个 CanvasWorkspace，事务回到父文稿会话，正文按内容范围自适应预览；不与全局 board 混写。模式切换、导入和导出入口已移除，底层导出契约仍在 core / platform 保留并单独验证。详见 [文稿实现](design-docs/notes-authoring.md)。
+
+### Canvas AI 生成
+
+Canvas AI 入口复用 ChatGPT 订阅 provider，固定 host 提示生成受限新增 DSL，校验预览后原子插入并支持撤销；不读取现有文稿或执行生成代码。能力边界与验证见 [画布 AI 生成](design-docs/canvas-ai-generation.md)。

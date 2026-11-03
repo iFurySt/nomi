@@ -40,6 +40,7 @@ export interface ChatGPTRequest {
   conversationId?: string;
   effort?: ChatGPTEffort;
   webSearch?: boolean;
+  generation?: "canvas";
 }
 export type ChatGPTMethod =
   | "status"
@@ -95,10 +96,13 @@ export function validateChatGPTRequest(
           "conversationId",
           "effort",
           "webSearch",
+          "generation",
         ].includes(k),
     ) ||
     (v.conversationId !== undefined && !validChatGPTId(v.conversationId)) ||
     (v.effort !== undefined && !chatGPTEfforts.includes(v.effort)) ||
+    (v.generation !== undefined && v.generation !== "canvas") ||
+    (v.generation === "canvas" && v.webSearch === true) ||
     (v.webSearch !== undefined && typeof v.webSearch !== "boolean") ||
     !validChatGPTId(v.requestId) ||
     !validChatGPTId(v.profileId) ||

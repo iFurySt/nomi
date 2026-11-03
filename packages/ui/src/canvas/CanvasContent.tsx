@@ -1,4 +1,3 @@
-import { canvasShapeTextColor } from "@nomi/core";
 import { useId } from "react";
 import { Paperclip, ImagePlus, FlaskConical } from "lucide-react";
 import type { CanvasDocument, CanvasCommand, CanvasNote } from "@nomi/core";
@@ -8,7 +7,9 @@ export { AssetContent } from "./AssetContent";
 import { Markdown } from "./Markdown";
 import { InteractiveBlock } from "./InteractiveBlock";
 import { NoteReference } from "../writing/NoteLink";
-import { ShapeGlyph } from "./ShapeGlyph";
+import { CanvasShapeContent } from "./CanvasShapeContent";
+import { DrawingSurface } from "../writing/DrawingSurface";
+import { EmbeddedCanvasBlock } from "./EmbeddedCanvasBlock";
 export function CanvasContent({
   document,
   contentId,
@@ -33,6 +34,9 @@ export function CanvasContent({
   const prefix = useId();
   const block = (id: string) => {
     const b = document.blocks.find((b) => b.id === id)!;
+    if (b.type === "canvas")
+      return <EmbeddedCanvasBlock key={id} block={b} profile={profile} />;
+    if (b.type === "drawing") return <DrawingSurface key={id} block={b} />;
     if (b.type === "note-reference")
       return (
         <NoteReference
@@ -70,108 +74,16 @@ export function CanvasContent({
           blockId={b.id}
         />
       );
-    if (b.type === "shape") {
-      const s = b.shapeStyle ?? {},
-        t = s.text ?? {};
-      const textStyle = {
-        fontSize: t.size ?? 14,
-        fontWeight: t.bold ? 700 : 400,
-        fontStyle: t.italic ? "italic" : undefined,
-        textDecoration: [
-          t.underline ? "underline" : "",
-          t.strike ? "line-through" : "",
-        ].join(" "),
-        color: canvasShapeTextColor(s) ?? "var(--text)",
-        textAlign: t.align ?? "center",
-        transform: t.rotate ? "rotate(90deg)" : undefined,
-      } as React.CSSProperties;
-      const displayText =
-        t.list === "bullet"
-          ? b.text
-              .split("\n")
-              .map((v) => `• ${v}`)
-              .join("\n")
-          : t.list === "number"
-            ? b.text
-                .split("\n")
-                .map((v, i) => `${i + 1}. ${v}`)
-                .join("\n")
-            : t.list === "quote"
-              ? b.text
-                  .split("\n")
-                  .map((v) => `❝ ${v}`)
-                  .join("\n")
-              : b.text;
+    if (b.type === "shape")
       return (
-        <div
+        <CanvasShapeContent
           key={id}
-          className={`canvas-shape-content shape-tone-${b.tone}`}
-          style={{
-            alignItems:
-              t.verticalAlign === "top"
-                ? "flex-start"
-                : t.verticalAlign === "bottom"
-                  ? "flex-end"
-                  : "center",
-          }}
-        >
-          <svg
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-            style={{
-              fill: s.fill ?? "var(--shape-fill)",
-              fillOpacity: s.fillOpacity ?? 1,
-              stroke: s.stroke ?? "var(--muted)",
-              strokeOpacity: s.strokeOpacity ?? 1,
-              strokeWidth: s.strokeWidth ?? 1.25,
-              strokeDasharray:
-                s.strokeStyle === "dashed"
-                  ? "8 6"
-                  : s.strokeStyle === "dotted"
-                    ? "1 5"
-                    : undefined,
-            }}
-          >
-            <ShapeGlyph shape={b.shape} style={s} />
-          </svg>
-          {editing ? (
-            <textarea
-              data-shape-text={id}
-              aria-label="形状文字"
-              value={b.text}
-              spellCheck={false}
-              style={textStyle}
-              onChange={(e) =>
-                onEdit(
-                  [
-                    {
-                      type: "set_shape",
-                      block: { ...b, text: e.target.value },
-                    },
-                  ],
-                  b.id,
-                )
-              }
-              onBlur={endGroup}
-            />
-          ) : (
-            <span
-              className={!b.text ? "is-placeholder" : undefined}
-              style={textStyle}
-            >
-              {t.link && b.text ? (
-                <a href={t.link} target="_blank" rel="noreferrer">
-                  {displayText}
-                </a>
-              ) : (
-                displayText || "双击输入文字"
-              )}
-            </span>
-          )}
-        </div>
+          block={b}
+          editing={editing}
+          onEdit={onEdit}
+          endGroup={endGroup}
+        />
       );
-    }
     return (
       <AssetContent
         key={id}

@@ -23,6 +23,7 @@ import {
   newCanvasId,
   temperatureProgram,
   parseInteractiveProgram,
+  emptyCanvasScene,
   type CanvasBlock,
   type CanvasAsset,
   type CanvasCommand,
@@ -42,6 +43,8 @@ import {
 import { NoteBreadcrumb } from "../writing/NoteBreadcrumb";
 import { NoteLink, NoteReference } from "../writing/NoteLink";
 import { NoteCollection } from "../writing/NoteCollection";
+import { EmbeddedCanvasBlock } from "../canvas/EmbeddedCanvasBlock";
+import { DrawingSurface } from "../writing/DrawingSurface";
 import { NoteIconPicker, type ChangeNoteIcon } from "../writing/NoteIconPicker";
 import { NotesLibrary, noteMoveTargets } from "../writing/NotesLibrary";
 import { ResizableNotesLayout } from "../writing/ResizableNotesLayout";
@@ -409,6 +412,20 @@ export function Notes({ profile }: { profile: string }) {
     if (kind === "note-reference") {
       setReferenceQuery("");
       setReferenceOpen(true);
+      return;
+    }
+    if (kind === "canvas") {
+      const block: CanvasBlock = {
+        id: newCanvasId("canvas"),
+        type: "canvas",
+        scene: emptyCanvasScene(newCanvasId("scene")),
+      };
+      insertContent(note.id, block);
+      requestAnimationFrame(() =>
+        document
+          .querySelector<HTMLElement>(`[data-embedded-canvas="${block.id}"]`)
+          ?.focus(),
+      );
       return;
     }
     if (kind === "asset") {
@@ -1001,6 +1018,10 @@ export function Notes({ profile }: { profile: string }) {
                             }
                           />
                         )
+                      ) : block.type === "canvas" ? (
+                        <EmbeddedCanvasBlock block={block} profile={profile} />
+                      ) : block.type === "drawing" ? (
+                        <DrawingSurface block={block} />
                       ) : block.type === "note-reference" ? (
                         <NoteReference
                           block={block}

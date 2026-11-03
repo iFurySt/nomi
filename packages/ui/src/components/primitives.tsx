@@ -72,6 +72,9 @@ export function Modal({
   children,
   sheet = false,
   className = "",
+  keepEscape = false,
+  closeText,
+  hideHeader = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -80,6 +83,9 @@ export function Modal({
   children: ReactNode;
   sheet?: boolean;
   className?: string;
+  keepEscape?: boolean;
+  closeText?: string;
+  hideHeader?: boolean;
 }) {
   const previousFocus = useRef<HTMLElement | null>(null);
   const wasOpen = useRef(false);
@@ -93,6 +99,9 @@ export function Modal({
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
         <Dialog.Content
+          onEscapeKeyDown={
+            keepEscape ? (event) => event.preventDefault() : undefined
+          }
           className={`dialog-content${sheet ? " detail-sheet" : ""}${className ? ` ${className}` : ""}`}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
@@ -112,7 +121,7 @@ export function Modal({
             }
           }}
         >
-          <header className="dialog-header">
+          <header className={hideHeader ? "sr-only" : "dialog-header"}>
             <div>
               <Dialog.Title>{title}</Dialog.Title>
               <Dialog.Description
@@ -121,15 +130,19 @@ export function Modal({
                 {description ?? "Workspace details and available actions."}
               </Dialog.Description>
             </div>
-            <Dialog.Close asChild>
-              <button
-                className="icon-button"
-                data-close
-                aria-label="Close dialog"
-              >
-                <X size={18} />
-              </button>
-            </Dialog.Close>
+            {!hideHeader && (
+              <Dialog.Close asChild>
+                <button
+                  className={
+                    closeText ? "button button-secondary" : "icon-button"
+                  }
+                  data-close
+                  aria-label={closeText ?? "Close dialog"}
+                >
+                  {closeText ?? <X size={18} />}
+                </button>
+              </Dialog.Close>
+            )}
           </header>
           {children}
         </Dialog.Content>

@@ -30,7 +30,10 @@ import { tmpdir } from "node:os";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
-import { isAppExternalURL } from "../../../packages/core/src/app-links";
+import {
+  isAppExternalURL,
+  isAuthReturnURL,
+} from "../../../packages/core/src/app-links";
 import { allowsClipboardWrite } from "../../../packages/host/src/renderer-permissions";
 app.setName("Nomi");
 const devUrl = process.env.NOMI_DEV_URL;
@@ -69,6 +72,22 @@ else
       window.focus();
     } else if (app.isReady()) void createWindow().catch(failStartup);
   });
+
+function focusNomi() {
+  const window = BrowserWindow.getAllWindows()[0];
+  if (!window) return;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+  app.focus({ steal: true });
+}
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  if (isAuthReturnURL(url)) {
+    if (app.isReady()) focusNomi();
+    else void app.whenReady().then(focusNomi);
+  }
+});
 
 let documentStore: DocumentStore | undefined;
 const pendingPackages: string[] = [];
@@ -453,6 +472,10 @@ if (primaryInstance)
           smokeProfile ? join(smokeProfile, "data") : defaultDataDir(),
         ),
         (url) => shell.openExternal(url),
+        undefined,
+        undefined,
+        undefined,
+        process.execPath.includes("/dist/Nomi.app/"),
       );
       ipcMain.handle(
         "nomi:chatgpt",
@@ -478,8 +501,10 @@ if (primaryInstance)
               )
                 event.sender.send("nomi:chatgpt-delta", delta);
             });
+            if (method === "signIn") focusNomi();
             return { ok: true, value };
           } catch (error) {
+            if (method === "signIn") focusNomi();
             return {
               ok: false,
               error:

@@ -5,6 +5,7 @@ import {
   parseCanvasDocument,
   validateDocumentJSON,
   CANVAS_ASSET_BYTES,
+  blockAssetIds,
   type CanvasDocument,
   type CanvasBlock,
   type CanvasAsset,
@@ -100,18 +101,23 @@ export async function readPackage(path: string): Promise<ReadPackage> {
   )
     throw Error("文稿包结构无效。");
   const decoded = structuredClone(raw.document);
-  for (const block of decoded.blocks) {
-    if (block.type === "markdown")
-      block.source = (await read(block.source, 2 * 1024 * 1024)).toString(
-        "utf8",
-      );
-    else if (block.type === "interactive") {
-      block.program = JSON.parse(
-        (await read(block.source, 2 * 1024 * 1024)).toString(),
-      );
-      delete block.source;
+  const decodeSources = async (doc: CanvasDocument) => {
+    for (const block of doc.blocks as any[]) {
+      if (block.type === "markdown")
+        block.source = (await read(block.source, 2 * 1024 * 1024)).toString(
+          "utf8",
+        );
+      else if (block.type === "interactive") {
+        block.program = JSON.parse(
+          (await read(block.source, 2 * 1024 * 1024)).toString(),
+        );
+        delete block.source;
+      }
+      if (block.type === "canvas" && block.scene)
+        await decodeSources(block.scene);
     }
-  }
+  };
+  await decodeSources(decoded);
   const document = parseCanvasDocument(decoded);
   if (
     typeof raw.packageId !== "string" ||
@@ -168,18 +174,23 @@ export function encodePackage(
   const files = new Map<string, Buffer>();
   const encoded: any = structuredClone(parseCanvasDocument(document));
   if (kind === "note") encoded.title = document.notes[0].title;
-  for (const b of encoded.blocks) {
-    if (b.type === "markdown") {
-      const path = `text/${b.id}.md`;
-      files.set(path, Buffer.from(b.source));
-      b.source = path;
-    } else if (b.type === "interactive") {
-      const path = `interactive/${b.id}.nomi-ui.json`;
-      files.set(path, Buffer.from(json(b.program)));
-      delete b.program;
-      b.source = path;
+  const encodeSources = (doc: CanvasDocument, prefix = "") => {
+    for (const b of doc.blocks as any[]) {
+      if (b.type === "markdown") {
+        const path = `${prefix}text/${b.id}.md`;
+        files.set(path, Buffer.from(b.source));
+        b.source = path;
+      } else if (b.type === "interactive") {
+        const path = `${prefix}interactive/${b.id}.nomi-ui.json`;
+        files.set(path, Buffer.from(json(b.program)));
+        delete b.program;
+        b.source = path;
+      }
+      if (b.type === "canvas")
+        encodeSources(b.scene, `${prefix}canvases/${b.id}/`);
     }
-  }
+  };
+  encodeSources(encoded);
   const assetPaths: Record<string, string> = Object.create(null);
   for (const a of document.assets) {
     const ext =
@@ -449,9 +460,7 @@ export function planPackages(
     const blocks = n.blocks.map((id) =>
       document.blocks.find((b) => b.id === id)!,
     );
-    const assetIds = new Set(
-      blocks.flatMap((b) => ("asset" in b ? [b.asset] : [])),
-    );
+    const assetIds = new Set(blocks.flatMap(blockAssetIds));
     if (n.icon?.type === "image") assetIds.add(n.icon.asset);
     const { parentId: _, ...note } = n;
     const contents = new Set([n.id, ...n.blocks]);

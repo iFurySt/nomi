@@ -30,7 +30,7 @@ Nomi/
   .nomi-history/                   # 旧库、暂存提交、备份及被删除包
 ```
 
-未使用的目录不必创建。`ink/` 与 `previews/` 是设计预留，当前 renderer 没有笔迹支持，也未生成预览缓存。未知普通文件留在包内；不自动把任意目录识别成文稿，仅扫描根目录和 `children/` 内的 `.nomi` 包。系统文件管理器的排序不改变文稿顺序。
+未使用的目录不必创建。`ink/` 与 `previews/` 是设计预留，尚未实现独立压感笔迹文件与预览缓存；文稿内 Canvas 使用下文的独立场景。未知普通文件留在包内；不自动把任意目录识别成文稿，仅扫描根目录和 `children/` 内的 `.nomi` 包。系统文件管理器的排序不改变文稿顺序。
 
 本机默认 scope 位于 `文稿/`；其他 profile 继续使用隔离的 `文稿-<sha256>/`。库根不是包。打开文件包不执行任何代码，GenUI 仍经过现有严格解释器。
 
@@ -82,6 +82,35 @@ Markdown 存储块：
 Emoji 必须是单个 Unicode 字素，支持组合人物、肤色、旗帜。图片引用必须在 `document.assets` 中存在，MIME 为 PNG / JPEG / WebP / GIF，并有相应 `assetPaths` 与 `assets/` 原件。即使正文没有引用这张图片，包也会携带图标原件；导出和独立导入保留它，导入时重新映射 Asset ID。AI 修改 Emoji 可直接替换该字段；移除图标删除 `icon`，不写 `null`。添加图片仍按先原件、后元数据和引用的顺序操作。
 
 这是 draft-1 的可选字段扩展；无 icon 的旧包无需迁移。0.1.0 的封闭字段校验会拒绝带 icon 的包，需要升级到 0.1.1；不能通过修改 feed 修复旧二进制。0.1.1 起，manifest、document、Note / Block / 布局上的附加 JSON 元数据在读取、普通编辑和文件包重组时保留。逐篇包独有的 document / board 元数据继续留在原包，不与工作区元数据混合。未知字段不参与渲染、资源路径解析或能力执行，仍受大小、深度和安全键限制。改变必需语义、新内容类型或新交互程序能力必须有相应 schema / 能力版本；不能依靠附加字段绕过解释器校验。
+
+## 文稿内画布块（2026-11-03）
+
+画布块直接保存在 `document.blocks`，其独立场景复用现有 Canvas IR：
+
+```json
+{
+  "id": "canvas.diagram",
+  "type": "canvas",
+  "scene": {
+    "schema": "nomi-document-ir/draft-1",
+    "id": "scene.diagram",
+    "title": "画布",
+    "revision": 1,
+    "notes": [],
+    "blocks": [],
+    "assets": [],
+    "board": { "id": "board.diagram", "placements": [], "connectors": [] }
+  }
+}
+```
+
+场景内 Block / Note / Placement / Connector 的字段和预算沿用 Canvas 契约，身份在场景内唯一。禁止场景内再嵌入 `canvas`，整份父文档仍受 2 MiB / JSON 深度与节点总预算限制。视口、选区和预览边界不进入正文。`set_canvas` 原子更新完整场景，外层撤销和文件保存负责持久化。
+
+场景资产必须同时在父 `document.assets` 中声明，ID、摘要、字节数与 MIME 一致；原件通过现有 `assetPaths` 存在包的 `assets/` 下。内嵌 Markdown 的文件路径为 `canvases/<canvasBlockId>/text/<innerBlockId>.md`，交互程序为 `canvases/<canvasBlockId>/interactive/<innerBlockId>.nomi-ui.json`，解码时还原场景原文。外部 AI 编辑这些源文件时保持身份和引用，不直接写预览图片或相机。
+
+文稿独立导出 / 文件包复制包含完整场景和原件。独立导入重新映射外层块与所有资产引用，场景内部身份保持局部有效，不依赖全局 board。新增类型需要支持 `canvas` 的客户端，旧客户端拒绝写回未知内容类型；没有此类型的旧文稿无需迁移。
+
+本轮未发布的内联手绘原型（`canvas` + `elements`）读取时转换为原生场景，矩形 / 椭圆 / 线段 / 箭头恢复为既有对象，笔迹保留为只读 `drawing` 叶块供摆放和预览。`drawing` 仅用于原型兼容，不提供插入入口或单独绘图工具；其几何仍严格校验。转换不修改调用者数据，正常保存后使用新场景格式。
 
 ## AI 直接编辑规则
 

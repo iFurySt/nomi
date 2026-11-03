@@ -214,7 +214,17 @@ it("dynamically registers with PKCE, verifies identity and scope, and keeps toke
     }).toString();
     expect((await fetch(callback)).status).toBe(400);
     callback.searchParams.set("state", authorize.searchParams.get("state")!);
-    expect((await fetch(callback)).status).toBe(200);
+    const response = await fetch(callback);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("content-security-policy")).toContain(
+      "script-src 'nonce-",
+    );
+    const html = await response.text();
+    expect(html).toContain("nomi://auth/complete");
+    expect(html).not.toContain("test-code");
+    expect(html).not.toContain(authorize.searchParams.get("state"));
   };
   const h = new ChatGPTHost(s, open, new ChatGPTTransport(fetcher, keys));
   hosts.push(h);
@@ -1010,4 +1020,27 @@ it("closing a renderer cancels ordinary Chat while preserving an independently o
   h.cancelPending(true);
   release();
   await expect(op).resolves.toHaveProperty("text", "Arena completed");
+});
+
+it("uses the bounded canvas protocol without enabling tools or accepting custom instructions", async () => {
+  const fetcher = vi.fn(
+    async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).endsWith("/models")) return models();
+      const body = JSON.parse(String(init?.body));
+      expect(body.instructions).toContain("Generate an editable Nomi scene");
+      expect(body.instructions).toContain("nomi-interactive-ir/draft-1");
+      expect(body.tools).toBeUndefined();
+      return stream([delta('{"commands":[]}'), completed], true);
+    },
+  ) as unknown as typeof fetch;
+  const { h } = await authorized(fetcher);
+  await expect(
+    h.request("respond", { ...request, generation: "canvas" }),
+  ).resolves.toMatchObject({ text: '{"commands":[]}' });
+  await expect(
+    h.request("respond", { ...request, generation: "canvas", webSearch: true }),
+  ).rejects.toThrow();
+  await expect(
+    h.request("respond", { ...request, generation: "arbitrary" }),
+  ).rejects.toThrow();
 });

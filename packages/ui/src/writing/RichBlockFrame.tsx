@@ -233,6 +233,7 @@ export function RichBlockFrame({
       : { from: current.end, to: current.end };
     if (
       kind === "asset" ||
+      kind === "canvas" ||
       kind === "experiment" ||
       kind === "note-reference"
     ) {

@@ -14,6 +14,8 @@ import {
   requestChatGPT,
   listChatGPTModels,
 } from "@nomi/platform";
+import { Check, ArrowUpRight } from "lucide-react";
+import "./pages/chatgpt-settings.css";
 import { Button, Modal } from "./components/primitives";
 
 interface Connection {
@@ -25,7 +27,11 @@ interface Connection {
   setModel: (model: string) => void;
   busy: boolean;
   signingIn: boolean;
+  signingInProfileId?: string;
   error: string;
+  errorMethod?: ChatGPTMethod;
+  dismissError: () => void;
+  retry: () => Promise<void>;
   refresh: () => Promise<void>;
   action: (method: ChatGPTMethod, params?: unknown) => Promise<void>;
 }
@@ -43,7 +49,17 @@ export function ChatGPTProvider({ children }: { children: ReactNode }) {
   const [modelsLoading, setModelsLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [signingInProfileId, setSigningInProfileId] = useState<string>();
   const [error, setError] = useState("");
+  const [errorMethod, setErrorMethod] = useState<ChatGPTMethod>();
+  const failed = useRef<{ method: ChatGPTMethod; params?: unknown }>({
+    method: "status",
+  });
+  const cancelled = useRef(false);
+  const dismissError = useCallback(() => {
+    setError("");
+    setErrorMethod(undefined);
+  }, []);
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
     if (!available) return;
@@ -52,7 +68,11 @@ export function ChatGPTProvider({ children }: { children: ReactNode }) {
       const next = await readChatGPTStatus();
       if (request === sequence.current) setStatus(next);
     } catch (e) {
-      if (request === sequence.current) setError((e as Error).message);
+      if (request === sequence.current) {
+        failed.current = { method: "status" };
+        setErrorMethod("status");
+        setError((e as Error).message);
+      }
     }
   }, [available]);
   useEffect(() => {
@@ -90,7 +110,11 @@ export function ChatGPTProvider({ children }: { children: ReactNode }) {
           }
         })
         .catch((e) => {
-          if (current) setError(e.message);
+          if (current) {
+            failed.current = { method: "models" };
+            setErrorMethod("models");
+            setError(e.message);
+          }
         })
         .finally(() => {
           if (current) setModelsLoading(false);
@@ -102,8 +126,15 @@ export function ChatGPTProvider({ children }: { children: ReactNode }) {
   const action = useCallback(
     async (method: ChatGPTMethod, params?: unknown) => {
       if (method !== "cancelSignIn") setBusy(true);
-      if (method === "signIn") setSigningIn(true);
-      setError("");
+      if (method === "signIn") {
+        setSigningInProfileId(
+          (params as { profileId?: string } | undefined)?.profileId,
+        );
+        cancelled.current = false;
+        setSigningIn(true);
+      }
+      if (method === "cancelSignIn") cancelled.current = true;
+      dismissError();
       try {
         const value =
           method === "models"
@@ -114,14 +145,18 @@ export function ChatGPTProvider({ children }: { children: ReactNode }) {
             "Signed out on this device. Remote revocation was not confirmed; disconnect Nomi in ChatGPT settings.",
           );
       } catch (e) {
-        setError((e as Error).message);
+        if (!(method === "signIn" && cancelled.current)) {
+          failed.current = { method, params };
+          setErrorMethod(method);
+          setError((e as Error).message);
+        }
       } finally {
         if (method === "signIn") setSigningIn(false);
         if (method !== "cancelSignIn") setBusy(false);
         await refresh();
       }
     },
-    [refresh, loadModels],
+    [refresh, loadModels, dismissError],
   );
   return (
     <Context.Provider
@@ -134,7 +169,11 @@ export function ChatGPTProvider({ children }: { children: ReactNode }) {
         setModel,
         busy,
         signingIn,
+        signingInProfileId,
         error,
+        errorMethod,
+        dismissError,
+        retry: () => action(failed.current.method, failed.current.params),
         refresh,
         action,
       }}
@@ -145,11 +184,21 @@ export function ChatGPTProvider({ children }: { children: ReactNode }) {
         onOpenChange={(open) => {
           if (!open) void action("acknowledgeWelcome");
         }}
-        title="You’re using your ChatGPT plan"
-        description="Eligible AI requests in Nomi use your ChatGPT plan or authorized credits. Manage usage in ChatGPT settings."
+        className="chatgpt-welcome"
+        title={
+          <>
+            <span className="chatgpt-welcome-check" aria-hidden="true">
+              <Check size={20} />
+            </span>
+            <span>ChatGPT connected</span>
+          </>
+        }
+        description="You’re using your ChatGPT plan. Eligible AI requests use your plan or authorized credits."
       >
         <div className="dialog-actions">
-          <Button onClick={() => void action("openUsage")}>Manage usage</Button>
+          <Button variant="ghost" onClick={() => void action("openUsage")}>
+            Manage usage <ArrowUpRight size={13} />
+          </Button>
           <Button
             variant="primary"
             disabled={busy}

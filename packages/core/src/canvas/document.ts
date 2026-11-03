@@ -1,4 +1,11 @@
 import { noteSubtreeIds } from "./note-tree";
+import { validateDrawing, type DrawingBlock } from "./drawing";
+import {
+  migrateInlineDrawing,
+  mergeCanvasAssets,
+  blockAssetIds,
+  type EmbeddedCanvasBlock,
+} from "./embedded-canvas";
 import { parseInteractiveProgram } from "../interactive/validate";
 import { temperatureProgram } from "../interactive/index";
 import type { InteractiveProgram } from "../interactive/types";
@@ -58,6 +65,8 @@ export interface CanvasShapeStyle {
   };
 }
 export type CanvasBlock =
+  | EmbeddedCanvasBlock
+  | DrawingBlock
   | { id: string; type: "markdown"; source: string }
   | {
       id: string;
@@ -234,7 +243,11 @@ export function validateDocumentJSON(
 export function parseCanvasDocument(raw: unknown): CanvasDocument {
   return validateCanvasDocument(raw, true);
 }
-function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
+function validateCanvasDocument(
+  raw: unknown,
+  clone: boolean,
+  embedded = false,
+): CanvasDocument {
   if (typeof raw === "string") {
     if (raw.length > CANVAS_DOCUMENT_BYTES) bad("文档超过 2 MiB。");
     try {
@@ -244,6 +257,20 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
     }
   }
   validateDocumentJSON(raw);
+  const input = raw as CanvasDocument;
+  if (
+    Array.isArray(input.blocks) &&
+    input.blocks.some(
+      (b) => b?.type === "canvas" && !(b as EmbeddedCanvasBlock).scene,
+    )
+  ) {
+    raw = {
+      ...input,
+      blocks: input.blocks.map((b) =>
+        b?.type === "canvas" && !b.scene ? migrateInlineDrawing(b) : b,
+      ),
+    };
+  }
   // Additive fields are opaque data: retain them for forward-compatible saves.
   const p = record(raw);
   if (p.schema !== "nomi-document-ir/draft-1")
@@ -281,6 +308,21 @@ function validateCanvasDocument(raw: unknown, clone: boolean): CanvasDocument {
     contentIds.add(b.id);
     if (b.type === "markdown") {
       text(b.source, 200000);
+    } else if (b.type === "canvas") {
+      if (embedded) bad("画布内不能再次嵌入画布。");
+      validateCanvasDocument(b.scene, false, true);
+      for (const a of (b.scene as CanvasDocument).assets) {
+        const original = assets.find((p) => p.id === a.id);
+        if (
+          !original ||
+          original.sha256 !== a.sha256 ||
+          original.bytes !== a.bytes ||
+          original.mime !== a.mime
+        )
+          bad("画布附件引用无效。");
+      }
+    } else if (b.type === "drawing") {
+      validateDrawing(b as DrawingBlock);
     } else if (b.type === "note-reference") {
       id(b.documentId);
       id(b.noteId);
@@ -513,6 +555,7 @@ export type CanvasCommand =
   | { type: "rename_note"; id: string; title: string }
   | { type: "set_note_blocks"; id: string; blocks: string[] }
   | { type: "set_shape"; block: Extract<CanvasBlock, { type: "shape" }> }
+  | { type: "set_canvas"; block: EmbeddedCanvasBlock }
   | { type: "connect"; connector: CanvasConnector }
   | { type: "update_connector"; connector: CanvasConnector }
   | { type: "remove_connector"; id: string }
@@ -583,6 +626,18 @@ export function applyCanvasCommands(
         (p) => p.id === ("id" in command ? command.id : ""),
       ) ?? bad("摆放已不存在。");
     switch (command.type) {
+      case "set_canvas": {
+        const index = next.blocks.findIndex(
+          (b) => b.id === command.block.id && b.type === "canvas",
+        );
+        if (index < 0) bad("画布块已不存在。");
+        next.blocks[index] = command.block;
+        next.assets = mergeCanvasAssets(
+          next.assets,
+          command.block.scene.assets,
+        );
+        break;
+      }
       case "set_shape": {
         const index = next.blocks.findIndex(
           (b) => b.id === command.block.id && b.type === "shape",
@@ -704,7 +759,7 @@ export function applyCanvasCommands(
           !next.notes.some(
             (n) => n.icon?.type === "image" && n.icon.asset === previous,
           ) &&
-          !next.blocks.some((b) => "asset" in b && b.asset === previous)
+          !next.blocks.some((b) => blockAssetIds(b).includes(previous))
         )
           next.assets = next.assets.filter((a) => a.id !== previous);
         break;

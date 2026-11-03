@@ -1,4 +1,6 @@
 export * from "./document";
+export * from "./drawing";
+export * from "./embedded-canvas";
 export * from "./note-export";
 
 export * from "./geometry";

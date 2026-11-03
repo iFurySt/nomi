@@ -26,7 +26,7 @@ export function desktopRuntime() {
   const identity = JSON.stringify({
     version,
     iconHash: createHash("sha256").update(readFileSync(icon)).digest("hex"),
-    schema: 5,
+    schema: 6,
     entryPath: join(root, "apps/desktop/dist/main.cjs"),
     applicationVersion: JSON.parse(
       readFileSync(join(root, "apps/desktop/package.json"), "utf8"),
@@ -82,7 +82,11 @@ export function desktopRuntime() {
       plist,
     ]);
   // Register a directory document package, not an executable application bundle.
-  for (const key of ["UTExportedTypeDeclarations", "CFBundleDocumentTypes"]) {
+  for (const key of [
+    "UTExportedTypeDeclarations",
+    "CFBundleDocumentTypes",
+    "CFBundleURLTypes",
+  ]) {
     try {
       execFileSync("/usr/libexec/PlistBuddy", ["-c", `Delete :${key}`, plist], {
         stdio: "pipe",
@@ -90,6 +94,11 @@ export function desktopRuntime() {
     } catch {}
   }
   const declarations = [
+    "Add :CFBundleURLTypes array",
+    "Add :CFBundleURLTypes:0 dict",
+    "Add :CFBundleURLTypes:0:CFBundleURLName string Nomi Local",
+    "Add :CFBundleURLTypes:0:CFBundleURLSchemes array",
+    "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string nomi-local",
     "Add :UTExportedTypeDeclarations array",
     "Add :UTExportedTypeDeclarations:0 dict",
     "Add :UTExportedTypeDeclarations:0:UTTypeIdentifier string com.ifuryst.nomi.document",

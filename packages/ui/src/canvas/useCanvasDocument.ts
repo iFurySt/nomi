@@ -317,6 +317,16 @@ function useCanvasDocumentState(profile: string) {
 const CanvasDocumentContext = createContext<ReturnType<
   typeof useCanvasDocumentState
 > | null>(null);
+export type CanvasDocumentData = ReturnType<typeof useCanvasDocumentState>;
+export function CanvasDocumentScope({
+  value,
+  children,
+}: {
+  value: CanvasDocumentData;
+  children: ReactNode;
+}) {
+  return createElement(CanvasDocumentContext.Provider, { value }, children);
+}
 export function CanvasDocumentProvider({
   profile,
   children,

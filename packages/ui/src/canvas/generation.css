@@ -1,0 +1,57 @@
+.dialog-content.generation-dialog {
+  width: min(920px, calc(100vw - 32px));
+  max-width: 920px;
+}
+.generation-dialog label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.generation-dialog select {
+  max-width: 320px;
+  padding: 6px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.generation-dialog textarea {
+  display: block;
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  margin: 14px 0 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.generation-hint,
+.generation-dialog .dialog-actions span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.generation-preview {
+  margin: 16px 0;
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--canvas);
+}
+.generation-object {
+  position: absolute;
+  overflow: auto;
+  background: var(--surface);
+}
+.generation-object .canvas-shape-content {
+  height: 100%;
+  width: 100%;
+}
+
+.generation-object.shape-card > .canvas-content {
+  height: 100%;
+  padding: 0;
+}

@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createCanvasDocument,
+  emptyCanvasScene,
   applyCanvasCommands,
   type CanvasDocument,
 } from "../../core/src/canvas/index";
@@ -52,6 +53,82 @@ async function fixture(save = true) {
     store.save({ ...input, document: d, baseRevision });
   return { path, root, tree, store, doc, input, load, put, config };
 }
+it("round trips embedded native scenes, nested sources and originals through external edits and import", async () => {
+  const f = await fixture();
+  const scene = emptyCanvasScene("scene.inline");
+  const bytes = Buffer.from("nested original");
+  const asset = {
+    id: "asset.inner",
+    name: "inner.png",
+    mime: "image/png",
+    bytes: bytes.length,
+    sha256: packageHash(bytes),
+  };
+  scene.assets = [asset];
+  scene.blocks = [
+    { id: "text.inner", type: "markdown", source: "Nested text" },
+    { id: "image.inner", type: "image", asset: asset.id },
+  ];
+  scene.board.placements = [
+    { id: "place.inner", content: "text.inner", x: 0, y: 0, width: 300 },
+  ];
+  const changed = applyCanvasCommands(f.doc, f.doc.revision, [
+    {
+      type: "add_block",
+      noteId: f.doc.notes[0].id,
+      asset,
+      block: { id: "canvas.inline", type: "canvas", scene },
+    },
+  ]);
+  await f.store.save({
+    ...f.input,
+    document: changed,
+    baseRevision: f.doc.revision,
+    assets: [{ asset, bytes }],
+  });
+  expect(await f.load()).toEqual(changed);
+  const source = join(
+    f.tree,
+    "A.nomi",
+    "canvases",
+    "canvas.inline",
+    "text",
+    "text.inner.md",
+  );
+  expect(await readFile(source, "utf8")).toBe("Nested text");
+  await writeFile(source, "External nested text");
+  const external = await f.load();
+  expect(external.blocks.find((b) => b.id === "canvas.inline")).toMatchObject({
+    scene: {
+      blocks: [{ source: "External nested text" }, { asset: asset.id }],
+    },
+  });
+  const outside = join(f.path, "Drawing.nomi");
+  await cp(join(f.tree, "A.nomi"), outside, { recursive: true });
+  const id = await f.store.importPackage(outside),
+    imported = await f.load(),
+    note = imported.notes.find((n) => n.id === id)!;
+  const block = imported.blocks.find(
+    (b) => note.blocks.includes(b.id) && b.type === "canvas",
+  )!;
+  expect(block.id).not.toBe("canvas.inline");
+  if (block.type !== "canvas") throw Error("Missing canvas");
+  expect(block.scene.blocks[0]).toMatchObject({
+    source: "External nested text",
+  });
+  expect(block.scene.assets[0].id).not.toBe(asset.id);
+  expect(block.scene.blocks[1]).toMatchObject({
+    asset: block.scene.assets[0].id,
+  });
+  expect(imported.assets.some((a) => a.id === block.scene.assets[0].id)).toBe(
+    true,
+  );
+  expect(
+    (await readPackage(outside)).document.blocks.find(
+      (b) => b.id === "canvas.inline",
+    ),
+  ).toMatchObject({ scene: { assets: [asset] } });
+});
 it("round trips all existing document semantics and standalone notes with physical children", async () => {
   const f = await fixture();
   expect(await f.load()).toEqual(f.doc);

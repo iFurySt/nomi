@@ -3,6 +3,7 @@ import {
   newCanvasId,
   canvasSelectionBounds,
   canvasConnectorGeometry,
+  blockAssetIds,
   type CanvasDocument,
   type CanvasRect,
   type CanvasCommand,
@@ -37,7 +38,7 @@ export function selectionSnapshot(doc: CanvasDocument, ids: string[]) {
         : b,
     ),
     assets: doc.assets.filter((a) =>
-      blocks.some((b) => "asset" in b && b.asset === a.id),
+      blocks.some((b) => blockAssetIds(b).includes(a.id)),
     ),
     board: {
       id: "clipboard.board",

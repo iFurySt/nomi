@@ -1,3 +1,6 @@
+import { CanvasToolMenu } from "../canvas/CanvasToolMenu";
+import { ShapeGlyph } from "../canvas/ShapeGlyph";
+import { GenerateCanvas } from "../canvas/GenerateCanvas";
 import {
   useEffect,
   useLayoutEffect,
@@ -10,7 +13,9 @@ import type {
   DragEvent as ReactDragEvent,
 } from "react";
 import {
+  Sparkles,
   Shapes,
+  LayoutTemplate,
   MousePointer2,
   Hand,
   Plus,
@@ -142,14 +147,23 @@ const resizeDirections: { direction: CanvasResizeDirection; label: string }[] =
 const isTyping = (target: EventTarget | null) =>
   target instanceof Element &&
   !!target.closest('input,textarea,select,[contenteditable="true"]');
-export function CanvasWorkspace({ profile }: { profile: string }) {
+export function CanvasWorkspace({
+  profile,
+  embedded = false,
+  onClose,
+}: {
+  profile: string;
+  embedded?: boolean;
+  onClose?: () => void;
+}) {
+  const [generating, setGenerating] = useState(false);
   const data = useCanvasDocument(profile),
     doc = data.document;
   const viewport = useRef<HTMLDivElement>(null),
     fileInput = useRef<HTMLInputElement>(null);
   const [camera, setCamera] = useState<CanvasCamera>(
     () =>
-      readCanvasCamera(profile, "document.home") ?? {
+      readCanvasCamera(profile, data.document?.id ?? "document.home") ?? {
         x: 70,
         y: 80,
         zoom: 0.75,
@@ -549,14 +563,14 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
       Math.max(
         0.2,
         Math.min(
-          (v.clientWidth - 100) / (right - left),
+          (v.clientWidth - 112) / (right - left),
           (v.clientHeight - 160) / (bottom - top),
         ),
       ),
     );
     pan({
       zoom,
-      x: (v.clientWidth - (right - left) * zoom) / 2 - left * zoom,
+      x: 88 + (v.clientWidth - 112 - (right - left) * zoom) / 2 - left * zoom,
       y: 90 + (v.clientHeight - 170 - (bottom - top) * zoom) / 2 - top * zoom,
     });
     saveView();
@@ -573,7 +587,7 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
       0.2,
       Math.min(
         1,
-        (v.clientWidth - 100) / p.width,
+        (v.clientWidth - 112) / p.width,
         (v.clientHeight - 190) / height,
       ),
     );
@@ -582,7 +596,7 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
     setExampleIndex(index);
     pan({
       zoom,
-      x: (v.clientWidth - p.width * zoom) / 2 - p.x * zoom,
+      x: 88 + (v.clientWidth - 112 - p.width * zoom) / 2 - p.x * zoom,
       y: 100 + (v.clientHeight - 190 - height * zoom) / 2 - p.y * zoom,
     });
     saveView();
@@ -636,11 +650,15 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
   useLayoutEffect(() => {
     if (!doc || initialized.current) return;
     initialized.current = true;
-    if (!readCanvasCamera(profile, doc.id)) fit();
-  }, [doc, profile]);
+    if (embedded || !readCanvasCamera(profile, doc.id)) fit();
+  }, [doc, profile, embedded]);
   useEffect(() => {
     const save = () =>
-      writeCanvasCamera(profile, "document.home", cameraRef.current);
+      writeCanvasCamera(
+        profile,
+        data.current.current?.id ?? "document.home",
+        cameraRef.current,
+      );
     window.addEventListener("pagehide", save);
     return () => {
       save();
@@ -700,7 +718,26 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
   }, [!!doc, profile]);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if (isTyping(event.target) || document.querySelector('[role="dialog"]'))
+      const dialogs = [...document.querySelectorAll('[role="dialog"]')];
+      const dialog = dialogs.at(-1);
+      if (
+        embedded &&
+        event.key === "Escape" &&
+        !event.isComposing &&
+        isTyping(event.target) &&
+        viewport.current?.closest('[role="dialog"]') === dialog
+      ) {
+        (event.target as HTMLElement).blur();
+        finishEditing();
+        viewport.current?.focus();
+        return;
+      }
+      if (
+        isTyping(event.target) ||
+        (dialog &&
+          (!embedded ||
+            viewport.current?.closest('[role="dialog"]') !== dialog))
+      )
         return;
       if (event.code === "Space") {
         event.preventDefault();
@@ -708,7 +745,12 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
         viewport.current?.classList.add("space-panning");
       }
       if (event.key === "Escape") {
+        if (event.isComposing) return;
         const active = gesture.current;
+        if (embedded && !active && !editing && !connection) {
+          onClose?.();
+          return;
+        }
         if (active?.capture?.hasPointerCapture(active.pointer))
           active.capture.releasePointerCapture(active.pointer);
         else if (active && viewport.current?.hasPointerCapture(active.pointer))
@@ -929,7 +971,17 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
       window.removeEventListener("keyup", release);
       window.removeEventListener("blur", release);
     };
-  }, [selection.join(","), selectedConnector, data.document, dsl, focus]);
+  }, [
+    selection.join(","),
+    selectedConnector,
+    data.document,
+    dsl,
+    focus,
+    embedded,
+    onClose,
+    editing,
+    connection,
+  ]);
   const begin = (
     event: ReactPointerEvent,
     kind: Gesture["kind"],
@@ -2036,7 +2088,7 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
   };
   return (
     <div
-      className={`canvas-workspace tool-${tool} ${connection ? "is-connecting" : ""} ${connection?.reconnect ? "is-reconnecting" : ""} ${dragOver ? "is-file-over" : ""}`}
+      className={`canvas-workspace ${embedded ? "is-embedded" : ""} tool-${tool} ${connection ? "is-connecting" : ""} ${connection?.reconnect ? "is-reconnecting" : ""} ${dragOver ? "is-file-over" : ""}`}
       onPointerUp={(event) => {
         if (gesture.current) end(event);
       }}
@@ -2079,26 +2131,148 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
         }
       }}
     >
-      <div className="canvas-titlebar">
-        <button
-          aria-label="画布内容"
-          title="画布内容"
-          onClick={() => setOutline(!outline)}
-        >
-          <Layers size={18} />
-        </button>
-        <div>
-          <strong>{doc.title}</strong>
-          <span role="status">
-            {data.saveError
-              ? "尚未保存"
-              : data.saving
-                ? "保存中…"
-                : "已保存到本机"}
-          </span>
+      {embedded && (
+        <div className="canvas-titlebar">
+          <button
+            aria-label="关闭画布"
+            data-close
+            onClick={() => {
+              finishEditing();
+              onClose?.();
+            }}
+          >
+            <X size={18} />
+            <span>Close</span>
+          </button>
+          <span className="canvas-title-divider" />
+          <input
+            key={doc.id + ":" + doc.title}
+            className="canvas-name"
+            aria-label="画布名称"
+            defaultValue={doc.title}
+            maxLength={200}
+            onFocus={(event) => event.target.select()}
+            onBlur={(event) => {
+              const current = data.current.current;
+              const title = event.target.value.trim() || "画布";
+              if (current && title !== current.title) {
+                try {
+                  data.endGroup();
+                  data.replace({ ...current, title }, current.revision);
+                } catch (error) {
+                  setMessage((error as Error).message);
+                }
+              }
+              event.target.value = title;
+            }}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return;
+              if (event.key === "Enter") {
+                event.preventDefault();
+                event.currentTarget.blur();
+                viewport.current?.focus();
+              }
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                event.currentTarget.value = doc.title;
+                event.currentTarget.blur();
+                viewport.current?.focus();
+              }
+            }}
+          />
         </div>
-      </div>
-      <div className="canvas-toolbar" aria-label="画布工具栏">
+      )}
+      <span className="sr-only canvas-save-status" role="status">
+        {data.saveError ? "尚未保存" : data.saving ? "保存中…" : "已保存到本机"}
+      </span>
+      {generating && (
+        <GenerateCanvas
+          repository={data.repository}
+          onClose={() => setGenerating(false)}
+          onInsert={(commands) => {
+            const point = {
+              x: Math.max(
+                center().x,
+                ...rectangles.map((r) => r.x + r.width + 80),
+              ),
+              y: center().y,
+            };
+            const shifted = commands.map((c) =>
+              c.type === "add_block" && c.placement
+                ? {
+                    ...c,
+                    placement: {
+                      ...c.placement,
+                      x: c.placement.x + point.x,
+                      y: c.placement.y + point.y,
+                    },
+                  }
+                : c,
+            );
+            data.endGroup();
+            const result = edit(shifted);
+            if (result) {
+              const placed = shifted.flatMap((c) =>
+                c.type === "add_block" && c.placement
+                  ? [{ ...c.placement, height: c.placement.height ?? 300 }]
+                  : [],
+              );
+              setSelection(placed.map((p) => p.id));
+              const bounds = canvasSelectionBounds(placed),
+                v = viewport.current;
+              if (v) {
+                const zoom = Math.max(
+                  0.15,
+                  Math.min(
+                    1,
+                    (v.clientWidth - 160) / bounds.width,
+                    (v.clientHeight - 160) / bounds.height,
+                  ),
+                );
+                pan({
+                  x: v.clientWidth / 2 - (bounds.x + bounds.width / 2) * zoom,
+                  y: v.clientHeight / 2 - (bounds.y + bounds.height / 2) * zoom,
+                  zoom,
+                });
+                saveView();
+              }
+            }
+            return !!result;
+          }}
+        />
+      )}
+      <div
+        className="canvas-toolbar"
+        role="toolbar"
+        aria-label="画布工具栏"
+        aria-orientation="vertical"
+      >
+        <CanvasToolMenu label="模板" icon={<LayoutTemplate size={18} />}>
+          {(close) => (
+            <button
+              className="canvas-template-item"
+              aria-label="添加体验样例"
+              disabled={addingExamples}
+              onClick={() => {
+                close();
+                void addExamples();
+              }}
+            >
+              <Shapes size={20} />
+              <span>全部内容示例</span>
+            </button>
+          )}
+        </CanvasToolMenu>
+        <button
+          aria-label="AI 生成"
+          title="AI 生成图示或交互实验"
+          onClick={() => {
+            finishEditing();
+            setGenerating(true);
+          }}
+        >
+          <Sparkles size={18} />
+        </button>
         <button
           aria-label="选择工具"
           title="选择"
@@ -2122,7 +2296,6 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
           onClick={() => createNote()}
         >
           <FilePlus2 size={18} />
-          <span>笔记</span>
         </button>
         <button
           aria-label="添加图片或文件"
@@ -2130,7 +2303,6 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
           onClick={() => attach()}
         >
           <ImagePlus size={18} />
-          <Paperclip size={15} />
         </button>
         <button
           aria-label="添加交互块"
@@ -2140,25 +2312,41 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
           <FlaskConical size={18} />
         </button>
         <span className="canvas-tool-divider" />
-        <select
-          aria-label="添加形状"
-          title="添加形状"
-          value=""
-          onChange={(event) =>
-            createShape(
-              event.target.value as "rectangle" | "ellipse" | "diamond",
-            )
-          }
-        >
-          <option value="" disabled>
-            ◇ 形状
-          </option>
-          {CANVAS_SHAPES.map((shape) => (
-            <option key={shape} value={shape}>
-              {canvasShapeNames[shape]}
-            </option>
-          ))}
-        </select>
+        <CanvasToolMenu label="添加形状" icon={<Shapes size={18} />}>
+          {(close) => (
+            <div className="selection-shape-grid">
+              {CANVAS_SHAPES.map((shape) => (
+                <button
+                  key={shape}
+                  data-create-shape={shape}
+                  aria-label={`添加${canvasShapeNames[shape]}`}
+                  title={canvasShapeNames[shape]}
+                  onClick={() => {
+                    close();
+                    createShape(shape);
+                  }}
+                >
+                  <svg viewBox="-8 -8 116 116">
+                    {shape === "text" ? (
+                      <text
+                        x="50"
+                        y="75"
+                        textAnchor="middle"
+                        fontSize="78"
+                        fill="currentColor"
+                        stroke="none"
+                      >
+                        T
+                      </text>
+                    ) : (
+                      <ShapeGlyph shape={shape} />
+                    )}
+                  </svg>
+                </button>
+              ))}
+            </div>
+          )}
+        </CanvasToolMenu>
         <button
           aria-label="连接工具"
           title="连接：从对象边缘拖向另一个对象"
@@ -2194,6 +2382,26 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
           onClick={data.redo}
         >
           <Redo2 size={18} />
+        </button>
+        <span className="canvas-tool-divider" />
+        <button
+          aria-label="画布内容"
+          title="画布内容"
+          aria-pressed={outline}
+          onClick={() => setOutline(!outline)}
+        >
+          <Layers size={18} />
+        </button>
+        <button
+          aria-label="编辑文档 DSL"
+          title="文档 DSL"
+          onClick={() => {
+            sourceRevision.current = doc.revision;
+            setDsl(JSON.stringify(doc, null, 2));
+            setDslError("");
+          }}
+        >
+          <Code2 size={18} />
         </button>
       </div>
       {activeConnector && !connection ? (
@@ -2251,28 +2459,6 @@ export function CanvasWorkspace({ profile }: { profile: string }) {
           onEndGroup={data.endGroup}
         />
       ) : null}
-      <button
-        className="canvas-examples-trigger"
-        aria-label="添加体验样例"
-        title="添加全部内容类型的体验样例"
-        disabled={addingExamples}
-        onClick={() => void addExamples()}
-      >
-        <Shapes size={17} />
-        <span>{addingExamples ? "准备样例…" : "体验样例"}</span>
-      </button>
-      <button
-        className="canvas-dsl-trigger"
-        aria-label="编辑文档 DSL"
-        title="文档 DSL"
-        onClick={() => {
-          sourceRevision.current = doc.revision;
-          setDsl(JSON.stringify(doc, null, 2));
-          setDslError("");
-        }}
-      >
-        <Code2 size={18} />
-      </button>
       <div
         ref={viewport}
         className="canvas-viewport"

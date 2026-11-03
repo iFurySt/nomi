@@ -7,6 +7,7 @@ import { insertionNode } from "./RichBlockFrame";
 import "./slash-menu.css";
 
 const aliases: Record<InsertKind, string> = {
+  canvas: "canvas drawing draw sketch 画布 绘图 涂鸦 手绘",
   paragraph: "text plain 正文 文本",
   heading1: "h1 heading 标题 一级 #",
   heading2: "h2 heading 标题 二级 ##",
@@ -24,6 +25,7 @@ const aliases: Record<InsertKind, string> = {
   experiment: "interactive genui experiment 交互 实验",
 };
 const common = new Set<InsertKind>([
+  "canvas",
   "table",
   "formula",
   "note-reference",
@@ -102,6 +104,7 @@ export function SlashMenu({
     // atomic insertion replaces this paragraph; cancelling loses no text.
     if (
       kind === "asset" ||
+      kind === "canvas" ||
       kind === "experiment" ||
       kind === "note-reference"
     ) {

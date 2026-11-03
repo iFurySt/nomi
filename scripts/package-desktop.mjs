@@ -158,6 +158,7 @@ run("python3", [
 import plistlib,json,sys,pathlib
 p=pathlib.Path(sys.argv[1]);c=json.loads(sys.argv[2]);v=sys.argv[3];arch=sys.argv[4]
 d=plistlib.loads(p.read_bytes());d.update(CFBundleName='Nomi',CFBundleExecutable='Nomi',CFBundleDisplayName='Nomi',CFBundleIdentifier=c['bundleId'],CFBundleShortVersionString=v,CFBundleVersion=v,CFBundleIconFile='nomi.icns',LSApplicationCategoryType='public.app-category.productivity',LSMinimumSystemVersion=c['minimumSystemVersion'],SUFeedURL=c['feedBase']+'/appcast-'+arch+'.xml',SUPublicEDKey=c['sparklePublicKey'],SUEnableAutomaticChecks=True,SUAutomaticallyUpdate=False,SUAllowsAutomaticUpdates=False,SUShowReleaseNotes=False)
+d['CFBundleURLTypes']=[dict(CFBundleURLName='Nomi',CFBundleURLSchemes=['nomi'])]
 d['UTExportedTypeDeclarations']=[dict(UTTypeIdentifier='com.ifuryst.nomi.document',UTTypeDescription='Nomi Document',UTTypeConformsTo=['com.apple.package','public.composite-content'],UTTypeTagSpecification={'public.filename-extension':['nomi']})]
 d['CFBundleDocumentTypes']=[dict(CFBundleTypeName='Nomi Document',CFBundleTypeRole='Editor',LSHandlerRank='Owner',LSTypeIsPackage=True,CFBundleTypeIconFile='nomi.icns',LSItemContentTypes=['com.ifuryst.nomi.document'])]
 p.write_bytes(plistlib.dumps(d))

@@ -54,7 +54,9 @@ Settings → General 位于 Appearance 上方，也是设置默认页。文稿�
 
 ## ChatGPT 与 AI 路径
 
-桌面账号菜单 → **Sign in with ChatGPT** 或 Settings → ChatGPT，在系统浏览器中完成 Nomi 自己的授权后返回。可管理多个账号、选择账号提供的模型与 reasoning effort；可用性取决于实际账号权限和服务响应，不保证所有账号都可用。
+桌面账号菜单 → **Sign in with ChatGPT** 或 Settings → ChatGPT，在系统浏览器中完成 Nomi 自己的授权后返回。回调页只保留 Continue in Nomi 标题与 Open Nomi 按钮，并自动尝试唤回桌面；实际账号状态以交换凭据和身份验证完成后的 App 为准。等待状态与 Cancel 同行；首次启用订阅显示一次紧凑确认框及 Manage usage 入口，按 [官方 UI/UX 指南](https://developers.openai.com/siwc/ui-ux-guidelines) 保留说明。失败可就地重试或关闭提示，主动取消不显示连接错误；未验证的注册记录保留重试所需 client ID，但不冒充已连接账号。
+
+正式 macOS 包声明 `nomi://auth/complete`，本地开发包声明 `nomi-local://auth/complete`，两者仅用于唤醒窗口，不接受查询参数、不携带凭据、不导航文稿。OAuth 继续使用 `127.0.0.1` 的 HTTP callback；回调页设置 no-store / no-referrer 与 nonce CSP，并移除地址栏授权参数。参考 [Electron Deep Links](https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app) 与 [OpenAI OSS 登录协议](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)。可管理多个账号、选择账号提供的模型与 reasoning effort；可用性取决于实际账号权限和服务响应，不保证所有账号都可用。
 
 路径为 `React UI → allowlisted preload → ChatGPTHost`。保留 PKCE / state / nonce、回调验证、JWT 校验、刷新与撤销、加密存储及账号偏好；renderer 不拿 token。0.1.0 没有独立 Chat 页面和金融工具，不启动 Codex app-server。保留 provider 适配为未来文稿 AI 能力使用，不宣称已接通笔记或家庭资料。家庭 server 的 SeedX 路径独立。
 

@@ -1,4 +1,5 @@
 import { parseCanvasDocument, type CanvasDocument } from "./document";
+import { blockAssetIds } from "./embedded-canvas";
 
 export interface NoteExportOptions {
   format: "markdown" | "jekyll";
@@ -60,7 +61,7 @@ export function planNoteExport(
   );
   const assets = document.assets.filter(
     (a) =>
-      blocks.some((b) => "asset" in b && b.asset === a.id) ||
+      blocks.some((b) => blockAssetIds(b).includes(a.id)) ||
       (note.icon?.type === "image" && note.icon.asset === a.id),
   );
   const { parentId: _parentId, ...standaloneNote } = note;
@@ -88,6 +89,10 @@ export function planNoteExport(
           "文稿引用仅导出名称，不包含目标正文。请在 Nomi 中打开引用。",
         );
         return `${label(document.notes.find((n) => block.documentId === document.id && n.id === block.noteId)?.title || block.title || "未命名文稿")}（文稿引用）`;
+      }
+      if (block.type === "canvas") {
+        warnings.push("画布绘图请在随包附带的离线阅读页或 Nomi 文稿中查看。");
+        return `[画布绘图](${assetPath("index.html")}#${noteFileId(block.id)})`;
       }
       if (block.type === "interactive") {
         const path = assetPath(`${noteFileId(block.id)}.html`);

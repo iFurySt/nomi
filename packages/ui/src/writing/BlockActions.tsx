@@ -40,6 +40,7 @@ import {
 import type { MathAlignment } from "./mathSource";
 import { textFormats, type TextFormat } from "./SelectionToolbar";
 export type InsertKind =
+  | "canvas"
   | "note-reference"
   | "paragraph"
   | "heading1"
@@ -69,6 +70,7 @@ export const blockChoices = [
   ["table", "表格", Table2],
   ["formula", "公式", Sigma],
   ["note-reference", "文稿", FileText],
+  ["canvas", "画布", LayoutDashboard],
   ["asset", "图片 / 附件", ImagePlus],
   ["experiment", "交互实验", FlaskConical],
 ] as const;
@@ -159,14 +161,24 @@ export function BlockActions({
       "内容块");
   const basic = blockChoices.filter(
     ([value]) =>
-      !["asset", "experiment", "table", "formula", "note-reference"].includes(
-        value,
-      ),
+      ![
+        "asset",
+        "experiment",
+        "table",
+        "formula",
+        "note-reference",
+        "canvas",
+      ].includes(value),
   );
   const common = blockChoices.filter(([value]) =>
-    ["asset", "experiment", "table", "formula", "note-reference"].includes(
-      value,
-    ),
+    [
+      "asset",
+      "experiment",
+      "table",
+      "formula",
+      "note-reference",
+      "canvas",
+    ].includes(value),
   );
   const insertChoices = (
     <>
@@ -351,6 +363,7 @@ export function BlockActions({
                         .filter(
                           ([value]) =>
                             ![
+                              "canvas",
                               "note-reference",
                               "asset",
                               "experiment",
@@ -408,6 +421,7 @@ export function BlockActions({
                 >
                   <Trash2 size={15} />
                   {[
+                    "canvas",
                     "note-reference",
                     "image",
                     "interactive",

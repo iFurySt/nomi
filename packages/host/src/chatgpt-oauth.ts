@@ -1,9 +1,11 @@
+import { chatGPTCallbackPage } from "./chatgpt-callback-page";
 import { createServer } from "node:http";
 import { createHash, randomBytes } from "node:crypto";
 import { CHATGPT_ISSUER, CHATGPT_RESOURCE } from "./chatgpt-transport";
 
 export async function startChatGPTSignIn(options: {
   hostId: string;
+  localReturn?: boolean;
   clientId?: string;
   idToken?: string;
   signal: AbortSignal;
@@ -26,16 +28,20 @@ export async function startChatGPTSignIn(options: {
   // Attach rejection handling before asynchronous listener startup/browser open.
   void callback.catch(() => {});
   const server = createServer((request, response) => {
-    response.setHeader("Content-Type", "text/plain; charset=utf-8");
+    const pageNonce = randomBytes(18).toString("base64url");
+    response.setHeader("Content-Type", "text/html; charset=utf-8");
+    response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Cache-Control", "no-store");
     response.setHeader(
       "Content-Security-Policy",
-      "default-src 'none'; frame-ancestors 'none'",
+      `default-src 'none'; style-src 'nonce-${pageNonce}'; script-src 'nonce-${pageNonce}'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
     );
     response.setHeader("Referrer-Policy", "no-referrer");
-    const finish = (status: number, body: string) => {
+    const finish = (status: number, _body: string) => {
       response.writeHead(status);
-      response.end(body);
+      response.end(
+        chatGPTCallbackPage(status === 200, pageNonce, options.localReturn),
+      );
     };
     try {
       if (

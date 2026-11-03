@@ -830,7 +830,11 @@ async function checks(phase, expected) {
       ["ellipse", "验证与理解", "blue"],
     ]) {
       const count = cards().length;
-      choose("添加形状", shape);
+      button("添加形状").click();
+      await until(() =>
+        document.querySelector(`[data-create-shape="${shape}"]`),
+      );
+      document.querySelector(`[data-create-shape="${shape}"]`).click();
       await until(
         () =>
           cards().length === count + 1 &&
@@ -848,8 +852,8 @@ async function checks(phase, expected) {
       await until(() => !document.querySelector("[data-shape-text]"));
       await until(
         () =>
-          document.querySelector('.canvas-titlebar [role="status"]')
-            .textContent === "已保存到本机",
+          document.querySelector(".canvas-save-status").textContent ===
+          "已保存到本机",
       );
     }
     d = await saved();
@@ -1955,7 +1959,7 @@ async function checks(phase, expected) {
   );
   await until(
     () =>
-      document.querySelector('.canvas-titlebar [role="status"]').textContent ===
+      document.querySelector(".canvas-save-status").textContent ===
       "已保存到本机",
   );
   if (phase === "ready") {
@@ -2054,6 +2058,8 @@ async function checks(phase, expected) {
   }
   if (phase === "examples") {
     const before = await saved();
+    button("模板").click();
+    await until(() => button("添加体验样例"));
     button("添加体验样例").click();
     await until(
       async () =>
@@ -2124,8 +2130,10 @@ async function checks(phase, expected) {
       "Sequential tour did not wrap",
     );
     const revision = (await saved()).revision;
+    button("模板").click();
+    await until(() => button("添加体验样例"));
     button("添加体验样例").click();
-    await until(() => !button("添加体验样例").disabled);
+    await until(() => !document.querySelector(".canvas-tool-menu"));
     await wait(40);
     assert(
       (await saved()).revision === revision,
@@ -2376,8 +2384,7 @@ async function checks(phase, expected) {
   picker.dispatchEvent(new Event("change", { bubbles: true }));
   await until(
     () =>
-      document.querySelector('.canvas-titlebar [role="status"]').textContent ===
-      "尚未保存",
+      document.querySelector(".canvas-save-status").textContent === "尚未保存",
   );
   assert(
     (await saved()).assets.length === 3,
@@ -2387,7 +2394,7 @@ async function checks(phase, expected) {
   button("撤销画布修改").click();
   await until(
     () =>
-      document.querySelector('.canvas-titlebar [role="status"]').textContent ===
+      document.querySelector(".canvas-save-status").textContent ===
       "已保存到本机",
   );
   button("重做画布修改").click();
@@ -2459,8 +2466,7 @@ async function checks(phase, expected) {
   input(existing.querySelector("[data-markdown]"), source + "\n恢复保存");
   await until(
     () =>
-      document.querySelector('.canvas-titlebar [role="status"]').textContent ===
-      "尚未保存",
+      document.querySelector(".canvas-save-status").textContent === "尚未保存",
   );
   window.canvasFixture.failWrites = false;
   [...document.querySelectorAll(".canvas-message button")]
@@ -2468,7 +2474,7 @@ async function checks(phase, expected) {
     .click();
   await until(
     () =>
-      document.querySelector('.canvas-titlebar [role="status"]').textContent ===
+      document.querySelector(".canvas-save-status").textContent ===
       "已保存到本机",
   );
   existing.querySelector(".canvas-card-actions button").click();

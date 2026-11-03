@@ -510,8 +510,9 @@ export class DocumentStore {
         : {}),
       ...(n.parentId ? { parentId: fresh(n.parentId) } : {}),
     }));
+    const { remapCanvasAssets } = await import("../../core/src/canvas/index");
     const blocks = source.blocks.map((b) => ({
-      ...b,
+      ...remapCanvasAssets(b, fresh),
       id: fresh(b.id),
       ...(b.type === "note-reference" &&
       b.documentId === source.id &&
