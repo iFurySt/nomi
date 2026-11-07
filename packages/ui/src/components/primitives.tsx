@@ -76,6 +76,7 @@ export function Modal({
   closeText,
   hideHeader = false,
   initialFocus,
+  overlayClassName = "",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -88,6 +89,7 @@ export function Modal({
   closeText?: string;
   hideHeader?: boolean;
   initialFocus?: string;
+  overlayClassName?: string;
 }) {
   const previousFocus = useRef<HTMLElement | null>(null);
   const wasOpen = useRef(false);
@@ -99,7 +101,7 @@ export function Modal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="dialog-overlay" />
+        <Dialog.Overlay className={`dialog-overlay ${overlayClassName}`} />
         <Dialog.Content
           onEscapeKeyDown={
             keepEscape ? (event) => event.preventDefault() : undefined

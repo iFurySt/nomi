@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { ListTree, Pin, PinOff } from "lucide-react";
+import { ListTree, Pin } from "lucide-react";
 
 type Heading = { element: HTMLElement; text: string; level: number };
 const preference = "nomi.notes.outline-pinned.v1";
@@ -15,7 +15,7 @@ export function WritingOutline({
   const [headings, setHeadings] = useState<Heading[]>([]),
     [active, setActive] = useState(0);
   const [open, setOpen] = useState(false),
-    [wide, setWide] = useState(false);
+    [marginWidth, setMarginWidth] = useState(0);
   const [pinned, setPinned] = useState(() => {
     try {
       return localStorage.getItem(preference) === "true";
@@ -23,6 +23,7 @@ export function WritingOutline({
       return false;
     }
   });
+  const wide = marginWidth >= 120;
   const fixed = pinned && wide,
     expanded = fixed || open;
   useEffect(() => {
@@ -37,6 +38,16 @@ export function WritingOutline({
       entries.forEach((heading, i) => {
         if (heading.element.getBoundingClientRect().top <= ceiling) index = i;
       });
+      // The final section may be too short to reach the reading line.
+      const last = entries.at(-1);
+      if (
+        last &&
+        pane.scrollTop > 0 &&
+        pane.scrollHeight - pane.clientHeight - pane.scrollTop <= 2 &&
+        last.element.getBoundingClientRect().top <
+          pane.getBoundingClientRect().bottom
+      )
+        index = entries.length - 1;
       setActive(index);
     };
     const scan = () => {
@@ -74,11 +85,27 @@ export function WritingOutline({
       childList: true,
       characterData: true,
     });
-    const resize = new ResizeObserver(() => {
-      setWide(pane.parentElement!.clientWidth >= 900);
+    const measure = () => {
+      const article = pane.querySelector<HTMLElement>(".writing-article");
+      if (!article) return;
+      // Share the existing left margin, leaving the writing block handles clear.
+      const style = getComputedStyle(article);
+      const contentLeft =
+        article.getBoundingClientRect().left + parseFloat(style.paddingLeft);
+      setMarginWidth(
+        Math.max(
+          0,
+          Math.min(220, contentLeft - pane.getBoundingClientRect().left - 76),
+        ),
+      );
       schedule();
-    });
+    };
+    const resize = new ResizeObserver(measure);
     resize.observe(pane.parentElement!);
+    resize.observe(pane);
+    const article = pane.querySelector<HTMLElement>(".writing-article");
+    if (article) resize.observe(article);
+    measure();
     pane.addEventListener("scroll", track, { passive: true });
     scan();
     return () => {
@@ -131,6 +158,7 @@ export function WritingOutline({
       aria-label="文稿目录"
       data-expanded={expanded || undefined}
       data-pinned={fixed || undefined}
+      style={fixed ? { width: marginWidth } : undefined}
       onPointerEnter={(event) => event.pointerType !== "touch" && setOpen(true)}
       onPointerLeave={() => setOpen(false)}
       onFocusCapture={() => setOpen(true)}
@@ -182,7 +210,7 @@ export function WritingOutline({
                   }
                 }}
               >
-                {fixed ? <PinOff size={15} /> : <Pin size={15} />}
+                <Pin size={15} fill={fixed ? "currentColor" : "none"} />
               </button>
             )}
           </header>

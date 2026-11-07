@@ -1,3 +1,5 @@
+import { Sparkles } from "lucide-react";
+import { Tooltip } from "../components/Tooltip";
 import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useEditorState } from "@tiptap/react";
@@ -39,9 +41,11 @@ export function formatText(
 export function SelectionToolbar({
   editor,
   onFormat,
+  onAI,
   disabled,
 }: {
   editor: Editor;
+  onAI?: (range: TextRange) => void;
   onFormat: (format: TextFormat, range: TextRange) => void;
   disabled: boolean;
 }) {
@@ -224,6 +228,13 @@ export function SelectionToolbar({
       style={{ left: position.left, top: position.top }}
       onPointerDown={(e) => e.preventDefault()}
     >
+      {onAI && (
+        <Tooltip label="AI">
+          <button aria-label="AI" onClick={() => onAI(anchor.range)}>
+            <Sparkles size={17} />
+          </button>
+        </Tooltip>
+      )}
       {textFormats.map(([kind, label, Icon]) => (
         <button
           key={kind}

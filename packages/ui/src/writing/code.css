@@ -5,7 +5,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-muted);
-  overflow: hidden;
+  overflow: visible;
 }
 .code-toolbar {
   display: flex;
@@ -25,7 +25,7 @@
   border-radius: 4px;
   outline: none;
   background: transparent;
-  color: var(--text);
+  color: var(--muted);
   font: inherit;
 }
 .code-toolbar .code-caption::placeholder {
@@ -34,7 +34,8 @@
 }
 .code-toolbar .code-caption:hover,
 .code-toolbar .code-caption:focus {
-  background: var(--interaction-hover);
+  background: transparent;
+  box-shadow: none;
 }
 .code-toolbar .code-language {
   flex-shrink: 0;
@@ -44,8 +45,8 @@
   padding: 3px 6px;
   color: var(--muted);
 }
-.code-tool,
-.code-copy {
+.code-toolbar .code-tool,
+.code-toolbar .code-copy {
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -58,9 +59,9 @@
   background: transparent;
   cursor: pointer;
 }
-.code-tool:hover,
-.code-copy:hover,
-.code-tool[aria-pressed="true"] {
+.code-toolbar .code-tool:hover,
+.code-toolbar .code-copy:hover,
+.code-toolbar .code-tool[aria-pressed="true"] {
   background: var(--interaction-hover, var(--border));
   color: var(--text);
 }
@@ -205,5 +206,85 @@
   :root:not([data-theme="light"]) .writing-code-block .hljs-built_in,
   :root:not([data-theme="light"]) .writing-code-block .hljs-name {
     color: #9dbfe3;
+  }
+}
+
+/* Keep the resting header quiet without removing keyboard access. */
+.code-toolbar
+  > :is(.code-language, .code-tool, .code-copy, .code-tool-divider) {
+  opacity: 0;
+  pointer-events: none;
+}
+.code-toolbar .code-fold[aria-expanded="false"],
+.writing-code-block:hover .code-toolbar > *,
+.code-toolbar:has(:focus-visible, .code-caption:focus, [data-state="open"])
+  > * {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: none) {
+  .code-toolbar > * {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* The resize grip sits on the bottom border, outside the scrolling code. */
+.writing-code-block:hover,
+.writing-code-block:has(.code-resize-handle:focus-visible, [data-resizing]) {
+  border-color: #527bff;
+}
+.code-scroll {
+  box-sizing: border-box;
+  border-radius: 0 0 8px 8px;
+  overscroll-behavior: auto;
+}
+.writing-code-block .code-resize-handle {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+  opacity: 0;
+  pointer-events: none;
+}
+.writing-code-block .code-resize-handle span {
+  width: 52px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  opacity: 0.55;
+}
+.writing-code-block:hover .code-resize-handle,
+.writing-code-block .code-resize-handle:focus-visible,
+.writing-code-block .code-resize-handle[data-resizing] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.writing-code-block .code-resize-handle:hover,
+.writing-code-block .code-resize-handle:focus-visible {
+  background: transparent;
+  outline: none;
+}
+.writing-code-block .code-resize-handle:hover span,
+.writing-code-block .code-resize-handle:focus-visible span,
+.writing-code-block .code-resize-handle[data-resizing] span {
+  background: #527bff;
+  opacity: 1;
+}
+@media (hover: none) {
+  .writing-code-block .code-resize-handle {
+    opacity: 1;
+    pointer-events: auto;
   }
 }

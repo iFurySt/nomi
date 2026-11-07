@@ -15,12 +15,14 @@ export function CanvasScenePreview({
   viewportHeight,
   viewportWidth,
   zoom = 1,
+  offset,
 }: {
   scene: CanvasDocument;
   content: (id: string) => ReactNode;
   viewportHeight?: number;
   viewportWidth?: number;
   zoom?: number;
+  offset?: { x: number; y: number };
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(720),
@@ -114,56 +116,15 @@ export function CanvasScenePreview({
     >
       {empty ? (
         <div className="embedded-canvas-empty">
-          <svg
-            width="88"
-            height="72"
-            viewBox="0 0 88 72"
-            fill="none"
-            aria-hidden="true"
-          >
-            <rect
-              x="19"
-              y="10"
-              width="53"
-              height="47"
-              rx="7"
-              fill="var(--canvas)"
-              stroke="currentColor"
-              opacity=".3"
-            />
-            <rect
-              x="12"
-              y="16"
-              width="53"
-              height="47"
-              rx="7"
-              fill="var(--canvas)"
-              stroke="currentColor"
-              opacity=".6"
-            />
-            <path
-              d="m20 51 12-13 10 10 8-7 8 10"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-            <circle cx="49" cy="30" r="4" fill="currentColor" opacity=".4" />
-            <path
-              d="M9 31 5 27m68 26 7 3M67 9l3-5"
-              stroke="var(--accent, #527bff)"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
-          <span>画布暂无内容</span>
+          <span>暂无内容</span>
         </div>
       ) : (
         <div className="embedded-canvas-picture" inert aria-hidden="true">
           <div
             className="embedded-canvas-world"
             style={{
-              left: (width - sceneWidth * scale) / 2,
-              top: (height - sceneHeight * scale) / 2,
+              left: (width - sceneWidth * scale) / 2 + (offset?.x ?? 0),
+              top: (height - sceneHeight * scale) / 2 + (offset?.y ?? 0),
               width: sceneWidth,
               height: sceneHeight,
               transform: `scale(${scale}) translate(${-left}px, ${-top}px)`,

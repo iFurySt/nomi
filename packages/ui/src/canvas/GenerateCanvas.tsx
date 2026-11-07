@@ -4,6 +4,7 @@ import {
   canvasGenerationPrefix,
   parseCanvasGeneration,
   type CanvasDocument,
+  type NoteGenerationContext,
 } from "@nomi/core";
 import { respondWithChatGPT, requestChatGPT } from "@nomi/platform";
 import { useChatGPT } from "../chatgpt-context";
@@ -14,7 +15,9 @@ export function GenerateCanvas({
   onStart,
   onPreview,
   onInsert,
+  noteContext,
 }: {
+  noteContext?: NoteGenerationContext;
   onClose: () => void;
   onStart: () => void;
   onPreview: (scene?: CanvasDocument) => void;
@@ -82,7 +85,8 @@ export function GenerateCanvas({
           requestId: id,
           profileId: account.id,
           model: connection.model,
-          generation: "canvas",
+          generation: noteContext ? "note" : "canvas",
+          ...(noteContext ? { noteContext } : {}),
           messages: [{ role: "user", content: message }],
         },
         (delta) => {
@@ -108,14 +112,18 @@ export function GenerateCanvas({
       if (streamError) throw streamError;
       const scene = parseCanvasGeneration(result.text);
       if (!callbacks.current.onInsert(scene))
-        throw Error("未能加入画布，请重试。");
+        throw Error("插入位置已改变，请重新选择。");
       callbacks.current.onPreview(undefined);
       setStatus("已生成");
       setPrompt("");
     } catch (e) {
       if (request.current !== id) return;
       callbacks.current.onPreview(undefined);
-      setError("生成未完成，请重试。");
+      setError(
+        e instanceof Error && e.message === "插入位置已改变，请重新选择。"
+          ? e.message
+          : "生成未完成，请重试。",
+      );
       setStatus("");
     } finally {
       if (request.current === id) {
@@ -127,7 +135,7 @@ export function GenerateCanvas({
   return (
     <section
       className={`canvas-ai-composer${docked ? " is-docked" : ""}`}
-      aria-label="画布 AI"
+      aria-label={noteContext ? "文稿 AI" : "画布 AI"}
       data-busy={busy}
       onKeyDown={(e) => {
         e.stopPropagation();
@@ -163,7 +171,7 @@ export function GenerateCanvas({
           <textarea
             ref={input}
             aria-label="生成需求"
-            placeholder="想在画布上画什么？"
+            placeholder={noteContext ? "想做什么？" : "想在画布上画什么？"}
             value={prompt}
             maxLength={2000}
             readOnly={busy}

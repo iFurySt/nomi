@@ -1944,31 +1944,6 @@
   background: var(--interaction-hover);
   color: var(--canvas-accent);
 }
-.canvas-tool-tip {
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #24262a;
-  color: white;
-  font-size: 12px;
-  line-height: 20px;
-  pointer-events: none;
-  box-shadow: 0 4px 14px #00000016;
-}
-.canvas-tool-tip kbd {
-  min-width: 20px;
-  padding: 0 4px;
-  text-align: center;
-  border-radius: 4px;
-  background: #ffffff26;
-  font: inherit;
-}
-.canvas-tool-tip svg {
-  fill: #24262a;
-}
 .canvas-viewport[data-tool="shape"],
 .canvas-viewport[data-tool="text"] {
   cursor: crosshair;

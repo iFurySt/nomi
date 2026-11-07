@@ -22,24 +22,105 @@ export function EmbeddedCanvasBlock({
   block,
   profile,
   autoOpen = false,
+  noteId,
   onAutoOpened,
+  onRemove,
+  onInsertParagraph,
 }: {
   block: Block;
   profile: string;
   autoOpen?: boolean;
+  noteId?: string;
   onAutoOpened?: () => void;
+  onRemove?: () => void;
+  onInsertParagraph?: () => void;
 }) {
   const parent = useCanvasDocument(profile);
   const data = useEmbeddedCanvas(parent, block);
-  const [open, setOpen] = useState(autoOpen);
+  const routeOpen = () =>
+    !!noteId &&
+    location.hash.split("?")[0] === "#/notes" &&
+    new URLSearchParams(location.hash.split("?")[1]).get("note") === noteId &&
+    new URLSearchParams(location.hash.split("?")[1]).get("canvas") === block.id;
+  const [open, setOpen] = useState(routeOpen);
+  const show = () => {
+    if (noteId && !routeOpen()) {
+      const base = `#/notes?note=${encodeURIComponent(noteId)}`;
+      // Canonicalize the parent entry so Back returns to this exact note.
+      history.replaceState(history.state, "", base);
+      history.pushState(
+        { nomiCanvasReturn: base },
+        "",
+        `${base}&canvas=${encodeURIComponent(block.id)}`,
+      );
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    }
+    setOpen(true);
+  };
+  useEffect(() => {
+    if (!noteId) return;
+    const changed = () => setOpen(routeOpen());
+    window.addEventListener("hashchange", changed);
+    return () => window.removeEventListener("hashchange", changed);
+  }, [noteId, block.id]);
   useEffect(() => {
     if (!autoOpen) return;
-    setOpen(true);
+    show();
     onAutoOpened?.();
   }, [autoOpen, onAutoOpened]);
   const host = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<Block["preview"]>();
-  const [zoom, setZoom] = useState(1);
+  const [view, setView] = useState({ zoom: 1, x: 0, y: 0 });
+  const { zoom } = view;
+  const setZoom = (value: number) =>
+    setView({ zoom: Math.max(0.25, Math.min(3, value)), x: 0, y: 0 });
+  useEffect(() => {
+    const node = host.current?.querySelector<HTMLElement>(
+      ".embedded-canvas-preview",
+    );
+    if (!node) return;
+    // Chromium reports trackpad pinch as Ctrl+wheel. A non-passive listener
+    // keeps the gesture local instead of zooming/scrolling the document.
+    const wheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+      host.current?.focus({ preventScroll: true });
+      window.getSelection()?.removeAllRanges();
+      if (
+        !block.scene.board.placements.length &&
+        !block.scene.board.connectors?.length
+      )
+        return;
+      const rect = node.getBoundingClientRect();
+      const x = event.clientX - rect.left - rect.width / 2;
+      const y = event.clientY - rect.top - rect.height / 2;
+      const delta =
+        event.deltaY *
+        (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1);
+      setView((before) => {
+        const next = Math.max(
+          0.25,
+          Math.min(
+            3,
+            before.zoom *
+              Math.exp(-Math.max(-100, Math.min(100, delta)) * 0.01),
+          ),
+        );
+        const ratio = next / before.zoom;
+        return {
+          zoom: next,
+          x: x - (x - before.x) * ratio,
+          y: y - (y - before.y) * ratio,
+        };
+      });
+    };
+    node.addEventListener("wheel", wheel, { passive: false });
+    return () => node.removeEventListener("wheel", wheel);
+  }, [
+    block.scene.board.placements.length,
+    block.scene.board.connectors?.length,
+  ]);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
   const resize = useRef<{
@@ -156,6 +237,11 @@ export function EmbeddedCanvasBlock({
   const close = () => {
     parent.endGroup();
     void parent.flush();
+    if (noteId && routeOpen()) {
+      const base = `#/notes?note=${encodeURIComponent(noteId)}`;
+      if (history.state?.nomiCanvasReturn === base) history.back();
+      else location.hash = base;
+    }
     setOpen(false);
   };
   const scope = `${profile}:canvas:${parent.document?.id}:${block.id}`;
@@ -169,9 +255,20 @@ export function EmbeddedCanvasBlock({
         tabIndex={0}
         role="group"
         aria-label="画布，双击编辑"
+        onPointerDown={(event) => {
+          if (
+            event.button !== 0 ||
+            !(event.target instanceof Element) ||
+            !event.target.closest(".embedded-canvas-preview")
+          )
+            return;
+          event.preventDefault();
+          event.currentTarget.focus({ preventScroll: true });
+          window.getSelection()?.removeAllRanges();
+        }}
         onDoubleClick={(event) => {
           event.stopPropagation();
-          setOpen(true);
+          show();
         }}
         onKeyDown={(event) => {
           if (event.key === "Escape" && resize.current) {
@@ -181,10 +278,28 @@ export function EmbeddedCanvasBlock({
             return;
           }
           if (event.target !== event.currentTarget) return;
-          if (event.key === "Enter" || event.key === " ") {
+          if (
+            event.nativeEvent.isComposing ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.altKey
+          )
+            return;
+          if (
+            (event.key === "Backspace" || event.key === "Delete") &&
+            onRemove
+          ) {
             event.preventDefault();
             event.stopPropagation();
-            setOpen(true);
+            onRemove();
+          } else if (event.key === "Enter" && onInsertParagraph) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!event.repeat) onInsertParagraph();
+          } else if (event.key === " ") {
+            event.preventDefault();
+            event.stopPropagation();
+            show();
           }
         }}
       >
@@ -198,11 +313,7 @@ export function EmbeddedCanvasBlock({
             role="toolbar"
             aria-label="画布预览操作"
           >
-            <button
-              type="button"
-              aria-label="编辑画布"
-              onClick={() => setOpen(true)}
-            >
+            <button type="button" aria-label="编辑画布" onClick={show}>
               <Pencil size={16} />
               <span>编辑</span>
             </button>
@@ -225,7 +336,7 @@ export function EmbeddedCanvasBlock({
                 (!block.scene.board.placements.length &&
                   !block.scene.board.connectors?.length)
               }
-              onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}
+              onClick={() => setZoom(zoom - 0.25)}
             >
               <ZoomOut size={17} />
             </button>
@@ -247,7 +358,7 @@ export function EmbeddedCanvasBlock({
                 (!block.scene.board.placements.length &&
                   !block.scene.board.connectors?.length)
               }
-              onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
+              onClick={() => setZoom(zoom + 0.25)}
             >
               <ZoomIn size={17} />
             </button>
@@ -292,6 +403,7 @@ export function EmbeddedCanvasBlock({
         <CanvasScenePreview
           viewportHeight={preview?.height}
           zoom={zoom}
+          offset={view}
           scene={block.scene}
           content={(id) => (
             <CanvasContent
@@ -313,6 +425,7 @@ export function EmbeddedCanvasBlock({
           open
           title={block.scene.title}
           className="embedded-canvas-modal"
+          overlayClassName="embedded-canvas-overlay"
           keepEscape
           hideHeader
           initialFocus=".canvas-viewport"

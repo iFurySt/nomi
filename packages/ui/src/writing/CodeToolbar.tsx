@@ -53,6 +53,7 @@ export function CodeToolbar({
 }) {
   const cancelCaption = useRef(false);
   const [draft, setDraft] = useState(caption);
+  const [editingCaption, setEditingCaption] = useState(false);
   useEffect(() => setDraft(caption), [caption]);
   const value = aliases[language ?? ""] ?? language ?? "";
   const options = [
@@ -83,12 +84,14 @@ export function CodeToolbar({
       <input
         className="code-caption"
         aria-label="代码块说明"
-        placeholder="Code block"
+        placeholder={editingCaption ? "代码块名称" : "Code block"}
+        onFocus={() => setEditingCaption(true)}
         value={draft}
         readOnly={readOnlyCaption}
         tabIndex={readOnlyCaption ? -1 : undefined}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
+          setEditingCaption(false);
           if (cancelCaption.current) {
             cancelCaption.current = false;
             return;

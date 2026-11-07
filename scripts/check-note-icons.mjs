@@ -77,12 +77,16 @@ async function checks(phase) {
     };
   }
   if (phase === "hint-check") {
-    await until(() => document.querySelector(".note-icon-hint"));
-    const hint = document.querySelector(".note-icon-hint"),
+    await until(() =>
+      document
+        .querySelector(".nomi-tooltip")
+        ?.parentElement.style.transform.includes("translate"),
+    );
+    const hint = document.querySelector(".nomi-tooltip"),
       r = hint.getBoundingClientRect(),
       b = row().querySelector(".notes-icon-button").getBoundingClientRect();
     assert(
-      hint.parentElement === document.body,
+      !hint.closest(".notes-library") && document.body.contains(hint),
       "Hint clipped by scroll container",
     );
     assert(
@@ -90,19 +94,8 @@ async function checks(phase) {
       "Hint is not centered above icon",
     );
     assert(
-      r.bottom <= b.top - 7 && r.x >= 8,
+      r.bottom <= b.top - 3 && r.x >= 8,
       "Hint overlaps trigger or viewport edge",
-    );
-    assert(
-      Math.abs(
-        r.x +
-          parseFloat(
-            getComputedStyle(hint).getPropertyValue("--hint-arrow-x"),
-          ) -
-          b.x -
-          b.width / 2,
-      ) < 0.5,
-      "Hint arrow misses icon",
     );
     return;
   }
@@ -218,7 +211,7 @@ async function checks(phase) {
     const title = document.querySelector('[aria-label="文稿标题"]').value;
     await open();
     assert(
-      !document.querySelector(".note-icon-hint"),
+      !document.querySelector(".nomi-tooltip"),
       "Hint remained over picker",
     );
     assert(
@@ -353,7 +346,7 @@ await writeFile(
 const {app,BrowserWindow}=require('electron');const {writeFileSync}=require('node:fs');
 app.disableHardwareAcceleration();
 app.setPath('userData',${JSON.stringify(join(output, "profile"))});
-app.whenReady().then(async()=>{const win=new BrowserWindow({width:1120,height:820,show:true,webPreferences:{nodeIntegration:false,contextIsolation:true,backgroundThrottling:false}});const js=s=>win.webContents.executeJavaScript(s);const run=p=>js('('+${JSON.stringify(checks.toString())}+')('+JSON.stringify(p)+')');
+app.whenReady().then(async()=>{const win=new BrowserWindow({width:1120,height:820,show:true,webPreferences:{nodeIntegration:false,contextIsolation:true,backgroundThrottling:false}});const js=s=>win.webContents.executeJavaScript(s);const run=async p=>{const r=await js('(async()=>{try{return {value:await ('+${JSON.stringify(checks.toString())}+')('+JSON.stringify(p)+')}}catch(e){return {error:e.stack}}})()');if(r.error)throw Error(r.error);return r.value;};
 const shot=async(name)=>{await new Promise(r=>setTimeout(r,400));writeFileSync(${JSON.stringify(report)}+'/'+name+'.png',(await win.webContents.capturePage()).toPNG());};
 try{await win.loadFile(${JSON.stringify(join(output, "index.html"))});win.show();win.focus();await new Promise(r=>setTimeout(r,300));const point=await run('hint-position');win.webContents.sendInputEvent({type:'mouseMove',x:1,y:1});win.webContents.sendInputEvent({type:'mouseEnter',...point});win.webContents.sendInputEvent({type:'mouseMove',...point});await run('hint-check');await shot('icon-hover');await run('prepare');await shot('emoji-light');await js("document.documentElement.dataset.theme='dark'");await shot('emoji-dark');await js("document.documentElement.dataset.theme='light'");await run('upload');await shot('uploaded');await new Promise(r=>{win.webContents.once('did-finish-load',r);win.reload();});await run('restored');win.setSize(390,820);await shot('mobile');if(!await js('document.documentElement.scrollWidth===innerWidth'))throw Error('Mobile overflow');win.setSize(1120,820);await shot('emoji-final');const titlePoint=await run('heading-add');win.webContents.sendInputEvent({type:'mouseMove',x:1,y:1});await run('heading-hidden');await shot('heading-idle');win.webContents.sendInputEvent({type:'mouseMove',...titlePoint});await run('heading-visible');await shot('heading-add');win.webContents.sendInputEvent({type:'mouseMove',x:1,y:1});await run('heading-hidden');await run('heading-choose');await shot('heading-emoji');await run('heading-open');await run('upload');await run('heading-image');await shot('heading-image');await new Promise(r=>{win.webContents.once('did-finish-load',r);win.reload();});await run('heading-image');win.setSize(390,820);await shot('heading-mobile');if(!await js('document.documentElement.scrollWidth===innerWidth'))throw Error('Title icon mobile overflow');win.setSize(1120,820);await run('heading-remove');console.log('Note icons: PASS (independent target, search, undo/redo, upload validation, originals, reload, Remove, focus, heading add/emoji/upload/remove/undo/reload, dark/mobile)');${process.argv.includes("--interactive") ? "win.show();win.focus();" : "app.exit(0);"}}
 catch(error){console.error(error);await shot('failure');app.exit(1);}});${process.argv.includes("--interactive") ? "" : "setTimeout(()=>app.exit(1),45000);"}

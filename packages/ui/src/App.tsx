@@ -1,3 +1,8 @@
+import {
+  initialWorkspaceRoute,
+  lastRouteKey,
+  validWorkspaceRoute,
+} from "./components/workspace-route";
 import { UpdateProvider } from "./update-context";
 import {
   lazy,
@@ -32,13 +37,21 @@ const storage: StoragePort = {
   removeItem: (key) => window.localStorage.removeItem(key),
 };
 function currentPage(): WorkspacePage {
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(lastRouteKey);
+  } catch {
+    /* Optional view preference. */
+  }
+  const route = initialWorkspaceRoute(location.hash, saved);
+  if (location.hash !== route) history.replaceState(history.state, "", route);
   const candidate = location.hash
     .replace(/^#\/?/, "")
     .split("?")[0]
     ?.split("/")[0];
   return workspacePages.includes(candidate as WorkspacePage)
     ? (candidate as WorkspacePage)
-    : "canvas";
+    : "notes";
 }
 export function App() {
   const [loaded] = useState(() =>
@@ -70,9 +83,17 @@ export function App() {
   }, []);
   useEffect(() => {
     const change = () => {
-      setPage(currentPage());
+      const nextPage = currentPage();
+      const route = validWorkspaceRoute(location.hash);
+      try {
+        if (route) localStorage.setItem(lastRouteKey, route);
+      } catch {
+        /* Optional view preference. */
+      }
+      setPage(nextPage);
       setSettingsSection(parseSettingsSection(location.hash));
     };
+    change();
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
   }, []);

@@ -301,36 +301,6 @@ svg {
   position: relative;
   z-index: 30;
 }
-.rail-tip {
-  position: relative;
-}
-.rail-tip::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 7px 10px;
-  border-radius: 8px;
-  background: #202123;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 400;
-  white-space: nowrap;
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
-  pointer-events: none;
-  visibility: hidden;
-}
-.rail-tip:hover::after,
-.rail-tip:focus-visible::after {
-  visibility: visible;
-}
-.rail-tip[data-state="open"]::after {
-  visibility: hidden;
-}
 .update-glyph {
   display: grid;
   place-items: center;

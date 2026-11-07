@@ -1,4 +1,5 @@
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { useRef, type KeyboardEvent } from "react";
+import { Tooltip } from "./Tooltip";
 import type { Theme } from "@nomi/core";
 import "./appearance-mode.css";
 
@@ -32,8 +33,6 @@ export function AppearanceMode({
   onChange: (mode: Theme) => void;
 }) {
   const group = useRef<HTMLDivElement>(null);
-  const tooltipId = useId();
-  const [tooltip, setTooltip] = useState<Theme | null>(null);
   const choose = (mode: Theme) => {
     onChange(mode);
     group.current
@@ -41,11 +40,6 @@ export function AppearanceMode({
       ?.focus();
   };
   function keys(event: KeyboardEvent) {
-    if (event.key === "Escape") {
-      setTooltip(null);
-      event.stopPropagation();
-      return;
-    }
     const index = modes.findIndex((mode) => mode.value === value);
     const next =
       event.key === "Home"
@@ -70,53 +64,36 @@ export function AppearanceMode({
       onKeyDown={keys}
     >
       {modes.map((mode) => (
-        <button
-          key={mode.value}
-          type="button"
-          role="radio"
-          aria-label={mode.label}
-          aria-describedby={
-            tooltip === mode.value ? `${tooltipId}-${mode.value}` : undefined
-          }
-          onPointerEnter={(event) => {
-            if (event.pointerType !== "touch") setTooltip(mode.value);
-          }}
-          onPointerLeave={() => setTooltip(null)}
-          onFocus={() => setTooltip(mode.value)}
-          onBlur={() => setTooltip(null)}
-          aria-checked={value === mode.value}
-          tabIndex={value === mode.value ? 0 : -1}
-          data-mode={mode.value}
-          className="appearance-mode"
-          onClick={() => onChange(mode.value)}
-        >
-          {tooltip === mode.value && (
-            <span
-              id={`${tooltipId}-${mode.value}`}
-              role="tooltip"
-              className="appearance-mode-tooltip"
-            >
-              {mode.label}
-            </span>
-          )}
-          <span
-            className={`mode-preview mode-preview-${mode.value}`}
-            aria-hidden="true"
+        <Tooltip key={mode.value} label={mode.label}>
+          <button
+            type="button"
+            role="radio"
+            aria-label={mode.label}
+            aria-checked={value === mode.value}
+            tabIndex={value === mode.value ? 0 : -1}
+            data-mode={mode.value}
+            className="appearance-mode"
+            onClick={() => onChange(mode.value)}
           >
-            {mode.value === "system" ? (
-              <>
-                <span>
-                  <Preview />
-                </span>
-                <span>
-                  <Preview dark />
-                </span>
-              </>
-            ) : (
-              <Preview dark={mode.value === "dark"} />
-            )}
-          </span>
-        </button>
+            <span
+              className={`mode-preview mode-preview-${mode.value}`}
+              aria-hidden="true"
+            >
+              {mode.value === "system" ? (
+                <>
+                  <span>
+                    <Preview />
+                  </span>
+                  <span>
+                    <Preview dark />
+                  </span>
+                </>
+              ) : (
+                <Preview dark={mode.value === "dark"} />
+              )}
+            </span>
+          </button>
+        </Tooltip>
       ))}
     </div>
   );

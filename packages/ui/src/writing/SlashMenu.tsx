@@ -1,11 +1,12 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { SearchX } from "lucide-react";
+import { SearchX, Sparkles } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/core";
 import { Selection } from "@tiptap/pm/state";
 import { blockChoices, type InsertKind } from "./BlockActions";
 import { insertionNode } from "./RichBlockFrame";
 import "./slash-menu.css";
+import type { NoteAIRange } from "./noteAI";
 
 const aliases: Record<InsertKind, string> = {
   canvas: "canvas drawing draw sketch huaban huabu 画板 画布 绘图 涂鸦 手绘",
@@ -34,33 +35,50 @@ const common = new Set<InsertKind>([
   "experiment",
 ]);
 
-// Only a standalone top-level paragraph is a command. URLs, code, nested
-// lists/tables and literal slashes in prose retain their ordinary semantics.
+// Standalone commands offer all blocks. Inline /ai commands preserve surrounding
+// prose; slash inside URLs/code is ordinary text. Selected text uses a virtual menu.
 function commandAtCaret(editor: Editor) {
-  const { $from, empty } = editor.state.selection;
+  const { $from, from, empty } = editor.state.selection;
   if (
     !empty ||
-    $from.depth !== 1 ||
     $from.parent.type.name !== "paragraph" ||
-    $from.parentOffset !== $from.parent.content.size
+    editor.isActive("code")
   )
     return;
-  const text = $from.parent.textContent;
-  if (!/^\/[^/\n]{0,48}$/.test(text)) return;
-  return {
-    from: $from.before(),
-    to: $from.after(),
-    query: text.slice(1).trim().toLowerCase(),
-  };
+  const text = $from.parent.textBetween(0, $from.parentOffset);
+  if (
+    $from.depth === 1 &&
+    $from.parentOffset === $from.parent.content.size &&
+    /^\/[^/\n]{0,48}$/.test(text)
+  )
+    return {
+      from: $from.before(),
+      to: $from.after(),
+      query: text.slice(1).trim().toLowerCase(),
+      inline: false,
+    };
+  const match = text.match(/(?:^|\s)\/([a-zA-Z\u4e00-\u9fff]{0,24})$/);
+  if (match)
+    return {
+      from: from - match[1].length - 1,
+      to: from,
+      query: match[1].toLowerCase(),
+      inline: true,
+    };
 }
-type Session = NonNullable<ReturnType<typeof commandAtCaret>>;
+type Session = NonNullable<ReturnType<typeof commandAtCaret>> & {
+  virtual?: boolean;
+};
+type SlashKind = InsertKind | "ai";
 
 export function SlashMenu({
   editor,
   onInsert,
   onFormula,
+  onAI,
 }: {
   editor: Editor;
+  onAI?: (range: NoteAIRange) => void;
   onInsert: (
     kind: InsertKind,
     pos: number,
@@ -82,12 +100,19 @@ export function SlashMenu({
   const menu = useRef<HTMLDivElement>(null);
   const active = useRef<Session | undefined>(undefined);
   const dismissed = useRef(false);
-  const actions = useRef({ onInsert, onFormula });
-  actions.current = { onInsert, onFormula };
-  const options = blockChoices.filter(
-    ([kind, label]) =>
-      !session?.query ||
-      `${label} ${kind} ${aliases[kind]}`.toLowerCase().includes(session.query),
+  const actions = useRef({ onInsert, onFormula, onAI });
+  actions.current = { onInsert, onFormula, onAI };
+  const choices = [
+    ...(onAI ? [["ai", "AI", Sparkles] as const] : []),
+    ...blockChoices,
+  ];
+  const options = choices.filter(([kind, label]) =>
+    (session?.virtual || session?.inline) && kind !== "ai"
+      ? false
+      : !session?.query ||
+        `${label} ${kind} ${kind === "ai" ? "生成 智能 chatgpt" : aliases[kind]}`
+          .toLowerCase()
+          .includes(session.query),
   );
   const current = useRef({ options, selected });
   current.current = { options, selected };
@@ -96,11 +121,24 @@ export function SlashMenu({
     active.current = undefined;
     setSession(undefined);
   };
-  const choose = (kind: InsertKind) => {
+  const choose = (kind: SlashKind) => {
     if (editor.isDestroyed || editor.view.composing) return;
-    const range = commandAtCaret(editor);
+    const range = active.current?.virtual
+      ? active.current
+      : commandAtCaret(editor);
     if (!range || !active.current) return;
     close();
+    if (kind === "ai") {
+      if (!("virtual" in range && range.virtual)) {
+        // Remove only the typed command, retaining its paragraph and cursor.
+        editor.commands.deleteRange(
+          range.inline ? range : { from: range.from + 1, to: range.to - 1 },
+        );
+        const { from, to } = editor.state.selection;
+        actions.current.onAI?.({ from, to });
+      } else actions.current.onAI?.(range);
+      return;
+    }
     // Modal/file pickers retain the command until confirmed. Their existing
     // atomic insertion replaces this paragraph; cancelling loses no text.
     if (
@@ -146,7 +184,12 @@ export function SlashMenu({
       let frame = 0;
       const locate = () => {
         if (!active.current || editor.isDestroyed) return;
-        const caret = editor.view.coordsAtPos(active.current.from + 1);
+        const caret = editor.view.coordsAtPos(
+          Math.min(
+            editor.state.doc.content.size,
+            active.current.from + (active.current.virtual ? 0 : 1),
+          ),
+        );
         const bounds = dom.closest(".notes-scroll")?.getBoundingClientRect();
         if (
           caret.bottom < (bounds?.top ?? 0) ||
@@ -170,6 +213,13 @@ export function SlashMenu({
       };
       const update = () => {
         if (editor.isDestroyed) return;
+        if (
+          active.current?.virtual &&
+          editor.isFocused &&
+          editor.state.selection.from === active.current.from &&
+          editor.state.selection.to === active.current.to
+        )
+          return;
         const next = commandAtCaret(editor);
         if (!next) dismissed.current = false;
         if (
@@ -192,6 +242,33 @@ export function SlashMenu({
         locate();
       };
       const keydown = (event: KeyboardEvent) => {
+        if (
+          event.key === "/" &&
+          actions.current.onAI &&
+          !event.isComposing &&
+          !editor.view.composing &&
+          !event.metaKey &&
+          !event.ctrlKey &&
+          !event.altKey &&
+          !active.current
+        ) {
+          const { from, to, empty } = editor.state.selection;
+          if (
+            !empty &&
+            !editor.isActive("codeBlock") &&
+            !editor.isActive("code")
+          ) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const next = { from, to, query: "", virtual: true, inline: true };
+            active.current = next;
+            dismissed.current = false;
+            setSession(next);
+            setSelected(0);
+            locate();
+            return;
+          }
+        }
         if (
           !active.current ||
           event.isComposing ||
@@ -327,9 +404,10 @@ export function SlashMenu({
           <div key={kind}>
             {!session.query &&
               (index === 0 ||
-                common.has(kind) !== common.has(options[index - 1][0])) && (
+                common.has(kind as InsertKind) !==
+                  common.has(options[index - 1][0] as InsertKind)) && (
                 <div className="writing-slash-group">
-                  {common.has(kind) ? "内容块" : "基础"}
+                  {common.has(kind as InsertKind) ? "内容块" : "基础"}
                 </div>
               )}
             <button

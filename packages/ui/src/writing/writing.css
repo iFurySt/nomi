@@ -958,16 +958,13 @@
   min-height: 0;
   min-width: 0;
 }
-.notes-writing-area:has(.writing-outline[data-pinned]) {
-  grid-template-columns: auto minmax(0, 1fr);
-}
 .notes-scroll {
   min-width: 0;
   grid-column: 2;
   grid-row: 1;
 }
 .writing-article {
-  padding-right: 44px;
+  padding-inline: 62px;
 }
 .writing-protected {
   line-height: 1.9;
@@ -1027,6 +1024,15 @@
   padding: 0 4px 6px 8px;
   color: var(--muted);
 }
+.writing-outline-panel header button {
+  opacity: 0;
+  pointer-events: none;
+}
+.writing-outline:hover .writing-outline-panel header button,
+.writing-outline-panel header button:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
 .writing-outline-panel [role="navigation"] {
   max-height: min(60vh, 460px);
   overflow: auto;
@@ -1052,16 +1058,11 @@
 }
 .notes-main .writing-outline-panel button[aria-current] {
   color: var(--text);
-  background: var(--surface-muted);
+  background: transparent;
 }
 .writing-outline[data-pinned] {
-  position: relative;
-  top: auto;
-  left: auto;
-  grid-column: 1;
-  grid-row: 1;
-  width: 220px;
-  margin: 64px 0 24px 12px;
+  top: 64px;
+  left: 12px;
   min-height: 0;
 }
 .writing-outline[data-pinned] .writing-outline-rail {
@@ -1077,6 +1078,14 @@
 }
 .writing-outline[data-pinned] [role="navigation"] {
   max-height: calc(100vh - 260px);
+}
+.notes-main .writing-outline-panel [role="navigation"] button:hover {
+  background: transparent;
+  color: var(--text);
+}
+.writing-outline[data-pinned] [role="navigation"] button {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .writing-block.writing-block-image,
 .writing-block.writing-block-canvas,
@@ -1097,7 +1106,7 @@
     grid-column: 1;
   }
   .writing-article {
-    padding-right: 18px;
+    padding-inline: 46px;
   }
   .writing-outline {
     left: 6px;
@@ -1523,33 +1532,6 @@ body.notes-tree-dragging * {
 .notes-library nav .notes-icon-button[data-state="open"] {
   background: color-mix(in srgb, var(--text) 10%, transparent);
 }
-.note-icon-hint {
-  position: fixed;
-  z-index: 140;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: #202123;
-  color: white;
-  white-space: nowrap;
-  font: 400 12px/20px var(--font-sans, sans-serif);
-  pointer-events: none;
-}
-.note-icon-hint::after {
-  content: "";
-  position: absolute;
-  left: var(--hint-arrow-x);
-  width: 8px;
-  height: 8px;
-  background: inherit;
-  transform: translateX(-50%) rotate(45deg);
-  border-radius: 1px;
-}
-.note-icon-hint[data-side="top"]::after {
-  bottom: -4px;
-}
-.note-icon-hint[data-side="bottom"]::after {
-  top: -4px;
-}
 .note-icon-image {
   display: inline-flex;
   align-items: center;
@@ -1802,4 +1784,39 @@ body.notes-tree-dragging * {
 /* Paragraph-to-canvas spacing belongs to the outer block, not both layers. */
 .writing-block-markdown:has(+ .writing-block-canvas) .tiptap > :last-child {
   margin-bottom: 0;
+}
+
+/* The shared composer floats above the note without moving its text. */
+.note-ai-layer .canvas-ai-composer {
+  position: fixed;
+  z-index: 80;
+}
+.note-ai-layer .canvas-ai-composer.is-docked {
+  top: 100px;
+  left: calc(100% - 324px);
+}
+.note-ai-preview {
+  margin: 20px 0;
+  border-left: 2px solid var(--border);
+  padding-left: 16px;
+  pointer-events: none;
+}
+.note-ai-preview-block {
+  animation: canvas-ai-appear 0.25s ease-out;
+  margin-bottom: 16px;
+}
+@media (max-width: 700px) {
+  .note-ai-layer .canvas-ai-composer,
+  .note-ai-layer .canvas-ai-composer.is-docked {
+    left: 16px;
+    top: auto;
+    bottom: 20px;
+    width: calc(100% - 32px);
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-ai-preview-block {
+    animation: none;
+  }
 }

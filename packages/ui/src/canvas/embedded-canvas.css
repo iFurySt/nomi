@@ -187,9 +187,7 @@
   border-radius: 50%;
   background: var(--canvas);
 }
-.embedded-canvas-block:hover > .embedded-canvas-controls,
-.embedded-canvas-block:focus-within > .embedded-canvas-controls,
-.embedded-canvas-block.is-resizing > .embedded-canvas-controls {
+.embedded-canvas-block:hover > .embedded-canvas-controls {
   visibility: visible;
   opacity: 1;
 }
@@ -244,4 +242,44 @@
   background: var(--canvas);
   color: var(--muted);
   font-size: 12px;
+}
+
+/* Electron subtracts every no-drag rectangle, including underlying modal layers.
+   Keep their drag regions intact and exclude only the actual editor below 44px. */
+:root[data-runtime="desktop"][data-platform="darwin"] .embedded-canvas-overlay,
+:root[data-runtime="desktop"][data-platform="darwin"] .embedded-canvas-modal {
+  -webkit-app-region: drag;
+}
+:root[data-runtime="desktop"][data-platform="darwin"]
+  .embedded-canvas-modal
+  > .canvas-workspace {
+  margin-top: 44px;
+  -webkit-app-region: no-drag;
+}
+:root[data-runtime="desktop"][data-platform="darwin"]
+  .embedded-canvas-modal
+  .canvas-titlebar,
+:root[data-runtime="desktop"][data-platform="darwin"]
+  .embedded-canvas-modal
+  .canvas-history.embedded-history {
+  top: 8px;
+}
+
+/* Hidden shell controls must not punch no-drag holes through the canvas strip. */
+:root[data-runtime="desktop"][data-platform="darwin"]:has(
+    .embedded-canvas-modal
+  )
+  .window-toolbar {
+  visibility: hidden;
+}
+:root[data-runtime="desktop"][data-platform="darwin"]:has(
+    .embedded-canvas-modal
+  )
+  .window-toolbar
+  * {
+  -webkit-app-region: drag;
+}
+:root[data-runtime="desktop"][data-platform="darwin"]
+  .embedded-canvas-window-drag {
+  background: var(--surface-muted);
 }

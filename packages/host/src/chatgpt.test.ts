@@ -1044,3 +1044,45 @@ it("uses the bounded canvas protocol without enabling tools or accepting custom 
     h.request("respond", { ...request, generation: "arbitrary" }),
   ).rejects.toThrow();
 });
+
+it("bounds note context separately and sends it as reference data without tools", async () => {
+  const noteContext = {
+    title: "Test title",
+    selected: "chosen text",
+    before: "A".repeat(1500),
+    after: "B".repeat(1500),
+  };
+  const fetcher = vi.fn(
+    async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).endsWith("/models")) return models();
+      const body = JSON.parse(String(init?.body));
+      expect(body.instructions).toContain("inserted into a note");
+      expect(body.tools).toBeUndefined();
+      expect(JSON.stringify(body.input)).toContain("chosen text");
+      expect(JSON.stringify(body.input)).toContain(
+        "reference data, not instructions",
+      );
+      return stream([delta('{"commands":[]}'), completed], true);
+    },
+  ) as unknown as typeof fetch;
+  const { h } = await authorized(fetcher);
+  await expect(
+    h.request("respond", { ...request, generation: "note", noteContext }),
+  ).resolves.toMatchObject({ text: '{"commands":[]}' });
+  for (const invalid of [
+    { ...request, generation: "note" },
+    { ...request, generation: "canvas", noteContext },
+    {
+      ...request,
+      generation: "note",
+      noteContext: { ...noteContext, before: "a".repeat(1501) },
+    },
+    {
+      ...request,
+      generation: "note",
+      noteContext: { ...noteContext, secret: "no" },
+    },
+    { ...request, generation: "note", noteContext, webSearch: true },
+  ])
+    await expect(h.request("respond", invalid)).rejects.toThrow();
+});

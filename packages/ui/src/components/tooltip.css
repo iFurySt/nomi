@@ -1,0 +1,45 @@
+.nomi-tooltip {
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: min(280px, var(--radix-tooltip-content-available-width));
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #18191b;
+  color: #fff;
+  font: 400 13px/20px var(--font-sans, sans-serif);
+  letter-spacing: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+  user-select: none;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+  animation: nomi-tooltip-in 100ms ease-out;
+  -webkit-app-region: no-drag;
+}
+.nomi-tooltip kbd {
+  flex-shrink: 0;
+  min-width: 20px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 14%);
+  color: rgb(255 255 255 / 80%);
+  font: inherit;
+  text-align: center;
+  box-shadow: none;
+}
+@keyframes nomi-tooltip-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nomi-tooltip {
+    animation: none;
+  }
+}

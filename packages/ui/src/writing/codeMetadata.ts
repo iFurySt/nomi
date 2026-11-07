@@ -1,3 +1,10 @@
+/** Code viewport height in CSS pixels; absent metadata preserves auto sizing. */
+export function normalizeCodeHeight(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.round(Math.min(1600, Math.max(80, value)))
+    : null;
+}
+
 /** Optional fence metadata stays plain text, so AI and external editors can edit it. */
 export function parseCodeInfo(info = "") {
   const [, language = "", rest = ""] = info.match(/^(\S*)\s*(.*)$/s) ?? [];
@@ -20,6 +27,7 @@ export function parseCodeInfo(info = "") {
     caption: typeof metadata.caption === "string" ? metadata.caption : "",
     wrap: metadata.wrap === true,
     collapsed: metadata.collapsed === true,
+    height: normalizeCodeHeight(metadata.height),
     codeMetadata: metadata,
     codeExtra: extra,
   };
@@ -32,6 +40,9 @@ export function codeInfo(attrs: Record<string, unknown>) {
     if (attrs[key]) metadata[key] = attrs[key];
     else delete metadata[key];
   }
+  const height = normalizeCodeHeight(attrs.height);
+  if (height !== null) metadata.height = height;
+  else delete metadata.height;
   const extra = [
     attrs.codeExtra,
     Object.keys(metadata).length ? `nomi=${JSON.stringify(metadata)}` : "",

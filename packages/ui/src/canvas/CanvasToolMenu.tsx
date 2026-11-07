@@ -6,6 +6,7 @@ import {
   type ButtonHTMLAttributes,
 } from "react";
 import * as Popover from "@radix-ui/react-popover";
+import { Tooltip } from "../components/Tooltip";
 
 function useHover() {
   const [open, setOpen] = useState(false);
@@ -82,37 +83,17 @@ export function CanvasToolButton({
   side?: "right" | "top";
   children: ReactNode;
 }) {
-  const h = useHover();
   return (
-    <Popover.Root open={h.open} onOpenChange={h.setOpen}>
-      <Popover.Anchor asChild>
-        <button
-          {...props}
-          aria-label={props["aria-label"] ?? label}
-          onPointerEnter={h.enter}
-          onPointerLeave={h.leave}
-          onFocus={h.enter}
-          onBlur={h.leave}
-        >
-          {children}
-        </button>
-      </Popover.Anchor>
-      <Popover.Portal>
-        <Popover.Content
-          role="tooltip"
-          className="canvas-tool-tip"
-          side={side}
-          sideOffset={10}
-          collisionPadding={10}
-          onOpenAutoFocus={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => e.preventDefault()}
-        >
-          {label}
-          {shortcut && <kbd>{shortcut}</kbd>}
-          <Popover.Arrow />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <Tooltip
+      label={label}
+      shortcut={shortcut}
+      side={side}
+      disabled={props.disabled}
+    >
+      <button {...props} aria-label={props["aria-label"] ?? label}>
+        {children}
+      </button>
+    </Tooltip>
   );
 }
 

@@ -75,7 +75,7 @@ Settings → General 位于 Appearance 上方，也是设置默认页。文稿�
 
 正式 macOS 包声明 `nomi://auth/complete`，本地开发包声明 `nomi-dev://auth/complete`，两者仅用于唤醒窗口，不接受查询参数、不携带凭据、不导航文稿。OAuth 继续使用 `127.0.0.1` 的 HTTP callback；回调页设置 no-store / no-referrer 与 nonce CSP，并移除地址栏授权参数。参考 [Electron Deep Links](https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app) 与 [OpenAI OSS 登录协议](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)。可管理多个账号、选择账号提供的模型与 reasoning effort；可用性取决于实际账号权限和服务响应，不保证所有账号都可用。
 
-路径为 `React UI → allowlisted preload → ChatGPTHost`。保留 PKCE / state / nonce、回调验证、JWT 校验、刷新与撤销、加密存储及账号偏好；renderer 不拿 token。0.1.0 没有独立 Chat 页面和金融工具，不启动 Codex app-server。保留 provider 适配为未来文稿 AI 能力使用，不宣称已接通笔记或家庭资料。家庭 server 的 SeedX 路径独立。
+路径为 `React UI → allowlisted preload → ChatGPTHost`。保留 PKCE / state / nonce、回调验证、JWT 校验、刷新与撤销、加密存储及账号偏好；renderer 不拿 token。0.1.0 没有独立 Chat 页面和金融工具，不启动 Codex app-server。provider 已接通 Canvas 与文稿显式 AI 生成；文稿只发送有界的标题、选区和前后文，不接入家庭资料，见 [生成契约](design-docs/canvas-ai-generation.md)。家庭 server 的 SeedX 路径独立。
 
 ## 正式发行
 
@@ -104,3 +104,7 @@ Settings → General 位于 Appearance 上方，也是设置默认页。文稿�
 正式 App 发现更新后在头像上方显示蓝色下载按钮，点击才开始下载；圆环显示 Sparkle 的真实字节进度，解包时显示转圈。验证和准备完成后提示「稍后 / 重启并更新」。安装前保存所有文稿，保存失败会保留更新并允许重试。没有更新时隐藏入口，设置页显示检查结果。开发构建不连接更新源。
 
 设置页始终展示分类导航，不显示折叠 / 打开导航按钮，⌘B / Ctrl+B 不折叠设置导航；进入设置不覆盖文稿页的折叠偏好。窄屏分类改为顶部横排，保持可访问。
+
+### 启动位置与画布导航
+
+首次启动进入文稿；后续恢复上次有效页面（包括文稿选择、设置分区和内嵌画布）。显式文稿打开链接优先，失效页面回退文稿。位置只保存在当前运行环境的本地偏好中，开发版与正式版不共用。文稿内嵌画布进入导航历史，Cmd/Ctrl+[ 返回所属文稿，Cmd/Ctrl+] 再次进入；Close / Esc 同样退出。

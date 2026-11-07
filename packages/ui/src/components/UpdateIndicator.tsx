@@ -1,3 +1,4 @@
+import { Tooltip } from "./Tooltip";
 import { useEffect, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { Download, RotateCw, AlertCircle } from "lucide-react";
@@ -34,57 +35,63 @@ export function UpdateIndicator() {
   const progress = phase === "downloading" ? status.progress : undefined;
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        <button
-          className="rail-button rail-update rail-tip"
-          data-tooltip={label}
-          aria-label={label}
-          onClick={(event) => {
-            if (phase === "available") {
-              event.preventDefault();
-              void action("download");
-            }
-          }}
-        >
-          <span className="update-glyph">
-            {active ? (
-              <svg
-                viewBox="0 0 32 32"
-                className={
-                  progress === undefined
-                    ? "update-ring spinning"
-                    : "update-ring"
-                }
-                role="progressbar"
-                aria-label={label}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={
-                  progress === undefined
-                    ? undefined
-                    : Math.floor(progress * 100)
-                }
-              >
-                <circle className="update-ring-track" cx="16" cy="16" r="12" />
-                <circle
-                  className="update-ring-value"
-                  cx="16"
-                  cy="16"
-                  r="12"
-                  pathLength="100"
-                  strokeDasharray={`${progress === undefined ? 26 : Math.max(1, progress * 100)} 100`}
-                />
-              </svg>
-            ) : phase === "ready" ? (
-              <RotateCw size={18} />
-            ) : phase === "error" ? (
-              <AlertCircle size={18} />
-            ) : (
-              <Download size={18} />
-            )}
-          </span>
-        </button>
-      </Popover.Trigger>
+      <Tooltip label={label} side="right" disabled={open}>
+        <Popover.Trigger asChild>
+          <button
+            className="rail-button rail-update"
+            aria-label={label}
+            onClick={(event) => {
+              if (phase === "available") {
+                event.preventDefault();
+                void action("download");
+              }
+            }}
+          >
+            <span className="update-glyph">
+              {active ? (
+                <svg
+                  viewBox="0 0 32 32"
+                  className={
+                    progress === undefined
+                      ? "update-ring spinning"
+                      : "update-ring"
+                  }
+                  role="progressbar"
+                  aria-label={label}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={
+                    progress === undefined
+                      ? undefined
+                      : Math.floor(progress * 100)
+                  }
+                >
+                  <circle
+                    className="update-ring-track"
+                    cx="16"
+                    cy="16"
+                    r="12"
+                  />
+                  <circle
+                    className="update-ring-value"
+                    cx="16"
+                    cy="16"
+                    r="12"
+                    pathLength="100"
+                    strokeDasharray={`${progress === undefined ? 26 : Math.max(1, progress * 100)} 100`}
+                  />
+                </svg>
+              ) : phase === "ready" ? (
+                <RotateCw size={18} />
+              ) : phase === "error" ? (
+                <AlertCircle size={18} />
+              ) : (
+                <Download size={18} />
+              )}
+            </span>
+          </button>
+        </Popover.Trigger>
+      </Tooltip>
       <Popover.Portal>
         <Popover.Content
           className="update-popover"

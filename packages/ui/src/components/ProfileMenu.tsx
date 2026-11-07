@@ -1,3 +1,4 @@
+import { Tooltip } from "./Tooltip";
 import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ArrowUpRight, GitFork, Settings } from "lucide-react";
@@ -25,7 +26,10 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
         .toLocaleUpperCase()
     : "";
   const avatar = (
-    <span className={`profile-avatar${initials ? "" : " profile-avatar-placeholder"}`} aria-hidden="true">
+    <span
+      className={`profile-avatar${initials ? "" : " profile-avatar-placeholder"}`}
+      aria-hidden="true"
+    >
       {initials || (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
           <circle cx="12" cy="8" r="4" />
@@ -41,16 +45,17 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
   }
   return (
     <DropdownMenu.Root open={open} onOpenChange={setOpen}>
-      <DropdownMenu.Trigger asChild>
-        <button
-          className={`profile-trigger ${mobile ? "mobile-profile" : "rail-profile rail-tip"}`}
-          aria-label="Account menu"
-          title={mobile ? name : undefined}
-          data-tooltip={mobile ? undefined : name}
-        >
-          {avatar}
-        </button>
-      </DropdownMenu.Trigger>
+      <Tooltip label={name} side="right" disabled={mobile || open}>
+        <DropdownMenu.Trigger asChild>
+          <button
+            className={`profile-trigger ${mobile ? "mobile-profile" : "rail-profile"}`}
+            aria-label="Account menu"
+            title={mobile ? name : undefined}
+          >
+            {avatar}
+          </button>
+        </DropdownMenu.Trigger>
+      </Tooltip>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           className="dropdown-menu workspace-menu"

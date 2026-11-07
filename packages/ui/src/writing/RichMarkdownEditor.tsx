@@ -1,3 +1,4 @@
+import type { NoteAIRange } from "./noteAI";
 import {
   memo,
   useMemo,
@@ -65,6 +66,7 @@ export function RichMarkdownEditor(props: WritingEditorProps) {
       onBoundary: (...args: Parameters<WritingEditorProps["onBoundary"]>) =>
         latest.current.onBoundary(...args),
       onCanvas: () => latest.current.onCanvas(),
+      onAI: (range: NoteAIRange) => latest.current.onAI?.(range),
       onEditor: (...args: Parameters<WritingEditorProps["onEditor"]>) =>
         latest.current.onEditor(...args),
       onInsert: (...args: Parameters<WritingEditorProps["onInsert"]>) =>
@@ -80,6 +82,7 @@ export function RichMarkdownEditor(props: WritingEditorProps) {
   return (
     <MemoWritingEditor
       {...callbacks}
+      onAI={props.onAI ? callbacks.onAI : undefined}
       source={props.source}
       placeholder={props.placeholder}
       hideBlockTools={props.hideBlockTools}
@@ -95,6 +98,7 @@ function RichMarkdownEditorContent({
   onCanvas,
   onEditor,
   onInsert,
+  onAI,
   onBlockDrag,
   onBlockDragEnd,
   onBlockMove,
@@ -102,6 +106,7 @@ function RichMarkdownEditorContent({
   hideBlockTools = false,
 }: {
   source: string;
+  onAI?: (range: NoteAIRange) => void;
   onChange: (source: string, isolated?: boolean) => void;
   onBlur: () => void;
   onActivate: () => void;
@@ -342,9 +347,11 @@ function RichMarkdownEditorContent({
       <SelectionToolbar
         editor={editor}
         onFormat={applyFormat}
+        onAI={onAI}
         disabled={!!math || !!link}
       />
       <SlashMenu
+        onAI={onAI}
         editor={editor}
         onInsert={onInsert}
         onFormula={(range) => setMath({ latex: "", block: true, range })}

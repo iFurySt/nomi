@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { codeFence, codeInfo, parseCodeInfo } from "./codeMetadata";
+import {
+  codeFence,
+  codeInfo,
+  parseCodeInfo,
+  normalizeCodeHeight,
+} from "./codeMetadata";
 describe("code fence metadata", () => {
   it("round trips captions, wrap and collapsed without changing code", () => {
     const attrs = {
@@ -7,6 +12,7 @@ describe("code fence metadata", () => {
       caption: '示例 "hello"\n第二行',
       wrap: true,
       collapsed: true,
+      height: 240,
     };
     expect(parseCodeInfo(codeInfo(attrs))).toMatchObject(attrs);
     expect(codeFence({}, "```\ninline ` code")).toBe(
@@ -33,5 +39,17 @@ describe("code fence metadata", () => {
         wrap: false,
       }),
     ).toBe("ts");
+  });
+  it("validates viewport height and removes it when returning to auto", () => {
+    for (const value of [null, undefined, "200", -1, 0, NaN, Infinity])
+      expect(normalizeCodeHeight(value)).toBeNull();
+    expect(normalizeCodeHeight(10)).toBe(80);
+    expect(normalizeCodeHeight(2000)).toBe(1600);
+    expect(
+      codeInfo({
+        ...parseCodeInfo('js nomi={"height":200,"future":42}'),
+        height: null,
+      }),
+    ).toBe('js nomi={"future":42}');
   });
 });

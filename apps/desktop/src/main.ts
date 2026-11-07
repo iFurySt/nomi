@@ -277,6 +277,8 @@ async function createWindow() {
   if (smoke) {
     const result = await window.webContents.executeJavaScript(`(async () => {
       const waitFor = async check => {const deadline=Date.now()+6000; while(!check()) {if(Date.now()>deadline) throw Error('Renderer did not settle: '+check); await new Promise(r=>setTimeout(r,20));}};
+      await waitFor(() => document.querySelector('.rail-destinations'));
+      document.querySelector('a[href="#/canvas"]').click();
       await waitFor(() => document.querySelector('.canvas-workspace'));
       const updates = await window.nomiDesktop.requestUpdates('status');
       if (${updateSmoke} && !updates.available) throw Error('Sparkle startup failed: '+updates.reason);
@@ -298,7 +300,8 @@ async function createWindow() {
       await waitFor(()=>document.querySelector('.settings-content'));
       if(document.querySelector('a[href="#/settings/storage"]')) throw Error('Data settings exposed');
       location.hash='/stocks';
-      await waitFor(()=>document.querySelector('.canvas-workspace'));
+      await waitFor(()=>document.querySelector('.notes-library'));
+      if(location.hash !== '#/notes') throw Error('Legacy route must fall back to Notes');
       return {updates,navigation:links,sidebar:true,legacyRouteFallback:true,desktop:(await window.nomiDesktop.getRuntimeInfo()).kind};
     })()`);
     const output = smokeProfile

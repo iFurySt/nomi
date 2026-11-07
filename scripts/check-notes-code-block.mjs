@@ -49,6 +49,9 @@ async function check({ output }) {
       backgroundThrottling: false,
     },
   });
+  win.webContents.on("console-message", ({ level, message }) => {
+    if (level === "error") console.error(message);
+  });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const run = (fn, arg) =>
     win.webContents.executeJavaScript(`(${fn})(${JSON.stringify(arg)})`);
@@ -214,6 +217,299 @@ async function check({ output }) {
       ),
       "Caption cancellation failed",
     );
+    // Select-all inside code stays in that block, including repeated presses.
+    const range = await run(() => {
+      const ed = document.querySelector(".tiptap").editor;
+      const code = ed.getJSON().content[0];
+      ed.commands.setContent({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Before code" }],
+          },
+          code,
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "After code" }],
+          },
+        ],
+      });
+      const from = ed.state.doc.firstChild.nodeSize + 1;
+      ed.commands.focus();
+      ed.commands.setTextSelection(from + 2);
+      return { from, to: from + ed.state.doc.child(1).content.size };
+    });
+    await wait(120);
+    for (let i = 0; i < 2; i++) {
+      await key("A", ["meta"]);
+      assert(
+        await run(({ from, to }) => {
+          const selection =
+            document.querySelector(".tiptap").editor.state.selection;
+          return selection.from === from && selection.to === to;
+        }, range),
+        "Code select-all escaped into the document: " +
+          JSON.stringify(
+            await run(() => ({
+              selection: document
+                .querySelector(".tiptap")
+                .editor.state.selection.toJSON(),
+              focus: document.activeElement.outerHTML.slice(0, 120),
+            })),
+          ) +
+          JSON.stringify(range),
+      );
+    }
+    // Let the shared document history start a new typing group.
+    await wait(1100);
+    await win.webContents.insertText("replacement");
+    assert(
+      await run(() => {
+        const doc = document.querySelector(".tiptap").editor.state.doc;
+        return (
+          doc.child(0).textContent === "Before code" &&
+          doc.child(1).textContent === "replacement" &&
+          doc.child(2).textContent === "After code"
+        );
+      }),
+      "Typing after select-all replaced adjacent paragraphs",
+    );
+    await key("Z", ["meta"]);
+    await wait(120);
+    assert(
+      await run(
+        (source) =>
+          document.querySelector(".tiptap").editor.state.doc.child(1)
+            .textContent === source,
+        source,
+      ),
+      "Code replacement undo lost content",
+    );
+    await run(() => {
+      const ed = document.querySelector(".tiptap").editor;
+      ed.commands.setTextSelection(2);
+    });
+    await key("A", ["meta"]);
+    assert(
+      await run(() => {
+        const { selection, doc } =
+          document.querySelector(".tiptap").editor.state;
+        return selection.from <= 1 && selection.to >= doc.content.size - 1;
+      }),
+      "Normal document select-all was intercepted",
+    );
+    await run(() => {
+      document.querySelector(".tiptap").editor.commands.setTextSelection(1);
+      document.activeElement.blur();
+    });
+    const move = async (selector) => {
+      const point = selector
+        ? await run((selector) => {
+            const r = document.querySelector(selector).getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+          }, selector)
+        : { x: 1, y: 1 };
+      await win.webContents.debugger.sendCommand("Input.dispatchMouseEvent", {
+        type: "mouseMoved",
+        ...point,
+      });
+      await wait(80);
+    };
+    await move();
+    assert(
+      await run(
+        () =>
+          getComputedStyle(document.querySelector(".code-language")).opacity ===
+            "0" &&
+          getComputedStyle(document.querySelector(".code-fold")).opacity ===
+            "0",
+      ),
+      "Resting code toolbar is not quiet",
+    );
+    writeFileSync(
+      join(output, "resting.png"),
+      (await win.webContents.capturePage()).toPNG(),
+    );
+    await move(".writing-code-block");
+    assert(
+      await run(
+        () =>
+          getComputedStyle(document.querySelector(".code-language")).opacity ===
+          "1",
+      ),
+      "Hover does not reveal code tools",
+    );
+    for (const selector of [".code-tool[aria-pressed]", ".code-copy"]) {
+      await move(selector);
+      assert(
+        await run((selector) => {
+          const tool = document.querySelector(selector);
+          return (
+            getComputedStyle(tool).backgroundColor !== "rgba(0, 0, 0, 0)" &&
+            getComputedStyle(tool).backgroundColor !==
+              getComputedStyle(tool.closest(".writing-code-block"))
+                .backgroundColor
+          );
+        }, selector),
+        "Code tool has no distinct hover feedback: " + selector,
+      );
+    }
+    await click("折叠代码");
+    await run(() => document.activeElement.blur());
+    await move();
+    assert(
+      await run(
+        () =>
+          getComputedStyle(document.querySelector(".code-fold")).opacity ===
+            "1" &&
+          getComputedStyle(document.querySelector(".code-language")).opacity ===
+            "0",
+      ),
+      "Collapsed block must retain only disclosure and caption",
+    );
+    writeFileSync(
+      join(output, "collapsed.png"),
+      (await win.webContents.capturePage()).toPNG(),
+    );
+    await run(() => document.querySelector(".code-caption").focus());
+    assert(
+      await run(() => {
+        const input = document.querySelector(".code-caption"),
+          style = getComputedStyle(input);
+        return (
+          style.backgroundColor === "rgba(0, 0, 0, 0)" &&
+          style.color === getComputedStyle(input.parentElement).color
+        );
+      }),
+      "Caption editing is boxed or louder than toolbar",
+    );
+    writeFileSync(
+      join(output, "caption-editing.png"),
+      (await win.webContents.capturePage()).toPNG(),
+    );
+    await key("Escape");
+    await click("展开代码");
+    await move(".code-copy");
+    // Fixed-height resizing is a single change, with content scrolling inside.
+    const autoHeight = await run(
+      () => document.querySelector(".code-scroll").clientHeight,
+    );
+    const resizeStart = await run(() => {
+      const r = document
+        .querySelector(".code-resize-handle")
+        .getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    });
+    const mouse = (type, point, extra = {}) =>
+      win.webContents.debugger.sendCommand("Input.dispatchMouseEvent", {
+        type,
+        ...point,
+        ...extra,
+      });
+    await mouse("mouseMoved", resizeStart);
+    await mouse("mousePressed", resizeStart, { button: "left", clickCount: 1 });
+    await mouse(
+      "mouseMoved",
+      { x: resizeStart.x, y: resizeStart.y - autoHeight + 100 },
+      { button: "left", buttons: 1 },
+    );
+    await wait(80);
+    assert(
+      await run(() => {
+        const ed = document.querySelector(".tiptap").editor;
+        return (
+          ed.state.doc.child(1).attrs.height === null &&
+          document.querySelector(".code-scroll").clientHeight === 100
+        );
+      }),
+      "Drag should preview without saving every pointer move",
+    );
+    await mouse(
+      "mouseReleased",
+      { x: resizeStart.x, y: resizeStart.y - autoHeight + 100 },
+      { button: "left", clickCount: 1 },
+    );
+    await wait(100);
+    assert(
+      await run(() => {
+        const area = document.querySelector(".code-scroll");
+        area.scrollTop = 60;
+        return (
+          area.clientHeight === 100 &&
+          area.scrollHeight > area.clientHeight &&
+          area.scrollTop > 0 &&
+          document.querySelector(".tiptap").editor.state.doc.child(1).attrs
+            .height === 100
+        );
+      }),
+      "Resize failed to constrain the viewport and allow internal scrolling",
+    );
+    await move(".code-resize-handle");
+    writeFileSync(
+      join(output, "resized.png"),
+      (await win.webContents.capturePage()).toPNG(),
+    );
+    // Document undo/redo restores auto sizing / fixed height without changing code.
+    await run(() => document.querySelector(".tiptap").editor.commands.undo());
+    assert(
+      await run(
+        () =>
+          document.querySelector(".tiptap").editor.state.doc.child(1).attrs
+            .height === null,
+      ),
+      "Resize undo did not restore automatic height",
+    );
+    await run(() => document.querySelector(".tiptap").editor.commands.redo());
+    const fixedMarkdown = await run(() =>
+      document.querySelector(".tiptap").editor.getMarkdown(),
+    );
+    await run(
+      (text) =>
+        document
+          .querySelector(".tiptap")
+          .editor.commands.setContent(text, { contentType: "markdown" }),
+      fixedMarkdown,
+    );
+    assert(
+      await run(
+        () =>
+          document.querySelector(".tiptap").editor.state.doc.child(1).attrs
+            .height === 100,
+      ),
+      "Fixed height lost on Markdown reopen",
+    );
+    await click("折叠代码");
+    assert(
+      await run(
+        () =>
+          !document.querySelector(".code-resize-handle") &&
+          document.querySelector(".code-scroll").hidden,
+      ),
+      "Collapsed code retained its resize grip",
+    );
+    await click("展开代码");
+    assert(
+      await run(
+        () => document.querySelector(".code-scroll").clientHeight === 100,
+      ),
+      "Expand lost fixed height",
+    );
+    await run(() =>
+      document
+        .querySelector(".code-resize-handle")
+        .dispatchEvent(new MouseEvent("dblclick", { bubbles: true })),
+    );
+    assert(
+      await run(
+        () =>
+          document.querySelector(".tiptap").editor.state.doc.child(1).attrs
+            .height === null &&
+          document.querySelector(".code-scroll").clientHeight > 100,
+      ),
+      "Double-click should restore automatic height",
+    );
+    await move(".code-resize-handle");
     for (const theme of ["light", "dark"]) {
       await run(
         (theme) => (document.documentElement.dataset.theme = theme),
@@ -239,7 +535,7 @@ async function check({ output }) {
       (await win.webContents.capturePage()).toPNG(),
     );
     console.log(
-      "Code block passed: caption, language, wrap/gutter, copy, collapse, Markdown round trip, Escape, themes and narrow layout.",
+      "Code block passed: caption, language, wrap/gutter, copy, collapse, Markdown round trip, Escape, scoped select-all/undo, hover controls, resize/scroll/undo/reopen/reset, themes and narrow layout.",
     );
     app.exit(0);
   } catch (e) {

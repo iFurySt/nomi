@@ -241,7 +241,7 @@ async function checkEmbedded({ output, root }) {
       await run(
         () =>
           document.querySelector(".embedded-canvas-empty")?.textContent ===
-          "画布暂无内容",
+            "暂无内容" && !document.querySelector(".embedded-canvas-empty svg"),
       ),
       "Empty canvas must use short empty state",
     );
@@ -303,6 +303,53 @@ async function checkEmbedded({ output, root }) {
       "Tool rail must be compact, vertical and left aligned",
     );
     await assertFullCanvas();
+    const canvasRoute = await run(() => location.hash);
+    assert(
+      canvasRoute.includes("&canvas="),
+      "Opening canvas must add a navigation entry",
+    );
+    await run(() =>
+      document.activeElement.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "[",
+          metaKey: true,
+          bubbles: true,
+        }),
+      ),
+    );
+    await until(
+      () => run(() => !document.querySelector(".embedded-canvas-modal")),
+      "Command+[ did not return to Notes",
+    );
+    assert(
+      await run(
+        () =>
+          location.hash.startsWith("#/notes?note=") &&
+          !location.hash.includes("canvas="),
+      ),
+      "Back left the owning note",
+    );
+    await run(() =>
+      document.activeElement.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "]",
+          metaKey: true,
+          bubbles: true,
+        }),
+      ),
+    );
+    await until(
+      () =>
+        run(
+          () =>
+            !!document.querySelector(".embedded-canvas-modal .canvas-viewport"),
+        ),
+      "Command+] did not reopen canvas",
+    );
+    assert(
+      (await run(() => location.hash)) === canvasRoute,
+      "Forward changed the canvas route",
+    );
     assert(
       await run(() => {
         const drag = document.querySelector(".embedded-canvas-window-drag");
@@ -317,7 +364,14 @@ async function checkEmbedded({ output, root }) {
           rect.width === innerWidth &&
           rect.height === 44 &&
           document.elementFromPoint(innerWidth / 2, 20) === drag &&
-          close.top >= rect.bottom
+          close.top >= rect.bottom &&
+          getComputedStyle(document.querySelector(".embedded-canvas-modal"))
+            .webkitAppRegion === "drag" &&
+          getComputedStyle(document.querySelector(".embedded-canvas-overlay"))
+            .webkitAppRegion === "drag" &&
+          document
+            .querySelector(".embedded-canvas-modal > .canvas-workspace")
+            .getBoundingClientRect().top >= rect.bottom
         );
       }),
       "Native window drag strip must cover only the top safe area",
@@ -423,7 +477,8 @@ async function checkEmbedded({ output, root }) {
       () =>
         run(
           () =>
-            document.querySelector('[role="tooltip"]')?.textContent === "TextT",
+            document.querySelector('[role="tooltip"]')?.textContent ===
+            "Text (T)",
         ),
       "Text tooltip/shortcut missing",
     );
@@ -651,6 +706,135 @@ async function checkEmbedded({ output, root }) {
           await window.canvasFixture.repository("local-device").load()
         ).blocks.find((b) => b.type === "canvas"),
       );
+    const selectedScene = JSON.stringify((await savedBlock()).scene);
+    // Selection owns keyboard input; hover alone owns the floating controls.
+    await nativeClick(".embedded-canvas-preview");
+    assert(
+      await run(() =>
+        document.activeElement?.matches("[data-embedded-canvas]"),
+      ),
+      "Preview click did not select the canvas",
+    );
+    await mouse("mouseMoved", { x: 2, y: 80 });
+    assert(
+      await run(
+        () =>
+          getComputedStyle(document.querySelector(".embedded-canvas-controls"))
+            .visibility === "hidden",
+      ),
+      "Selected canvas kept the toolbar visible without hover",
+    );
+    assert(
+      await run(
+        () =>
+          getComputedStyle(document.querySelector(".embedded-canvas-resize"))
+            .visibility === "visible",
+      ),
+      "Selected canvas lost its resize handles",
+    );
+    await shot("selected-without-hover");
+    await key("Return");
+    assert(
+      await run(() => {
+        const canvas = document
+          .querySelector("[data-embedded-canvas]")
+          .closest("[data-writing-block]");
+        const next = canvas.nextElementSibling;
+        return (
+          !document.querySelector(".embedded-canvas-modal") &&
+          next?.contains(document.activeElement) &&
+          document.activeElement?.matches(".tiptap")
+        );
+      }),
+      "Enter must create and focus the paragraph immediately below canvas",
+    );
+    await key("Z", ["meta"]);
+    for (const deletionKey of ["Backspace", "Delete"]) {
+      await nativeClick(".embedded-canvas-preview");
+      await key(deletionKey);
+      assert(
+        await run(() => !document.querySelector("[data-embedded-canvas]")),
+        deletionKey + " did not remove selected canvas",
+      );
+      await key("Z", ["meta"]);
+      await until(
+        () => run(() => !!document.querySelector("[data-embedded-canvas]")),
+        "Canvas deletion could not be undone",
+      );
+      assert(
+        JSON.stringify((await savedBlock()).scene) === selectedScene,
+        "Deletion undo changed scene",
+      );
+    }
+    // Trackpad pinch travels through Chromium's real Ctrl+wheel path.
+    const pinchRect = await bounds(".embedded-canvas-preview");
+    await run(() => document.activeElement?.blur());
+    const gestureBefore = await run(async () => ({
+      revision: (await window.canvasFixture.repository("local-device").load())
+        .revision,
+      scroll: document.querySelector(".notes-scroll").scrollTop,
+      width: window.innerWidth,
+    }));
+    const pinchPoint = {
+      x: pinchRect.x + pinchRect.width * 0.7,
+      y: pinchRect.y + pinchRect.height * 0.6,
+    };
+    const localAnchor = await run((p) => {
+      const r = document
+        .querySelector(".embedded-canvas-world")
+        .getBoundingClientRect();
+      return { x: (p.x - r.left) / r.width, y: (p.y - r.top) / r.height };
+    }, pinchPoint);
+    await win.webContents.debugger.sendCommand("Input.dispatchMouseEvent", {
+      type: "mouseWheel",
+      ...pinchPoint,
+      deltaX: 0,
+      deltaY: -40,
+      modifiers: 2,
+    });
+    await until(
+      () =>
+        run(
+          () =>
+            document.querySelector(".embedded-canvas-zoom").textContent !==
+            "100%",
+        ),
+      "Trackpad pinch did not zoom preview",
+    );
+    assert(
+      await run(
+        ({ p, anchor, before }) => {
+          const r = document
+            .querySelector(".embedded-canvas-world")
+            .getBoundingClientRect();
+          return (
+            document.activeElement?.matches("[data-embedded-canvas]") &&
+            window.innerWidth === before.width &&
+            document.querySelector(".notes-scroll").scrollTop ===
+              before.scroll &&
+            Math.abs((p.x - r.left) / r.width - anchor.x) < 0.001 &&
+            Math.abs((p.y - r.top) / r.height - anchor.y) < 0.001
+          );
+        },
+        { p: pinchPoint, anchor: localAnchor, before: gestureBefore },
+      ),
+      "Pinch must select canvas, keep its cursor anchor, and leave document viewport unchanged",
+    );
+    assert(
+      win.webContents.getZoomFactor() === 1,
+      "Pinch zoomed the entire app",
+    );
+    assert(
+      await run(
+        async (rev) =>
+          (await window.canvasFixture.repository("local-device").load())
+            .revision === rev,
+        gestureBefore.revision,
+      ),
+      "Preview gesture wrote document history",
+    );
+    await shot("pinch-preview");
+    await click("适应画布预览");
     // Native hover must remain reachable across the gap into the floating toolbar.
     const box = await bounds("[data-embedded-canvas]");
     await mouse("mouseMoved", { x: box.x + box.width / 2, y: box.y + 12 });
@@ -887,15 +1071,14 @@ async function checkEmbedded({ output, root }) {
       () => run(() => window.innerWidth <= 1000),
       "Narrow name-editing viewport not ready",
     );
-    await run(() => document.querySelector("[data-embedded-canvas]").focus());
-    await key("Return");
+    await nativeClick("[data-embedded-canvas]", 2);
     await until(
       () => run(() => !!document.querySelector('[aria-label="画布名称"]')),
       "Name missing",
     );
     assert(
       await run(() => document.activeElement?.matches(".canvas-viewport")),
-      "Enter from document must focus canvas rather than Close",
+      "Opening from document must focus canvas rather than Close",
     );
     await nativeClick('[aria-label="画布名称"]');
     await key("A", ["meta"]);

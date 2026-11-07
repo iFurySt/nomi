@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { useCanvasPopover } from "./useCanvasPopover";
 import { ShapeGlyph } from "./ShapeGlyph";
+import { Tooltip } from "../components/Tooltip";
 export type SelectionAction =
   | "copy"
   | "copy-image"
@@ -444,32 +445,32 @@ export function SelectionToolbar({
           {panel === "shape" && (
             <div className="selection-shape-grid">
               {CANVAS_SHAPES.map((value) => (
-                <button
-                  key={value}
-                  aria-label={`改为${canvasShapeNames[value]}`}
-                  title={canvasShapeNames[value]}
-                  aria-pressed={shape?.shape === value}
-                  onClick={() => {
-                    onShape(value);
-                    setPanel(null);
-                  }}
-                >
-                  <svg viewBox="-6 -6 112 112">
-                    {value === "text" ? (
-                      <text
-                        x="25"
-                        y="75"
-                        fill="currentColor"
-                        stroke="none"
-                        fontSize="70"
-                      >
-                        T
-                      </text>
-                    ) : (
-                      <ShapeGlyph shape={value} />
-                    )}
-                  </svg>
-                </button>
+                <Tooltip key={value} label={canvasShapeNames[value]}>
+                  <button
+                    aria-label={`改为${canvasShapeNames[value]}`}
+                    aria-pressed={shape?.shape === value}
+                    onClick={() => {
+                      onShape(value);
+                      setPanel(null);
+                    }}
+                  >
+                    <svg viewBox="-6 -6 112 112">
+                      {value === "text" ? (
+                        <text
+                          x="25"
+                          y="75"
+                          fill="currentColor"
+                          stroke="none"
+                          fontSize="70"
+                        >
+                          T
+                        </text>
+                      ) : (
+                        <ShapeGlyph shape={value} />
+                      )}
+                    </svg>
+                  </button>
+                </Tooltip>
               ))}
             </div>
           )}

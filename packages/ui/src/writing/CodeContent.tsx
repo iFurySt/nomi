@@ -1,3 +1,4 @@
+import { CodeViewport } from "./CodeViewport";
 import { CodeToolbar, CodeGutter } from "./CodeToolbar";
 import { parseCodeInfo } from "./codeMetadata";
 import {
@@ -62,7 +63,11 @@ export function MarkdownCodeBlock({ children }: { children?: ReactNode }) {
         {...settings}
         onChange={(attrs) => setSettings((old) => ({ ...old, ...attrs }))}
       />
-      <div className="code-scroll" hidden={settings.collapsed}>
+      <CodeViewport
+        height={settings.height}
+        collapsed={settings.collapsed}
+        onChange={(attrs) => setSettings((old) => ({ ...old, ...attrs }))}
+      >
         <div className="code-body">
           <CodeGutter source={source} />
           <pre>
@@ -71,7 +76,7 @@ export function MarkdownCodeBlock({ children }: { children?: ReactNode }) {
             </code>
           </pre>
         </div>
-      </div>
+      </CodeViewport>
     </div>
   );
 }

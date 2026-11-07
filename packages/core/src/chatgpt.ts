@@ -32,6 +32,27 @@ export interface ChatGPTModel {
   defaultEffort?: ChatGPTEffort;
   contextWindow?: number;
 }
+export interface NoteGenerationContext {
+  title: string;
+  selected: string;
+  before: string;
+  after: string;
+}
+export function validNoteGenerationContext(
+  value: unknown,
+): value is NoteGenerationContext {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    Object.keys(v).length === 4 &&
+    Object.entries({
+      title: 256,
+      selected: 4000,
+      before: 1500,
+      after: 1500,
+    }).every(([k, limit]) => typeof v[k] === "string" && v[k].length <= limit)
+  );
+}
 export interface ChatGPTRequest {
   requestId: string;
   profileId: string;
@@ -40,7 +61,8 @@ export interface ChatGPTRequest {
   conversationId?: string;
   effort?: ChatGPTEffort;
   webSearch?: boolean;
-  generation?: "canvas";
+  generation?: "canvas" | "note";
+  noteContext?: NoteGenerationContext;
 }
 export type ChatGPTMethod =
   | "status"
@@ -97,12 +119,18 @@ export function validateChatGPTRequest(
           "effort",
           "webSearch",
           "generation",
+          "noteContext",
         ].includes(k),
     ) ||
     (v.conversationId !== undefined && !validChatGPTId(v.conversationId)) ||
     (v.effort !== undefined && !chatGPTEfforts.includes(v.effort)) ||
-    (v.generation !== undefined && v.generation !== "canvas") ||
-    (v.generation === "canvas" && v.webSearch === true) ||
+    (v.generation !== undefined &&
+      !["canvas", "note"].includes(v.generation)) ||
+    (!!v.generation && v.webSearch === true) ||
+    (v.noteContext !== undefined &&
+      (v.generation !== "note" ||
+        !validNoteGenerationContext(v.noteContext))) ||
+    (v.generation === "note" && !validNoteGenerationContext(v.noteContext)) ||
     (v.webSearch !== undefined && typeof v.webSearch !== "boolean") ||
     !validChatGPTId(v.requestId) ||
     !validChatGPTId(v.profileId) ||

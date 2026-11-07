@@ -1,3 +1,4 @@
+import { CodeViewport } from "./CodeViewport";
 import {
   NodeViewContent,
   NodeViewWrapper,
@@ -22,7 +23,11 @@ function EditableCode({ node, updateAttributes }: NodeViewProps) {
         collapsed={node.attrs.collapsed}
         onChange={updateAttributes}
       />
-      <div className="code-scroll" hidden={node.attrs.collapsed}>
+      <CodeViewport
+        height={node.attrs.height}
+        collapsed={node.attrs.collapsed}
+        onChange={updateAttributes}
+      >
         <div className="code-body">
           <CodeGutter source={node.textContent} />
           <pre>
@@ -37,16 +42,31 @@ function EditableCode({ node, updateAttributes }: NodeViewProps) {
             />
           </pre>
         </div>
-      </div>
+      </CodeViewport>
     </NodeViewWrapper>
   );
 }
 export const WritingCodeBlock = CodeBlockLowlight.extend({
+  addKeyboardShortcuts() {
+    return {
+      ...this.parent?.(),
+      "Mod-a": () => {
+        const { $from, $to } = this.editor.state.selection;
+        if ($from.parent.type.name !== this.name || !$from.sameParent($to))
+          return false;
+        return this.editor.commands.setTextSelection({
+          from: $from.start(),
+          to: $from.end(),
+        });
+      },
+    };
+  },
   addAttributes() {
     const defaults = {
       caption: "",
       wrap: false,
       collapsed: false,
+      height: null,
       codeMetadata: {},
       codeExtra: "",
     };

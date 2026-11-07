@@ -39,6 +39,19 @@ Sources: [ChatGPT](https://chatgpt.com/),
 The adjacent DESIGN.md collection informed this document's structure, not a
 third product's branding. Values below are AIFi choices unless marked observed.
 
+## Shared hover hints (2026-11-07)
+
+Navigation, canvas tool buttons, note icons, appearance controls and account /
+update triggers use `components/Tooltip.tsx`. Match the supplied ChatGPT reference:
+12px radius, regular 13px/20px type, 8px × 12px padding, a 4px trigger gap,
+#18191b background and no arrow. Optional shortcut badges have a translucent
+background, without an outline. Radix handles hover/focus, Escape, portal
+positioning and collision avoidance. Disable the hint while its action menu is
+open. Hints close immediately on pointer leave (`disableHoverableContent`);
+adjacent shape and line choices must never overlap during rapid pointer movement.
+Both creation and selected-shape palettes reuse the same hint. Keep menus separate
+from non-interactive hints.
+
 ## 2. Color Palette & Roles
 
 | Token | Light | Dark | Role |

@@ -1,3 +1,4 @@
+import { Tooltip } from "./Tooltip";
 import { UpdateIndicator } from "./UpdateIndicator";
 import {
   PanelsTopLeft,
@@ -43,20 +44,25 @@ function AppNavigation({
       aria-label="Main navigation"
     >
       {destinations.map(({ page: target, icon: Icon }) => (
-        <a
+        <Tooltip
           key={target}
-          href={`#/${target}`}
-          draggable={false}
-          onDragStart={(event) => event.preventDefault()}
-          className={`rail-button ${mobile ? "" : "rail-tip"} ${page === target ? "selected" : ""}`}
-          data-tooltip={mobile ? undefined : pageLabels[target]}
-          aria-label={pageLabels[target]}
-          aria-current={page === target ? "page" : undefined}
-          onClick={onNavigate}
+          label={pageLabels[target]}
+          side="right"
+          disabled={mobile}
         >
-          <Icon size={21} strokeWidth={1.7} />
-          {mobile && <span>{pageLabels[target]}</span>}
-        </a>
+          <a
+            href={`#/${target}`}
+            draggable={false}
+            onDragStart={(event) => event.preventDefault()}
+            className={`rail-button ${page === target ? "selected" : ""}`}
+            aria-label={pageLabels[target]}
+            aria-current={page === target ? "page" : undefined}
+            onClick={onNavigate}
+          >
+            <Icon size={21} strokeWidth={1.7} />
+            {mobile && <span>{pageLabels[target]}</span>}
+          </a>
+        </Tooltip>
       ))}
     </nav>
   );
@@ -308,17 +314,18 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
           <AppNavigation />
           <span className="rail-separator" />
-          <button
-            className="rail-button rail-search rail-tip"
-            aria-label="Search the workspace"
-            data-tooltip="Search"
-            onClick={() => {
-              setSearch("");
-              setSearchOpen(true);
-            }}
-          >
-            <Search size={20} />
-          </button>
+          <Tooltip label="Search" side="right">
+            <button
+              className="rail-button rail-search"
+              aria-label="Search the workspace"
+              onClick={() => {
+                setSearch("");
+                setSearchOpen(true);
+              }}
+            >
+              <Search size={20} />
+            </button>
+          </Tooltip>
           <div className="rail-footer">
             <UpdateIndicator />
             <ProfileMenu />

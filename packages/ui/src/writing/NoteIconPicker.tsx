@@ -1,5 +1,5 @@
-import { useId, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useRef, useState } from "react";
+import { Tooltip } from "../components/Tooltip";
 import * as Popover from "@radix-ui/react-popover";
 import { Search, Shuffle, SmilePlus, Upload } from "lucide-react";
 import type { CanvasNote, NoteIcon as IconValue } from "@nomi/core";
@@ -33,42 +33,7 @@ export function NoteIconPicker({
     [busy, setBusy] = useState(false);
   const file = useRef<HTMLInputElement>(null),
     search = useRef<HTMLInputElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const hint = useRef<HTMLDivElement>(null);
-  const hintId = useId();
-  const [hintVisible, setHintVisible] = useState(false);
   const adding = variant === "heading" && !note.icon;
-  const showHint = hintVisible && !open && !adding;
-  useLayoutEffect(() => {
-    if (!showHint || !trigger.current || !hint.current) return;
-    const anchor = trigger.current.getBoundingClientRect();
-    const bubble = hint.current;
-    const center = anchor.left + anchor.width / 2;
-    const left = Math.max(
-      8,
-      Math.min(
-        center - bubble.offsetWidth / 2,
-        window.innerWidth - bubble.offsetWidth - 8,
-      ),
-    );
-    const above = anchor.top >= bubble.offsetHeight + 16;
-    bubble.style.left = `${left}px`;
-    bubble.style.top = `${above ? anchor.top - bubble.offsetHeight - 8 : anchor.bottom + 8}px`;
-    bubble.style.setProperty("--hint-arrow-x", `${center - left}px`);
-    bubble.dataset.side = above ? "top" : "bottom";
-    const dismiss = () => setHintVisible(false);
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") dismiss();
-    };
-    window.addEventListener("scroll", dismiss, true);
-    window.addEventListener("resize", dismiss);
-    window.addEventListener("keydown", escape);
-    return () => {
-      window.removeEventListener("scroll", dismiss, true);
-      window.removeEventListener("resize", dismiss);
-      window.removeEventListener("keydown", escape);
-    };
-  }, [showHint]);
   const title = note.title || "未命名文稿";
   const entries = query.trim()
     ? emojiGroups
@@ -123,48 +88,38 @@ export function NoteIconPicker({
       onOpenChange={(value) => {
         if (!busy) {
           setOpen(value);
-          setHintVisible(false);
           setError("");
           setQuery("");
           setTab("emoji");
         }
       }}
     >
-      <Popover.Trigger asChild>
-        <button
-          className={
-            variant === "tree"
-              ? "notes-icon-button"
-              : adding
-                ? "writing-add-icon"
-                : "writing-heading-icon"
-          }
-          aria-label={`${adding ? "添加" : "更改"}${title}的图标`}
-          ref={trigger}
-          aria-describedby={showHint ? hintId : undefined}
-          onPointerEnter={(e) => {
-            if (e.pointerType !== "touch") setHintVisible(true);
-          }}
-          onPointerLeave={() => setHintVisible(false)}
-          onFocus={() => {
-            if (!open) setHintVisible(true);
-          }}
-          onBlur={() => setHintVisible(false)}
-          onPointerDown={(e) => {
-            setHintVisible(false);
-            e.stopPropagation();
-          }}
-        >
-          {adding ? (
-            <>
-              <SmilePlus size={15} />
-              <span>Add Icon</span>
-            </>
-          ) : (
-            <NoteIcon note={note} repository={repository} />
-          )}
-        </button>
-      </Popover.Trigger>
+      <Tooltip label="Change icon" disabled={open || adding}>
+        <Popover.Trigger asChild>
+          <button
+            className={
+              variant === "tree"
+                ? "notes-icon-button"
+                : adding
+                  ? "writing-add-icon"
+                  : "writing-heading-icon"
+            }
+            aria-label={`${adding ? "添加" : "更改"}${title}的图标`}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            {adding ? (
+              <>
+                <SmilePlus size={15} />
+                <span>Add Icon</span>
+              </>
+            ) : (
+              <NoteIcon note={note} repository={repository} />
+            )}
+          </button>
+        </Popover.Trigger>
+      </Tooltip>
       <Popover.Portal>
         <Popover.Content
           className="note-icon-picker"
@@ -400,13 +355,6 @@ export function NoteIconPicker({
           )}
         </Popover.Content>
       </Popover.Portal>
-      {showHint &&
-        createPortal(
-          <div ref={hint} id={hintId} role="tooltip" className="note-icon-hint">
-            Change icon
-          </div>,
-          document.body,
-        )}
     </Popover.Root>
   );
 }

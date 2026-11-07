@@ -43,8 +43,9 @@ app.whenReady().then(async()=>{
  const until=async(s)=>{for(let i=0;i<200;i++){if(await js(s))return;await new Promise(r=>setTimeout(r,30));}throw Error('Timeout: '+s);};
  const shot=async(name)=>{await js('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');writeFileSync(${JSON.stringify(report)}+'/'+name+'.png',(await win.webContents.capturePage()).toPNG());};
  try {
- await win.loadFile(${JSON.stringify(join(output, "index.html"))},{hash:'/notes'});
+ await win.loadFile(${JSON.stringify(join(output, "index.html"))});
  await until("document.querySelector('[aria-label=新建文稿]')");
+ assert.equal(await js('location.hash'), '#/notes');
  await js("document.querySelector('[aria-label=新建文稿]').click()");
  await until("document.querySelector('[data-save-state=saved]')");
  await js(\`(async () => {
@@ -119,6 +120,16 @@ app.whenReady().then(async()=>{
    await until("[...document.querySelectorAll('[data-note-row][data-selected]')].some(e=>e.dataset.noteRow==='nav.leaf')");
    assert.equal(await js("document.querySelectorAll('[data-note-row]').length"),3);
  }
+ // A new launch URL has no hash; restore the saved note instead of Canvas.
+ await until("localStorage.getItem('nomi.last-route')==='#/notes?note=nav.leaf'");
+ await win.loadFile(${JSON.stringify(join(output, "index.html"))});
+ await until("document.querySelector('.notes-breadcrumb [aria-current=page]')?.textContent.includes('交互学习')");
+ assert.equal(await js('location.hash'), '#/notes?note=nav.leaf');
+ await js("location.hash='/canvas'");
+ await until("localStorage.getItem('nomi.last-route')==='#/canvas'");
+ await win.loadFile(${JSON.stringify(join(output, "index.html"))});
+ await until("document.querySelector('.canvas-workspace')");
+ assert.equal(await js('location.hash'), '#/canvas');
  console.log('Notes navigation: PASS (ancestor/current icons, root, parent navigation, revision unchanged, dark/narrow, settings always visible, shortcut ignored, collapse preference retained)');
  app.exit(0);
  }catch(e){console.error(e);await shot('failure');app.exit(1);}
