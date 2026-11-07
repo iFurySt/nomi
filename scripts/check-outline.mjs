@@ -75,18 +75,24 @@ async function check({ output }) {
   const geom = () =>
     run(() => {
       const r = document.querySelector(".tiptap").getBoundingClientRect();
-      const p = document.querySelector(".notes-scroll").getBoundingClientRect();
+      const pane = document.querySelector(".notes-scroll");
+      const p = pane.getBoundingClientRect();
       return {
         left: r.left,
         width: r.width,
         right: r.right,
-        paneLeft: p.left,
-        paneRight: p.right,
+        // Classic scrollbars occupy layout space on CI; compare the usable viewport.
+        paneLeft: p.left + pane.clientLeft,
+        paneRight: p.left + pane.clientLeft + pane.clientWidth,
       };
     });
   try {
     await win.loadFile(join(output, "index.html"));
     await until(() => run(() => !!document.querySelector(".writing-outline")));
+    // Exercise the non-overlay scrollbar geometry even on a trackpad-equipped Mac.
+    await win.webContents.insertCSS(
+      ".notes-scroll::-webkit-scrollbar { width: 15px; }",
+    );
     win.webContents.debugger.attach("1.3");
     await win.webContents.debugger.sendCommand(
       "Emulation.setFocusEmulationEnabled",
@@ -99,7 +105,7 @@ async function check({ output }) {
           original.paneLeft -
           (original.paneRight - original.right),
       ) < 1,
-      "Body margins are asymmetric",
+      "Body margins are asymmetric: " + JSON.stringify(original),
     );
     await move(20, 116);
     await until(() =>
