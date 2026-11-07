@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { unwrapMath } from "./mathDelimiters";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import type { Editor } from "@tiptap/core";
 import type { Transaction } from "@tiptap/pm/state";
@@ -32,7 +33,10 @@ export function FormulaPopover({
       if (editor.isDestroyed) return new DOMRect();
       const pos = target.current.pos;
       const node = pos === undefined ? undefined : editor.view.nodeDOM(pos);
-      if (node instanceof HTMLElement) return node.getBoundingClientRect();
+      if (node instanceof HTMLElement)
+        return (
+          node.querySelector(".block-math-inner") ?? node
+        ).getBoundingClientRect();
       const rect = editor.view.coordsAtPos(
         Math.min(
           target.current.range?.from ?? editor.state.selection.from,
@@ -47,30 +51,46 @@ export function FormulaPopover({
       );
     },
   });
-  useEffect(() => {
-    const mapTarget = ({ transaction }: { transaction: Transaction }) => {
-      if (ownChange.current || !transaction.docChanged) return;
-      const current = target.current;
-      if (current.pos !== undefined) {
-        const mapped = transaction.mapping.mapResult(current.pos);
-        if (
-          mapped.deletedAcross ||
-          editor.state.doc.nodeAt(mapped.pos)?.type.name !== type
-        ) {
-          onClose();
-          return;
-        }
-        current.pos = mapped.pos;
-      } else if (current.range) {
-        current.range = {
-          from: transaction.mapping.map(current.range.from, -1),
-          to: transaction.mapping.map(current.range.to, 1),
-        };
+  useLayoutEffect(() => {
+    let highlighted: HTMLElement | undefined;
+    const highlight = () => {
+      const pos = target.current.pos;
+      const node = pos === undefined ? null : editor.view.nodeDOM(pos);
+      if (highlighted !== node) {
+        highlighted?.removeAttribute("data-math-editing");
+        highlighted = node instanceof HTMLElement ? node : undefined;
       }
+      highlighted?.setAttribute("data-math-editing", "true");
     };
-    editor.on("transaction", mapTarget);
+    const update = ({ transaction }: { transaction: Transaction }) => {
+      if (!ownChange.current && transaction.docChanged) {
+        const current = target.current;
+        if (current.pos !== undefined) {
+          const mapped = transaction.mapping.mapResult(current.pos);
+          if (
+            mapped.deletedAcross ||
+            editor.state.doc.nodeAt(mapped.pos)?.type.name !== type
+          ) {
+            onClose();
+            return;
+          }
+          current.pos = mapped.pos;
+        } else if (current.range) {
+          current.range = {
+            from: transaction.mapping.map(current.range.from, -1),
+            to: transaction.mapping.map(current.range.to, 1),
+          };
+        }
+      }
+      // Preview updates can replace NodeViews. Keep the editing indicator
+      // independent of native text selection and textarea focus.
+      highlight();
+    };
+    highlight();
+    editor.on("transaction", update);
     return () => {
-      editor.off("transaction", mapTarget);
+      editor.off("transaction", update);
+      highlighted?.removeAttribute("data-math-editing");
     };
   }, [editor, type, onClose]);
   useEffect(() => {
@@ -81,6 +101,7 @@ export function FormulaPopover({
   const change = (value: string) => {
     setLatex(value);
     if (editor.isDestroyed || !value.trim()) return;
+    const normalized = unwrapMath(value);
     const current = target.current;
     ownChange.current = true;
     try {
@@ -95,24 +116,24 @@ export function FormulaPopover({
             ...node.attrs,
             latex: session.block
               ? writeMathSource(
-                  value,
+                  normalized,
                   readMathSource(node.attrs.latex).alignment,
                 )
-              : value,
+              : normalized,
           }),
         );
       } else {
         const range = current.range ?? editor.state.selection;
         const inserted = editor.commands.insertContentAt(range, {
           type,
-          attrs: { latex: value },
+          attrs: { latex: normalized },
         });
         if (!inserted) return;
         let nearest = Infinity;
         editor.state.doc.descendants((node, pos) => {
           if (
             node.type.name === type &&
-            node.attrs.latex === value &&
+            node.attrs.latex === normalized &&
             Math.abs(pos - range.from) < nearest
           ) {
             current.pos = pos;
@@ -120,6 +141,8 @@ export function FormulaPopover({
           }
         });
       }
+      if (current.pos !== undefined)
+        editor.commands.setNodeSelection(current.pos);
     } finally {
       ownChange.current = false;
     }
@@ -142,7 +165,7 @@ export function FormulaPopover({
         <Popover.Content
           className="writing-math-popover"
           aria-label="编辑公式"
-          side="top"
+          side="bottom"
           align="start"
           sideOffset={8}
           collisionPadding={12}
@@ -151,6 +174,12 @@ export function FormulaPopover({
             event.preventDefault();
             textarea.current?.focus({ preventScroll: true });
             textarea.current?.select();
+          }}
+          onInteractOutside={(event) => {
+            const pos = target.current.pos;
+            const node = pos === undefined ? null : editor.view.nodeDOM(pos);
+            if (node?.contains(event.detail.originalEvent.target as Node))
+              event.preventDefault();
           }}
           onCloseAutoFocus={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => {
@@ -168,9 +197,6 @@ export function FormulaPopover({
             placeholder="E = mc^2"
             onChange={(event) => change(event.target.value)}
           />
-          <small>
-            <kbd>Esc</kbd> 完成
-          </small>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

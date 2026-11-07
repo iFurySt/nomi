@@ -1,3 +1,5 @@
+import { formulaText, mathClipboardText } from "./mathClipboard";
+import { normalizeMathMarkdown } from "./mathDelimiters";
 import type { NoteAIRange } from "./noteAI";
 import {
   memo,
@@ -10,8 +12,12 @@ import {
 import { useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/core";
 import { Fragment, Slice } from "@tiptap/pm/model";
-import { Selection, TextSelection } from "@tiptap/pm/state";
-import { normalizeClipboardHTML, plainTextSlice } from "./clipboard";
+import { Selection, TextSelection, NodeSelection } from "@tiptap/pm/state";
+import {
+  normalizeClipboardHTML,
+  plainTextSlice,
+  recognizePastedMath,
+} from "./clipboard";
 import { notionClipboardData, restoreNotionBlanks } from "./notionClipboard";
 import { WritingHeading } from "./WritingHeading";
 import { SlashMenu } from "./SlashMenu";
@@ -20,11 +26,18 @@ import type { InsertKind } from "./BlockActions";
 import { WritingStarterKit } from "./WritingStarterKit";
 import { Markdown } from "@tiptap/markdown";
 import { InlineMath } from "@tiptap/extension-mathematics";
+import { FormulaToolbar } from "./FormulaToolbar";
 import { WritingBlockMath } from "./WritingMath";
 import { FormulaPopover, type FormulaSession } from "./FormulaPopover";
 import { withoutTableBreaks } from "./tableMarkdown";
 import { WritingCodeBlock } from "./CodeBlock";
 import { WritingComposition } from "./WritingComposition";
+import {
+  WritingTable,
+  readTableWidths,
+  tableWidthComment,
+} from "./WritingTable";
+import { TableControls } from "./TableControls";
 import { TableKit } from "@tiptap/extension-table";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
@@ -41,6 +54,11 @@ import "./math.css";
 // Keep unrepresented syntax in source mode. Opening a document must never rewrite it.
 export function needsSourceEditor(source: string) {
   const prose = source
+    .replace(
+      /^<!-- nomi-table-widths: .* -->\r?\n(?=\|[^\n]+\n\|[ :|-]+\|)/gm,
+      (line) =>
+        readTableWidths(line) ? line.replace(tableWidthComment, "") : line,
+    )
     .replace(/^(```|~~~)[\s\S]*?^\1.*$/gm, "")
     .replace(/`[^`\n]*`/g, "")
     .replace(/\$\$[\s\S]*?\$\$/g, "")
@@ -149,6 +167,7 @@ function RichMarkdownEditorContent({
   };
   const [math, setMath] = useState<FormulaSession>();
   const [link, setLink] = useState<{ href: string; range: TextRange }>();
+  const liveEditor = useRef<Editor | null>(null);
   const editor = useEditor({
     extensions: [
       WritingComposition,
@@ -172,7 +191,13 @@ function RichMarkdownEditorContent({
       }),
       Markdown,
       WritingCodeBlock,
-      TableKit.configure({ table: { renderWrapper: true } }),
+      TableKit.configure({ table: false }),
+      WritingTable.configure({
+        renderWrapper: true,
+        resizable: true,
+        cellMinWidth: 72,
+        lastColumnResizable: true,
+      }),
       TaskList,
       TaskItem.configure({
         nested: true,
@@ -181,22 +206,77 @@ function RichMarkdownEditorContent({
       InlineMath.configure({
         katexOptions: { throwOnError: false, trust: false },
         onClick: (node, pos) => {
-          editor?.commands.setNodeSelection(pos);
-          setMath({ latex: node.attrs.latex, block: false, pos });
+          // Focus synchronously: a scheduled focus would steal the caret back
+          // from the formula textarea after its popover has opened.
+          const currentEditor = liveEditor.current;
+          currentEditor?.view.focus();
+          currentEditor?.commands.setNodeSelection(pos);
+          setMath((current) =>
+            current?.pos === pos
+              ? undefined
+              : { latex: node.attrs.latex, block: false, pos },
+          );
         },
       }),
       WritingBlockMath.configure({
         katexOptions: { throwOnError: false, trust: false, displayMode: true },
         onClick: (node, pos) => {
-          editor?.commands.setNodeSelection(pos);
-          setMath({ latex: node.attrs.latex, block: true, pos });
+          // Focus synchronously: a scheduled focus would steal the caret back
+          // from the formula textarea after its popover has opened.
+          const currentEditor = liveEditor.current;
+          currentEditor?.view.focus();
+          currentEditor?.commands.setNodeSelection(pos);
+          setMath((current) =>
+            current?.pos === pos
+              ? undefined
+              : { latex: node.attrs.latex, block: true, pos },
+          );
         },
       }),
     ],
-    content: source,
+    content: normalizeMathMarkdown(source),
     contentType: "markdown",
     editorProps: {
+      clipboardTextSerializer: (slice) => mathClipboardText(slice.content),
+      handleDOMEvents: {
+        copy: (view, event) => {
+          const selection = view.state.selection;
+          if (
+            !(selection instanceof NodeSelection) ||
+            !["inlineMath", "blockMath"].includes(selection.node.type.name) ||
+            !event.clipboardData
+          )
+            return false;
+          event.clipboardData.clearData();
+          event.clipboardData.setData(
+            "text/plain",
+            formulaText(
+              selection.node.attrs.latex,
+              selection.node.type.name === "blockMath",
+            ),
+          );
+          event.preventDefault();
+          return true;
+        },
+        mousedown: (_view, event) => {
+          if (
+            event.button !== 0 ||
+            !(event.target instanceof Element) ||
+            !event.target.closest(
+              '[data-type="block-math"],[data-type="inline-math"]',
+            )
+          )
+            return false;
+          // Keep the rendered atom stable until its click handler opens the editor.
+          event.preventDefault();
+          return true;
+        },
+      },
       transformPastedHTML: normalizeClipboardHTML,
+      transformPasted: (slice, view, plain) =>
+        plain || view.state.selection.$from.parent.type.spec.code
+          ? slice
+          : recognizePastedMath(slice, view.state.schema),
       clipboardTextParser: (text, context, plain, view) => {
         // Explicit Markdown structures paste as editable content. Ordinary prose
         // keeps its exact line breaks, and Shift-paste remains plain text.
@@ -210,7 +290,7 @@ function RichMarkdownEditorContent({
         ) {
           try {
             const parsed = view.state.schema.nodeFromJSON(
-              editor.markdown.parse(text),
+              editor.markdown.parse(normalizeMathMarkdown(text)),
             );
             return Slice.maxOpen(Fragment.from(parsed.content));
           } catch {
@@ -285,6 +365,7 @@ function RichMarkdownEditorContent({
     onBlur: () => callbacks.current.onBlur(),
     onFocus: () => callbacks.current.onActivate(),
   });
+  liveEditor.current = editor;
   useEffect(() => {
     if (editor && source !== emitted.current) {
       const saved = selections.current.get(source);
@@ -292,7 +373,7 @@ function RichMarkdownEditorContent({
       receivingSource.current = true;
       try {
         emitted.current = source;
-        editor.commands.setContent(source, {
+        editor.commands.setContent(normalizeMathMarkdown(source), {
           contentType: "markdown",
           emitUpdate: false,
         });
@@ -344,6 +425,12 @@ function RichMarkdownEditorContent({
   };
   return (
     <div className="rich-writing">
+      <TableControls editor={editor} disabled={!!math || !!link} />
+      <FormulaToolbar
+        editor={editor}
+        disabled={!!math || !!link}
+        onEdit={setMath}
+      />
       <SelectionToolbar
         editor={editor}
         onFormat={applyFormat}

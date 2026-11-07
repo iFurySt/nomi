@@ -1,4 +1,4 @@
-# ChatGPT 生成画布、文稿与交互实验
+# ChatGPT 生成画布、文稿与交互块
 
 ## 当前实现
 
@@ -24,7 +24,7 @@ Responses 的真实文本 delta 到达后，`canvasGenerationPrefix` 只提取�
 
 生成期间若目标文字或文稿块顺序改变，则拒绝插入并提示重新选择；切换文稿、停止、关闭或离开页面会取消请求并丢弃迟到结果。当前不替换选区、不修改现有内容，不支持跨独立编辑器的浏览器 DOM 选区。
 
-## 交互实验能力边界
+## 交互块能力边界
 
 GenUI 是已有 portable learning IR，只有 Panel / Row / Text / Button / SegmentedControl / Slider / Math / Plot，运算目前为 math.softmax / array.at / array.replaceAt。提示词携带合法示例与能力集合。超出能力范围应生成诚实的说明图，不能把静态图声称为真实仿真。新增通用数学、物理或动画能力需要扩展 IR、预算与跨语言 conformance。
 
@@ -35,6 +35,6 @@ GenUI 是已有 portable learning IR，只有 Panel / Row / Text / Button / Segm
 - `node scripts/check-note-generation.mjs`：模拟文稿请求，覆盖光标/选区上下文、段落间临时预览、原生实验、嵌入图示、一次撤销、停止与过期位置、选区入口、IME 和离开页面的迟到响应。
 - `pnpm exec vitest run packages/ui/src/writing/noteAI.test.ts packages/host/src/chatgpt.test.ts`：上下文边界、其他文稿隔离、host 协议及关闭工具。
 - 2026-11-07 已重启 Nomi(Dev)，实际窗口验证 `/ai` 与未登录连接入口；开发版未连接账号，文稿模式尚无在线推理验收。
-- 旧版交互中，用户完成实际授权后曾验证模型列表与三步流程图的在线生成 / 预览；临时图未写入用户画布。新版流式界面尚未进行真实账号端到端调用；在线交互实验尚未单独验收。
+- 旧版交互中，用户完成实际授权后曾验证模型列表与三步流程图的在线生成 / 预览；临时图未写入用户画布。新版流式界面尚未进行真实账号端到端调用；在线交互块尚未单独验收。
 
 实现：core `canvas/generation.ts`，host `canvas-generation-prompt.ts`，UI `canvas/GenerateCanvas.tsx`。官方接入参考：https://developers.openai.com/siwc/token-sharing-open-source/sign-in

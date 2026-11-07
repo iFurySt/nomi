@@ -1,0 +1,56 @@
+/* Structural surfaces remain still; only the content placeholders breathe. */
+.notes-loading-library header {
+  min-height: 30px;
+}
+.notes-loading-library .notes-search {
+  min-height: 30px;
+}
+.notes-loading-tree {
+  min-height: 0;
+  overflow: hidden;
+}
+.notes-loading-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 12px 0 24px;
+}
+.notes-loading-row .skeleton:last-child {
+  flex-shrink: 1;
+}
+.notes-loading-main .notes-topbar {
+  gap: 8px;
+}
+.notes-loading-main .notes-scroll {
+  overflow: hidden;
+}
+.notes-loading-title {
+  display: flex;
+  align-items: center;
+  height: 1.4em;
+}
+.notes-loading-paragraph {
+  display: grid;
+  gap: 16px;
+  padding: 10px 0;
+  margin-bottom: 24px;
+}
+:is(.notes-loading-library, .notes-loading-main) .skeleton {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  animation: notes-loading-pulse 1.8s ease-in-out infinite;
+}
+@keyframes notes-loading-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+.canvas-workspace-loading {
+  height: 100%;
+  background: var(--canvas);
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.notes-loading-library, .notes-loading-main) .skeleton {
+    animation: none;
+  }
+}

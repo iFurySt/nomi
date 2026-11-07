@@ -24,7 +24,8 @@ const aliases: Record<InsertKind, string> = {
   formula: "math latex equation 公式 数学",
   "note-reference": "page document note 文稿 子页 笔记",
   asset: "image photo file video 图片 文件 附件 视频",
-  experiment: "interactive genui experiment 交互 实验",
+  experiment:
+    "interactive block genui experiment 交互块 交互 实验 jiaohu jiaohukuai",
 };
 const common = new Set<InsertKind>([
   "canvas",

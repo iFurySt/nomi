@@ -1,4 +1,5 @@
 import type { Node } from "@tiptap/pm/model";
+import { mathClipboardText } from "./mathClipboard";
 import { TableMap } from "@tiptap/pm/tables";
 
 export function tableRows(table: Node): string[][] {
@@ -10,7 +11,7 @@ export function tableRows(table: Node): string[][] {
       if (seen.has(pos)) return "";
       seen.add(pos);
       const cell = table.nodeAt(pos);
-      return cell?.textBetween(0, cell.content.size, "\n", "\n") ?? "";
+      return cell ? mathClipboardText(cell.content, "\n") : "";
     }),
   );
 }

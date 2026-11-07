@@ -20,6 +20,18 @@ const schema = new Schema({
 const p = (text: string) =>
   schema.node("paragraph", null, text ? schema.text(text) : undefined);
 describe("table text output", () => {
+  it("only allows valid layout comments immediately before a table", () => {
+    const prefix = "<!-- nomi-table-widths: [180,320] -->\n";
+    expect(
+      needsSourceEditor(prefix + "| A | B |\n| --- | --- |\n| 1 | 2 |"),
+    ).toBe(false);
+    expect(needsSourceEditor(prefix + "ordinary paragraph")).toBe(true);
+    expect(
+      needsSourceEditor(
+        "<!-- nomi-table-widths: [999999] -->\n| A |\n| --- |\n| 1 |",
+      ),
+    ).toBe(true);
+  });
   it("keeps only plain table line breaks editable, preserving protection for other HTML", () => {
     expect(
       needsSourceEditor("| A | B |\n| --- | --- |\n| one<br>two | text |"),
@@ -62,7 +74,12 @@ describe("formula layout in Markdown", () => {
     const latex = "\\begin{aligned}\na&=b\\\\\nc&=d\n\\end{aligned}";
     const source = writeMathSource(latex, "right");
     expect(readMathSource(source)).toEqual({ latex, alignment: "right" });
-    expect(writeMathSource(source, "center")).toBe(latex);
+    expect(readMathSource(writeMathSource(source, "center"))).toEqual({
+      latex,
+      alignment: "center",
+    });
+    expect(writeMathSource(source, "left")).toBe(latex);
+    expect(readMathSource(latex).alignment).toBe("left");
     expect(readMathSource(writeMathSource(source, "left"))).toEqual({
       latex,
       alignment: "left",

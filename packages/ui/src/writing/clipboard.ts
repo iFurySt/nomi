@@ -1,8 +1,10 @@
+import { mathTextParts } from "./mathDelimiters";
 import {
   Fragment,
   Slice,
   type ResolvedPos,
   type Schema,
+  type Node as PMNode,
 } from "@tiptap/pm/model";
 
 /** Rich clipboard producers use empty divs for blank paragraphs; PM ignores those by default. */
@@ -44,4 +46,27 @@ export function plainTextSlice(
       ),
     ),
   );
+}
+
+/** Convert explicit math in rich tables/prose without guessing plain letters or code. */
+export function recognizePastedMath(slice: Slice, schema: Schema): Slice {
+  const math = schema.nodes.inlineMath;
+  if (!math) return slice;
+  const visit = (node: PMNode): PMNode[] => {
+    if (node.type.spec.code || node.marks.some((mark) => mark.type.spec.code))
+      return [node];
+    if (node.isText)
+      return mathTextParts(node.text!).map((part) =>
+        part.latex === undefined
+          ? schema.text(part.text, node.marks)
+          : math.create({ latex: part.latex }, null, node.marks),
+      );
+    if (node.isLeaf) return [node];
+    const children: PMNode[] = [];
+    node.forEach((child) => children.push(...visit(child)));
+    return [node.copy(Fragment.fromArray(children))];
+  };
+  const nodes: PMNode[] = [];
+  slice.content.forEach((node) => nodes.push(...visit(node)));
+  return new Slice(Fragment.fromArray(nodes), slice.openStart, slice.openEnd);
 }

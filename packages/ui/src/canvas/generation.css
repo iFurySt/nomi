@@ -124,15 +124,39 @@
   margin: 6px 0;
   overflow-wrap: anywhere;
 }
-.canvas-ai-connect {
+.canvas-ai-composer[data-disconnected] {
+  width: min(300px, calc(100% - 48px));
+  padding: 42px 20px 20px;
+  border-radius: 18px;
+}
+.canvas-ai-connect a {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-height: 100px;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 120ms;
 }
-.canvas-ai-connect a {
-  color: var(--text);
+.canvas-ai-connect a:hover {
+  background: color-mix(in srgb, var(--text) 82%, var(--surface));
+}
+.canvas-ai-connect a:active {
+  background: color-mix(in srgb, var(--text) 70%, var(--surface));
+}
+.canvas-ai-connect a:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 3px;
+}
+.canvas-ai-composer .canvas-ai-close:hover {
+  border-radius: 7px;
+  background: var(--interaction-hover);
 }
 .is-thinking {
   animation: canvas-ai-pulse 1.4s ease-in-out infinite;

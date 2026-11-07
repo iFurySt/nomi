@@ -35,6 +35,7 @@ export function GenerateCanvas({
   const [error, setError] = useState("");
   const request = useRef<string | undefined>(undefined);
   const input = useRef<HTMLTextAreaElement>(null);
+  const connect = useRef<HTMLAnchorElement>(null);
   const callbacks = useRef({ onStart, onPreview, onInsert });
   callbacks.current = { onStart, onPreview, onInsert };
   const cancel = () => {
@@ -58,8 +59,11 @@ export function GenerateCanvas({
     };
   }, [account?.id]);
   useEffect(() => {
-    if (!busy) input.current?.focus();
-  }, [busy]);
+    if (!busy) {
+      if (account?.sharing) input.current?.focus();
+      else connect.current?.focus();
+    }
+  }, [busy, account?.sharing]);
   const close = () => {
     cancel();
     onClose();
@@ -137,6 +141,7 @@ export function GenerateCanvas({
       className={`canvas-ai-composer${docked ? " is-docked" : ""}`}
       aria-label={noteContext ? "文稿 AI" : "画布 AI"}
       data-busy={busy}
+      data-disconnected={!account?.sharing || undefined}
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === "Escape" && !e.nativeEvent.isComposing) close();
@@ -156,8 +161,8 @@ export function GenerateCanvas({
       )}
       {!account?.sharing ? (
         <div className="canvas-ai-connect">
-          <Sparkles size={22} />
-          <a href="#/settings/chatgpt" onClick={close}>
+          <a ref={connect} href="#/settings/chatgpt" onClick={close}>
+            <Sparkles size={18} />
             连接 ChatGPT
           </a>
         </div>

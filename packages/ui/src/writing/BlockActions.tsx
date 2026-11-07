@@ -72,7 +72,7 @@ export const blockChoices = [
   ["note-reference", "文稿", FileText],
   ["canvas", "画布", LayoutDashboard],
   ["asset", "图片 / 附件", ImagePlus],
-  ["experiment", "交互实验", FlaskConical],
+  ["experiment", "交互块", FlaskConical],
 ] as const;
 export function BlockActions({
   top = 0,
@@ -151,7 +151,7 @@ export function BlockActions({
     selected?.[1] ??
     ({
       image: "图片",
-      interactive: "交互实验",
+      interactive: "交互块",
       file: "附件",
       shape: "画布文字",
       table: "表格",

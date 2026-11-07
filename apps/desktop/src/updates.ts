@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, powerMonitor } from "electron";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import type { UpdateStatus } from "../../../packages/core/src/updates";
@@ -6,6 +6,7 @@ import type { UpdateStatus } from "../../../packages/core/src/updates";
 type Bridge = {
   start(): void;
   check(): void;
+  checkBackground(): void;
   state(): Omit<UpdateStatus, "version" | "available"> & {
     pendingInstall: boolean;
   };
@@ -37,6 +38,42 @@ export function setupUpdates(
   let preparing = false;
   let paused = false;
   let saveError = "";
+  const hour = 60 * 60 * 1000;
+  const startedAt = Date.now();
+  let lastCheck: number | undefined;
+  let scheduled: ReturnType<typeof setTimeout> | undefined;
+  const schedule = (delay: number) => {
+    clearTimeout(scheduled);
+    scheduled = setTimeout(() => {
+      backgroundCheck();
+      schedule(hour);
+    }, delay);
+    scheduled.unref();
+  };
+  const backgroundCheck = () => {
+    if (!bridge) return;
+    const state = bridge.state();
+    if (!state.automatic || !state.canCheck) return;
+    // Record attempts too: a failed request must not cause a focus/retry storm.
+    lastCheck = Date.now();
+    try {
+      bridge.checkBackground();
+    } catch (cause) {
+      console.error("Nomi background update check failed:", cause);
+    }
+  };
+  const catchUp = () => {
+    if (Date.now() - (lastCheck ?? startedAt) <= hour) return;
+    const previous = lastCheck;
+    backgroundCheck();
+    if (lastCheck !== previous) schedule(hour);
+  };
+  if (bridge) {
+    schedule(30_000);
+    app.on("browser-window-focus", catchUp);
+    app.on("activate", catchUp);
+    powerMonitor.on("resume", catchUp);
+  }
   const install = async () => {
     if (preparing || !bridge) return;
     if (bridge.state().phase !== "ready" && !bridge.state().pendingInstall)
@@ -62,6 +99,13 @@ export function setupUpdates(
     if (bridge?.state().pendingInstall && !preparing && !paused) void install();
   }, 250);
   timer.unref();
+  app.once("will-quit", () => {
+    clearInterval(timer);
+    clearTimeout(scheduled);
+    app.removeListener("browser-window-focus", catchUp);
+    app.removeListener("activate", catchUp);
+    powerMonitor.removeListener("resume", catchUp);
+  });
   const status = (): UpdateStatus => ({
     version: app.getVersion(),
     available: !!bridge,
@@ -82,7 +126,11 @@ export function setupUpdates(
       });
       return;
     }
-    if (bridge.state().canCheck) bridge.check();
+    if (bridge.state().canCheck) {
+      lastCheck = Date.now();
+      schedule(hour);
+      bridge.check();
+    }
     // The sidebar remains visible if a session is already downloading/ready.
   };
   ipcMain.handle(

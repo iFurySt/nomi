@@ -1,3 +1,4 @@
+import { normalizeMathMarkdown } from "../writing/mathDelimiters";
 import { remarkCodeMetadata } from "../writing/codeMetadata";
 import { memo, useDeferredValue } from "react";
 import ReactMarkdown from "react-markdown";
@@ -46,7 +47,7 @@ export const Markdown = memo(function Markdown({ source }: { source: string }) {
             ),
         }}
       >
-        {value}
+        {normalizeMathMarkdown(value)}
       </ReactMarkdown>
     </div>
   );

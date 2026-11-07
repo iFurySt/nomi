@@ -159,6 +159,10 @@ Use Radix primitives for those behaviors, not a large visual component library.
   back/forward, sidebar toggle, adjacent divider and page-specific breadcrumb,
   search, and theme. Controls use consistent 18px icons. Reserve 96px before navigation at the
   left on macOS; interactive controls are no-drag. Do not draw traffic lights.
+  Notes supply their document breadcrumb here through `WorkspaceTitle`; do not
+  repeat it inside the writing pane. Only custom document icons appear in this
+  breadcrumb. A reserved, subtle breathing dot follows the path while saving,
+  and disappears on success; save errors retain their explicit retry notice.
 - Web: 8px top gap, no desktop window toolbar; a 52px page toolbar lives inside
   the main panel with sidebar toggle, page title, search, and theme.
 - Agents: short functional heading, natural-language composer, template chips,

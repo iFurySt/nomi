@@ -25,7 +25,7 @@ import { WorkspaceContext } from "./workspace-context";
 import { ChatGPTProvider } from "./chatgpt-context";
 import { CanvasDocumentSession } from "./canvas/CanvasDocumentSession";
 import { Shell } from "./components/Shell";
-import { SkeletonRows } from "./components/Skeleton";
+import { WorkspaceLoading } from "./writing/NotesLoading";
 import { useResolvedTheme } from "./use-resolved-theme";
 import { Settings } from "./pages/Settings";
 const NotesWorkspace = lazy(() =>
@@ -141,9 +141,7 @@ export function App() {
             </a>
             <Shell>
               {(page === "canvas" || page === "notes") && (
-                <Suspense
-                  fallback={<SkeletonRows label="正在打开文稿" rows={4} />}
-                >
+                <Suspense fallback={<WorkspaceLoading page={page} />}>
                   <NotesWorkspace page={page} />
                 </Suspense>
               )}

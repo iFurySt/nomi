@@ -59,7 +59,7 @@ export async function createNoteArchive(
     );
   }
   files["README.txt"] = strToU8(
-    `Nomi 文稿：${plan.snapshot.title}\n\n正文：${plan.path}\n离线阅读与交互：${plan.directory}/index.html\nNomi 原始定义：${options.slug}.nomi.json\n\n${options.format === "jekyll" ? "将 _posts（或 _en_posts）和 assets 目录复制到博客仓库再预览。交互实验通过 iframe 加载随包附带的运行时。" : "Markdown 中的交互链接打开随包附带的 HTML；只复制 Markdown 会丢失附件和交互。"}\n未包含个人学习进度。此包是发布快照，后续修改请重新导出。\n${plan.warnings.join("\n")}`,
+    `Nomi 文稿：${plan.snapshot.title}\n\n正文：${plan.path}\n离线阅读与交互：${plan.directory}/index.html\nNomi 原始定义：${options.slug}.nomi.json\n\n${options.format === "jekyll" ? "将 _posts（或 _en_posts）和 assets 目录复制到博客仓库再预览。交互块通过 iframe 加载随包附带的运行时。" : "Markdown 中的交互链接打开随包附带的 HTML；只复制 Markdown 会丢失附件和交互。"}\n未包含个人学习进度。此包是发布快照，后续修改请重新导出。\n${plan.warnings.join("\n")}`,
   );
   return { bytes: zipSync(files, { level: 6 }), warnings: plan.warnings };
 }

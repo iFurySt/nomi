@@ -8,7 +8,7 @@
 
 **编辑交互**打开 JSON 定义；**导入**读取不超过 256 KiB 的 `.nomi-ui.json`，经手动应用后生效；**导出**只导出当前内容与默认值。修改文案或默认值保留仍符合新约束的个人参数。非法 JSON、未知能力、坏引用、循环或超预算定义均不替换当前可用版本。存储写入失败显示错误；尚未提交的个人进度写入失败时，阻止安装新定义。
 
-此处描述独立 Learn 实验室，每个本机 profile 一个可切换的交互实验。后续同日已新增默认 [Canvas 主工作区](canvas-workspace-runtime.md)，将交互块放进笔记与画布，实例状态按 document / block 分开；不把 Learn 页面当成主界面。没有 AI 生成、OpenUI 文本编译器、协作、云同步、移动端 UI 或发布。
+此处描述独立 Learn 实验室，每个本机 profile 一个可切换的交互块。后续同日已新增默认 [Canvas 主工作区](canvas-workspace-runtime.md)，将交互块放进笔记与画布，实例状态按 document / block 分开；不把 Learn 页面当成主界面。没有 AI 生成、OpenUI 文本编译器、协作、云同步、移动端 UI 或发布。
 
 ## 代码与协议
 

@@ -1,3 +1,4 @@
+import { WorkspaceTitleTarget } from "./WorkspaceTitle";
 import { Tooltip } from "./Tooltip";
 import { UpdateIndicator } from "./UpdateIndicator";
 import {
@@ -77,6 +78,7 @@ export function Shell({ children }: { children: ReactNode }) {
     settingsSection,
   } = useWorkspace();
   const desktop = !!window.nomiDesktop;
+  const [titleTarget, setTitleTarget] = useState<HTMLDivElement | null>(null);
   const drawerQuery = "(max-width: 899px)";
   const PageIcon =
     destinations.find((destination) => destination.page === page)?.icon ??
@@ -270,189 +272,203 @@ export function Shell({ children }: { children: ReactNode }) {
       </>
     );
   return (
-    <div
-      className={`app-shell ${sidebarCollapsed && page !== "settings" ? "sidebar-collapsed" : ""} ${desktop ? "desktop-shell" : "web-shell"} ${page === "notes" ? "notes-shell" : page === "canvas" ? "canvas-shell" : "settings-shell"}`}
-    >
-      {desktop && (
-        <header className="window-toolbar">
-          <div className="window-navigation">
-            <span className="native-window-space" aria-hidden="true" />
-            <IconButton
-              label="Go back"
-              title={`Go back (${modifier}[)`}
-              aria-keyshortcuts="Meta+[ Control+["
-              disabled={!routeHistory.canGoBack}
-              onClick={routeHistory.back}
-            >
-              <ArrowLeft size={18} />
-            </IconButton>
-            <IconButton
-              label="Go forward"
-              title={`Go forward (${modifier}])`}
-              aria-keyshortcuts="Meta+] Control+]"
-              disabled={!routeHistory.canGoForward}
-              onClick={routeHistory.forward}
-            >
-              <ArrowRight size={18} />
-            </IconButton>
-            {navigationToggle}
-          </div>
-          <span className="window-toolbar-divider" aria-hidden="true" />
-          <div className="window-title">
-            <PageIcon size={18} strokeWidth={1.7} />
-            <span>Nomi</span>
-            <span className="breadcrumb-divider">/</span>
-            <span>{pageLabels[page]}</span>
-          </div>
-          {toolbarActions}
-        </header>
-      )}
-      <div className="workspace-body">
-        <div className="tool-rail" aria-label="Workspace tools">
-          <div className="rail-brand">
-            <Logo small />
-          </div>
-          <AppNavigation />
-          <span className="rail-separator" />
-          <Tooltip label="Search" side="right">
-            <button
-              className="rail-button rail-search"
-              aria-label="Search the workspace"
-              onClick={() => {
-                setSearch("");
-                setSearchOpen(true);
-              }}
-            >
-              <Search size={20} />
-            </button>
-          </Tooltip>
-          <div className="rail-footer">
-            <UpdateIndicator />
-            <ProfileMenu />
-          </div>
-        </div>
-        <div className="workspace-panel">
-          <aside className="sidebar" id="workspace-sidebar">
-            {page === "settings" && <SettingsSidebar />}
-          </aside>
-          <div className="main-shell">
-            {!desktop && (
-              <header className="topbar">
-                <div className="topbar-left">
-                  {navigationToggle}
-                  <span className="window-toolbar-divider" aria-hidden="true" />
-                  <PageIcon size={18} strokeWidth={1.7} />
-                  <span className="page-label">{pageLabels[page]}</span>
-                </div>
-                {toolbarActions}
-              </header>
-            )}
-            {storageError && (
-              <div className="storage-warning" role="alert">
-                {storageError}
-                <button onClick={() => navigate("settings")}>
-                  Open Settings
-                </button>
-              </div>
-            )}
-            <main
-              tabIndex={-1}
-              id="main-content"
-              className={`main-content ${page === "settings" ? "settings-main" : ""}`}
-            >
-              {children}
-            </main>
-          </div>
-        </div>
-      </div>
-      <Modal
-        open={mobileOpen}
-        onOpenChange={setMobileOpen}
-        title="Navigation"
-        sheet
+    <WorkspaceTitleTarget.Provider value={titleTarget}>
+      <div
+        className={`app-shell ${sidebarCollapsed && page !== "settings" ? "sidebar-collapsed" : ""} ${desktop ? "desktop-shell" : "web-shell"} ${page === "notes" ? "notes-shell" : page === "canvas" ? "canvas-shell" : "settings-shell"}`}
       >
-        <AppNavigation mobile onNavigate={() => setMobileOpen(false)} />
-        {page === "settings" && (
-          <SettingsSidebar onSelect={() => setMobileOpen(false)} />
+        {desktop && (
+          <header className="window-toolbar">
+            <div className="window-navigation">
+              <span className="native-window-space" aria-hidden="true" />
+              <IconButton
+                label="Go back"
+                title={`Go back (${modifier}[)`}
+                aria-keyshortcuts="Meta+[ Control+["
+                disabled={!routeHistory.canGoBack}
+                onClick={routeHistory.back}
+              >
+                <ArrowLeft size={18} />
+              </IconButton>
+              <IconButton
+                label="Go forward"
+                title={`Go forward (${modifier}])`}
+                aria-keyshortcuts="Meta+] Control+]"
+                disabled={!routeHistory.canGoForward}
+                onClick={routeHistory.forward}
+              >
+                <ArrowRight size={18} />
+              </IconButton>
+              {navigationToggle}
+            </div>
+            <span className="window-toolbar-divider" aria-hidden="true" />
+            <div className="workspace-title-slot" ref={setTitleTarget} />
+            <div className="window-title workspace-title-fallback">
+              {page !== "notes" && <PageIcon size={18} strokeWidth={1.7} />}
+              <span>Nomi</span>
+              <span className="breadcrumb-divider">/</span>
+              <span>{pageLabels[page]}</span>
+            </div>
+            {toolbarActions}
+          </header>
         )}
-      </Modal>
-      <Modal
-        open={searchOpen}
-        onOpenChange={setSearchOpen}
-        title="Search"
-        className="workspace-search-dialog"
-      >
-        <label className="search-field" onKeyDown={searchKeys}>
-          <Search size={18} />
-          <input
-            autoFocus
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Canvas, 文稿, Settings…"
-            aria-label="Search workspace content"
-          />
-        </label>
-        <div
-          className="search-results"
-          ref={searchResults}
-          onKeyDown={searchKeys}
+        <div className="workspace-body">
+          <div className="tool-rail" aria-label="Workspace tools">
+            <div className="rail-brand">
+              <Logo small />
+            </div>
+            <AppNavigation />
+            <span className="rail-separator" />
+            <Tooltip label="Search" side="right">
+              <button
+                className="rail-button rail-search"
+                aria-label="Search the workspace"
+                onClick={() => {
+                  setSearch("");
+                  setSearchOpen(true);
+                }}
+              >
+                <Search size={20} />
+              </button>
+            </Tooltip>
+            <div className="rail-footer">
+              <UpdateIndicator />
+              <ProfileMenu />
+            </div>
+          </div>
+          <div className="workspace-panel">
+            <aside className="sidebar" id="workspace-sidebar">
+              {page === "settings" && <SettingsSidebar />}
+            </aside>
+            <div className="main-shell">
+              {!desktop && (
+                <header className="topbar">
+                  <div className="topbar-left">
+                    {navigationToggle}
+                    <span
+                      className="window-toolbar-divider"
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="workspace-title-slot"
+                      ref={setTitleTarget}
+                    />
+                    <div className="window-title workspace-title-fallback">
+                      {page !== "notes" && (
+                        <PageIcon size={18} strokeWidth={1.7} />
+                      )}
+                      <span className="page-label">{pageLabels[page]}</span>
+                    </div>
+                  </div>
+                  {toolbarActions}
+                </header>
+              )}
+              {storageError && (
+                <div className="storage-warning" role="alert">
+                  {storageError}
+                  <button onClick={() => navigate("settings")}>
+                    Open Settings
+                  </button>
+                </div>
+              )}
+              <main
+                tabIndex={-1}
+                id="main-content"
+                className={`main-content ${page === "settings" ? "settings-main" : ""}`}
+              >
+                {children}
+              </main>
+            </div>
+          </div>
+        </div>
+        <Modal
+          open={mobileOpen}
+          onOpenChange={setMobileOpen}
+          title="Navigation"
+          sheet
         >
-          {matches.map((target) => (
+          <AppNavigation mobile onNavigate={() => setMobileOpen(false)} />
+          {page === "settings" && (
+            <SettingsSidebar onSelect={() => setMobileOpen(false)} />
+          )}
+        </Modal>
+        <Modal
+          open={searchOpen}
+          onOpenChange={setSearchOpen}
+          title="Search"
+          className="workspace-search-dialog"
+        >
+          <label className="search-field" onKeyDown={searchKeys}>
+            <Search size={18} />
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Canvas, 文稿, Settings…"
+              aria-label="Search workspace content"
+            />
+          </label>
+          <div
+            className="search-results"
+            ref={searchResults}
+            onKeyDown={searchKeys}
+          >
+            {matches.map((target) => (
+              <button
+                key={target}
+                onClick={() => {
+                  navigate(target);
+                  setSearchOpen(false);
+                }}
+              >
+                <FolderOpen size={17} />
+                <span>{pageLabels[target]}</span>
+                <small>Page</small>
+              </button>
+            ))}
+            {matches.length === 0 && <p className="muted">No matches.</p>}
+          </div>
+          <footer className="search-footer">
             <button
-              key={target}
               onClick={() => {
-                navigate(target);
                 setSearchOpen(false);
+                setShortcutsOpen(true);
               }}
             >
-              <FolderOpen size={17} />
-              <span>{pageLabels[target]}</span>
-              <small>Page</small>
+              Shortcuts <kbd>{modifier} /</kbd>
             </button>
-          ))}
-          {matches.length === 0 && <p className="muted">No matches.</p>}
-        </div>
-        <footer className="search-footer">
-          <button
-            onClick={() => {
-              setSearchOpen(false);
-              setShortcutsOpen(true);
-            }}
-          >
-            Shortcuts <kbd>{modifier} /</kbd>
-          </button>
-        </footer>
-      </Modal>
-      <Modal
-        open={shortcutsOpen}
-        onOpenChange={setShortcutsOpen}
-        title="Keyboard shortcuts"
-      >
-        <dl className="shortcut-list">
-          {workspaceShortcuts
-            .filter(
-              (s) =>
-                (!("desktopOnly" in s) || desktop) &&
-                (page !== "settings" || s.action !== "sidebar"),
-            )
-            .map((s) => (
-              <div key={s.action}>
-                <dt>{s.label}</dt>
-                <dd>
-                  <kbd>
-                    {modifier} {s.display}
-                  </kbd>
-                </dd>
-              </div>
-            ))}
-          <div>
-            <dt>Close dialog or menu</dt>
-            <dd>
-              <kbd>Esc</kbd>
-            </dd>
-          </div>
-        </dl>
-      </Modal>
-    </div>
+          </footer>
+        </Modal>
+        <Modal
+          open={shortcutsOpen}
+          onOpenChange={setShortcutsOpen}
+          title="Keyboard shortcuts"
+        >
+          <dl className="shortcut-list">
+            {workspaceShortcuts
+              .filter(
+                (s) =>
+                  (!("desktopOnly" in s) || desktop) &&
+                  (page !== "settings" || s.action !== "sidebar"),
+              )
+              .map((s) => (
+                <div key={s.action}>
+                  <dt>{s.label}</dt>
+                  <dd>
+                    <kbd>
+                      {modifier} {s.display}
+                    </kbd>
+                  </dd>
+                </div>
+              ))}
+            <div>
+              <dt>Close dialog or menu</dt>
+              <dd>
+                <kbd>Esc</kbd>
+              </dd>
+            </div>
+          </dl>
+        </Modal>
+      </div>
+    </WorkspaceTitleTarget.Provider>
   );
 }

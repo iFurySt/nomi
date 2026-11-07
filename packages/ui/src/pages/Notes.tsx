@@ -1,3 +1,5 @@
+import { WorkspaceTitle } from "../components/WorkspaceTitle";
+import { NotesLoading } from "../writing/NotesLoading";
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import type { Editor } from "@tiptap/core";
 import { BlockActions, type InsertKind } from "../writing/BlockActions";
@@ -14,7 +16,7 @@ import {
   type BlockDrag,
   type TextSnapshot,
 } from "../writing/blockOperations";
-import { Check, TriangleAlert, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { WritingOutline } from "../writing/WritingOutline";
 import { Markdown } from "../canvas/Markdown";
 import {
@@ -722,7 +724,7 @@ export function Notes({ profile }: { profile: string }) {
         {data.loadError}
       </div>
     );
-  if (!doc) return <div className="writing-loading">正在打开文稿…</div>;
+  if (!doc) return <NotesLoading profile={profile} />;
   const rows = note
     ? writingRows(doc, note, (after) => {
         const key = `${note.id}:${after}`;
@@ -785,25 +787,27 @@ export function Notes({ profile }: { profile: string }) {
         onDelete={requestDelete}
       />
       <div className="notes-main">
-        <header className="notes-topbar">
-          {note && (
-            <NoteBreadcrumb
-              notes={doc.notes}
-              note={note}
-              repository={data.repository}
-              onChoose={choose}
-            />
-          )}
-          <span
-            className="notes-save"
-            data-save-state={saveState}
-            role="status"
-            title={saveDescription}
-            aria-label={saveDescription}
-          >
-            {data.saveError ? <TriangleAlert size={15} /> : <Check size={15} />}
-          </span>
-        </header>
+        {note && (
+          <WorkspaceTitle>
+            <div className="notes-document-title">
+              {note && (
+                <NoteBreadcrumb
+                  notes={doc.notes}
+                  note={note}
+                  repository={data.repository}
+                  onChoose={choose}
+                />
+              )}
+              <span
+                className="notes-save"
+                data-save-state={saveState}
+                role="img"
+                title={saveDescription}
+                aria-label={saveDescription}
+              />
+            </div>
+          </WorkspaceTitle>
+        )}
         {(error || data.saveError || message || data.externalNotice) && (
           <div
             className="notes-notice"
@@ -999,7 +1003,7 @@ export function Notes({ profile }: { profile: string }) {
                         <div className="writing-block-tools">
                           <span>
                             {block.type === "interactive"
-                              ? "交互实验"
+                              ? "交互块"
                               : "画布文字"}
                           </span>
                         </div>
@@ -1497,7 +1501,7 @@ export function Notes({ profile }: { profile: string }) {
       <Modal
         open={experimentOpen}
         onOpenChange={setExperimentOpen}
-        title="添加交互实验"
+        title="添加交互块"
       >
         <div className="writing-form">
           <button
@@ -1520,9 +1524,9 @@ export function Notes({ profile }: { profile: string }) {
           {!!experiments.length && (
             <>
               <Select
-                label="已有交互实验"
+                label="已有交互块"
                 value={existingBlock}
-                placeholder="选择画布中的实验"
+                placeholder="选择画布中的交互块"
                 options={experiments.map((b) => ({ value: b.id, label: b.id }))}
                 onValueChange={setExistingBlock}
               />

@@ -1,3 +1,4 @@
+import { normalizeMathMarkdown } from "./mathDelimiters";
 import { remarkCodeMetadata } from "./codeMetadata";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -70,7 +71,7 @@ function PublishedBlock({
             ),
           }}
         >
-          {block.source}
+          {normalizeMathMarkdown(block.source)}
         </ReactMarkdown>
       ) : block.type === "canvas" ? (
         <CanvasScenePreview

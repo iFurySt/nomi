@@ -181,7 +181,7 @@ async function checkSlash({ output, report, entry }) {
       await js(
         "document.querySelector('.writing-slash-menu [aria-selected=true]').textContent",
       ),
-      "交互实验",
+      "交互块",
     );
     await js("document.documentElement.dataset.theme='dark'");
     await shot("menu-dark");

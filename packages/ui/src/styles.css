@@ -4893,3 +4893,19 @@ kbd {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* The current page supplies one title in the shared window toolbar. */
+.workspace-title-slot,
+.topbar-left {
+  min-width: 0;
+}
+.workspace-title-slot {
+  flex: 0 1 auto;
+}
+.workspace-title-slot:empty,
+.workspace-title-slot:not(:empty) + .workspace-title-fallback {
+  display: none;
+}
+.window-toolbar > .topbar-actions {
+  flex-shrink: 0;
+}

@@ -35,7 +35,7 @@ export function NoteBreadcrumb({
           const title = entry.title || "未命名文稿";
           const content = (
             <>
-              <NoteIcon note={entry} repository={repository} />
+              {entry.icon && <NoteIcon note={entry} repository={repository} />}
               <span className="notes-breadcrumb-title">{title}</span>
             </>
           );

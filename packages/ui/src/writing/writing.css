@@ -93,24 +93,6 @@
   min-height: 0;
   background: var(--canvas);
 }
-.notes-topbar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex: 0 0 auto;
-  min-height: 48px;
-  padding: 8px 22px;
-}
-.notes-topbar .notes-save {
-  margin-left: auto;
-  flex: 0 0 auto;
-}
-
-.notes-save {
-  color: var(--muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
 
 .notes-scroll {
   overflow: auto;
@@ -349,7 +331,6 @@
 }
 .rich-writing .tiptap-mathematics-render.ProseMirror-selectednode {
   outline: none;
-  background: var(--interaction-hover);
 }
 .rich-writing .block-math,
 .rich-writing .katex-display {
@@ -526,10 +507,6 @@
   .writing-block-tools div {
     opacity: 1;
   }
-
-  .notes-save {
-    font-size: 10px;
-  }
 }
 /* Override the app's generic grid navigation: note rows keep their content height. */
 .notes-library nav {
@@ -586,16 +563,6 @@
 }
 .writing-block-tools > span {
   color: var(--muted);
-}
-.notes-save {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 70px;
-}
-
-.notes-save[data-save-state="error"] {
-  color: var(--negative);
 }
 
 .notes-library nav .notes-list-row {
@@ -839,15 +806,6 @@
   outline: none;
   box-shadow: none;
 }
-.writing-math-popover small {
-  display: block;
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 11px;
-}
-.writing-math-popover kbd {
-  font: inherit;
-}
 .writing-type-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -942,14 +900,6 @@
   position: relative;
 }
 
-.notes-save {
-  min-width: 0;
-  padding: 5px;
-  opacity: 0.65;
-}
-.notes-save[data-save-state="error"] {
-  opacity: 1;
-}
 .notes-writing-area {
   position: relative;
   display: grid;
@@ -1135,14 +1085,14 @@
   top: 0;
   bottom: 0;
   left: 3px;
-  width: 2px;
+  width: 1px;
   background: transparent;
   transition: background 120ms;
 }
 .notes-library-resizer:hover::after,
 .notes-library-resizer:focus-visible::after,
 .notes-workspace[data-resizing] .notes-library-resizer::after {
-  background: var(--interaction-accent, #5879ff);
+  background: color-mix(in srgb, var(--border) 65%, var(--muted));
 }
 .notes-workspace[data-resizing] {
   cursor: col-resize;
@@ -1192,7 +1142,8 @@
   font-size: 12px;
 }
 .notes-breadcrumb {
-  flex: 1;
+  flex: 0 1 auto;
+  -webkit-app-region: no-drag;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -1218,7 +1169,7 @@
 .notes-breadcrumb-separator {
   color: var(--border);
 }
-.notes-main .notes-breadcrumb button,
+.notes-breadcrumb button,
 .notes-breadcrumb-current {
   display: inline-flex;
   align-items: center;
@@ -1787,9 +1738,15 @@ body.notes-tree-dragging * {
 }
 
 /* The shared composer floats above the note without moving its text. */
+.note-ai-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
 .note-ai-layer .canvas-ai-composer {
   position: fixed;
   z-index: 80;
+  pointer-events: auto;
 }
 .note-ai-layer .canvas-ai-composer.is-docked {
   top: 100px;
@@ -1819,4 +1776,191 @@ body.notes-tree-dragging * {
   .note-ai-preview-block {
     animation: none;
   }
+}
+
+/* Keep saving feedback beside the path without shifting either the title or editor. */
+.notes-document-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 2px;
+}
+.notes-breadcrumb button {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+  font-weight: inherit;
+}
+.notes-breadcrumb button:hover {
+  background: var(--interaction-hover);
+  color: var(--text);
+}
+.notes-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 20px;
+  flex: 0 0 12px;
+  -webkit-app-region: no-drag;
+}
+.notes-save::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: 0;
+}
+.notes-save[data-save-state="pending"]::before,
+.notes-save[data-save-state="saving"]::before {
+  animation: notes-saving-breathe 1.6s ease-in-out infinite;
+}
+@keyframes notes-saving-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notes-save[data-save-state="pending"]::before,
+  .notes-save[data-save-state="saving"]::before {
+    animation: none;
+    opacity: 0.55;
+  }
+}
+
+.rich-writing [data-type="block-math"] .block-math-inner {
+  display: inline-block;
+  max-width: 100%;
+  padding: 3px 5px;
+  border-radius: 4px;
+  vertical-align: top;
+}
+.rich-writing [data-type="inline-math"] {
+  padding: 3px 4px;
+  border-radius: 4px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.rich-writing [data-type="inline-math"]:hover,
+.rich-writing [data-type="block-math"] .block-math-inner:hover {
+  background: var(--interaction-hover);
+}
+.rich-writing
+  [data-type="block-math"].ProseMirror-selectednode
+  .block-math-inner,
+.rich-writing [data-type="inline-math"].ProseMirror-selectednode,
+.rich-writing [data-type="block-math"][data-math-editing] .block-math-inner,
+.rich-writing [data-type="inline-math"][data-math-editing] {
+  background: color-mix(
+    in srgb,
+    var(--interaction-accent, #5879ff) 16%,
+    transparent
+  );
+}
+.writing-formula-toolbar {
+  position: relative;
+}
+
+/* Quiet table edge controls; the cell content keeps its normal editing surface. */
+.rich-writing .tableWrapper {
+  border-radius: 5px;
+}
+.rich-writing .tiptap table {
+  min-width: 0 !important;
+}
+.rich-writing .tiptap :is(td, th) {
+  min-width: 72px;
+}
+.rich-writing .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--interaction-accent, #5879ff);
+  pointer-events: none;
+  z-index: 3;
+}
+.rich-writing .resize-cursor {
+  cursor: col-resize;
+}
+.rich-writing .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: color-mix(
+    in srgb,
+    var(--interaction-accent, #5879ff) 13%,
+    transparent
+  );
+}
+.writing-table-controls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+.writing-table-controls button {
+  position: fixed;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  color: var(--secondary);
+  background: var(--surface-muted);
+  border-radius: 3px;
+}
+.writing-table-controls button:hover,
+.writing-table-controls button[data-state="open"] {
+  color: var(--primary);
+  background: var(--interaction-hover);
+}
+.writing-table-controls .writing-table-insert {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--canvas);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.writing-table-controls .writing-table-insert:hover {
+  color: white;
+  background: var(--interaction-accent, #5879ff);
+}
+.writing-table-menu {
+  min-width: 172px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--canvas);
+  color: var(--primary);
+  box-shadow: 0 8px 28px #0002;
+  z-index: 100;
+  font-size: 13px;
+}
+.writing-table-menu [role="menuitem"] {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-height: 32px;
+  padding: 5px 9px;
+  border-radius: 5px;
+  outline: none;
+  cursor: pointer;
+}
+.writing-table-menu [role="menuitem"][data-highlighted] {
+  background: var(--interaction-hover);
+}
+.writing-table-menu [role="separator"] {
+  height: 1px;
+  background: var(--border);
+  margin: 5px;
 }

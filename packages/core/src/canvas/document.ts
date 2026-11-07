@@ -1028,7 +1028,7 @@ export function createCanvasDocument(): CanvasDocument {
         id: "text.start",
         type: "markdown",
         source:
-          "## 思考不必排成一条线\n\n这里是一篇完整笔记，旁边可以放图片、附件和交互实验。\n\n- 双击空白处，新建一篇笔记\n- 拖动标题栏，重新组织内容\n- 点击编辑，继续写 Markdown 与公式\n\n**把相关的东西放在一起，让理解慢慢生长。**",
+          "## 思考不必排成一条线\n\n这里是一篇完整笔记，旁边可以放图片、附件和交互块。\n\n- 双击空白处，新建一篇笔记\n- 拖动标题栏，重新组织内容\n- 点击编辑，继续写 Markdown 与公式\n\n**把相关的东西放在一起，让理解慢慢生长。**",
       },
       {
         id: "text.questions",

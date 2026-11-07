@@ -97,8 +97,8 @@ export function planNoteExport(
       if (block.type === "interactive") {
         const path = assetPath(`${noteFileId(block.id)}.html`);
         return options.format === "jekyll"
-          ? `<iframe src="${path}" title="交互实验" loading="lazy" sandbox="allow-scripts" style="width:100%;height:900px;border:0;border-radius:12px;"></iframe>`
-          : `[打开交互实验：${label(block.program.id)}](${path})`;
+          ? `<iframe src="${path}" title="交互块" loading="lazy" sandbox="allow-scripts" style="width:100%;height:900px;border:0;border-radius:12px;"></iframe>`
+          : `[打开交互块：${label(block.program.id)}](${path})`;
       }
       if (block.type === "image" || block.type === "file") {
         const asset = assets.find((a) => a.id === block.asset)!;

@@ -20,7 +20,7 @@
 - [.nomi 文稿文件包提案](nomi-document-package.md)：目录作为单个文稿、包内 DSL / 资产、嵌套子文稿、外部 AI 编辑及迁移的设计基线。
 - [.nomi v1 实现契约](nomi-package-format.md)：当前字段、目录结构、AI 编辑规则、共享引用与首版边界。
 
-- [文稿编辑与文章导出](notes-authoring.md)：Canvas 同源 Note 的富文本 / Markdown 视图、公式、交互实验、附件、Markdown / Jekyll 包和离线阅读运行时。
+- [文稿编辑与文章导出](notes-authoring.md)：Canvas 同源 Note 的富文本 / Markdown 视图、公式、交互块、附件、Markdown / Jekyll 包和离线阅读运行时。
 
 - [画布主工作区实现](canvas-workspace-runtime.md)：默认 Canvas、世界坐标、长笔记、附件 / 原件、交互块、撤销与 IndexedDB 恢复。
 - [连线编辑与浮动工具栏](connector-editing.md)：边界锚点吸附、端点 / 线段、标记与样式、文字、剪贴板、层级和锁定的实现契约。

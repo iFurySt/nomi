@@ -6,12 +6,12 @@ export function readMathSource(source: string) {
   const match = source.match(/^\s*% nomi-align: (left|center|right)\r?\n/);
   return {
     latex: match ? source.slice(match[0].length) : source,
-    alignment: (match?.[1] ?? "center") as MathAlignment,
+    alignment: (match?.[1] ?? "left") as MathAlignment,
   };
 }
 export function writeMathSource(latex: string, alignment: MathAlignment) {
   const clean = readMathSource(latex).latex;
-  return alignment === "center"
+  return alignment === "left"
     ? clean
     : `% nomi-align: ${alignment}\n${clean}`;
 }

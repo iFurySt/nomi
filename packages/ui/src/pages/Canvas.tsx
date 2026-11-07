@@ -2564,7 +2564,7 @@ export function CanvasWorkspace({
         </CanvasToolButton>
         <CanvasToolButton
           aria-label="添加交互块"
-          label="交互实验"
+          label="交互块"
           onClick={() => addInteractive()}
         >
           <FlaskConical size={18} />
@@ -2866,7 +2866,7 @@ export function CanvasWorkspace({
             const title =
               note?.title ||
               (block?.type === "interactive"
-                ? "交互实验"
+                ? "交互块"
                 : doc.assets.find(
                     (a) =>
                       "asset" in (block ?? {}) &&
@@ -3201,7 +3201,7 @@ export function CanvasWorkspace({
               "title" in item
                 ? item.title
                 : item.type === "interactive"
-                  ? "交互实验"
+                  ? "交互块"
                   : item.type === "shape"
                     ? item.text || "形状"
                     : doc.assets.find(

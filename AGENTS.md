@@ -21,7 +21,7 @@ Nomi / 知己是个人一站式工作台，覆盖学习、笔记、信息 hub、
 
 - `docs/PLANS_GUIDE.md`：什么时候要写 execution plan，怎么维护。
 - `docs/product-specs/personal-workbench.md`：当前产品定位、领域边界和阶段范围。
-- `docs/design-docs/generative-interactive-content.md`：GenUI、交互学习、平台中立 DSL 与原生 renderer 的当前架构修订。
+- `docs/design-docs/generative-interactive-content.md`：交互块（统一产品名称）、GenUI、交互学习、平台中立 DSL 与原生 renderer 的当前架构修订。
 - `docs/design-docs/notes-infinite-canvas.md`：当前笔记 / 无限画布方向、DSL、跨端和手写架构提案。
 - `docs/design-docs/nomi-package-format.md`：`.nomi` 目录文件包的当前格式、AI 编辑规则、迁移、共享引用和打开边界；长期设计见相邻 `nomi-document-package.md`。
 - `docs/DESKTOP_RELEASE.md`：桌面 DMG、Sparkle、签名公证与 GitHub Actions 发布。

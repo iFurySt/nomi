@@ -2,6 +2,12 @@
 
 状态：2026-10-18 架构提案修订；2026-10-19 已实现交互 IR / TypeScript runtime、React 温度探索器与 Swift 计算参考。实际范围见 [运行时说明](interactive-learning-runtime.md)，同日已补齐 [画布主工作区](canvas-workspace-runtime.md) 与本地笔记 / 附件 / 交互块；完整产品、原生 UI、手写、同步与 AI 生成待实现。用户明确要求交互学习与 AI GenUI，并要求将来可用 SwiftUI / UIKit、Android Compose 等原生实现。本提案更新 [笔记与画布设计](notes-infinite-canvas.md) 中“共享 TypeScript / WebView”的实现假设；完整笔记、无限画布、Markdown / LaTeX、手写和本地优先目标继续保留。
 
+## 产品命名
+
+内容类型统一称为 **交互块**（Interactive Block），用于文稿、画布、插入菜单、AI 生成入口、导出文案与当前设计文档。它涵盖互动演示、交互实验、图表、测验和小工具；这些是内容用途，不代表当前运行时已支持全部能力。画布负责组织空间，交互块负责可操作、可响应的内容。
+
+「交互实验」仅用于具体的实验类内容，不再作为通用类型或入口名称；历史记录保留当时称呼，搜索可继续接受旧关键词。底层 `InteractiveBlock`、`interactive` 类型、现有内部 `experiment` 操作标识和文件格式保持兼容，不因显示名称调整而迁移已有资料。
+
 ## 本轮结论
 
 Nomi 的核心协议需要同时表达文档内容、空间视图和可运行的交互内容。新增一等 `InteractiveBlock`：可以出现在笔记中、画布中，也可以由 AI 在对话里生成，之后保存为长期内容。
