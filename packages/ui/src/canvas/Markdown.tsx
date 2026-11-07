@@ -1,3 +1,4 @@
+import { remarkCodeMetadata } from "../writing/codeMetadata";
 import { memo, useDeferredValue } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -25,6 +26,7 @@ export const Markdown = memo(function Markdown({ source }: { source: string }) {
           remarkMath,
           remarkMathAlignment,
           remarkTableBreaks,
+          remarkCodeMetadata,
         ]}
         rehypePlugins={[[rehypeKatex, mathOptions]]}
         components={{

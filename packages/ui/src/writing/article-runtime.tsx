@@ -1,3 +1,4 @@
+import { remarkCodeMetadata } from "./codeMetadata";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import ReactMarkdown from "react-markdown";
@@ -56,6 +57,7 @@ function PublishedBlock({
             remarkMath,
             remarkMathAlignment,
             remarkTableBreaks,
+            remarkCodeMetadata,
           ]}
           rehypePlugins={[rehypeKatex]}
           components={{

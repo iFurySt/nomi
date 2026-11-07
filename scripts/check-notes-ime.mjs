@@ -83,13 +83,20 @@ async function checkIME({ output, disableGuard }) {
       { enabled: true },
     );
     const state = () =>
-      run(() => ({
-        text: window.imeEditor.state.doc.textContent,
-        dom: window.imeEditor.view.dom.textContent,
-        composing: window.imeEditor.view.composing,
-        focused: document.activeElement === window.imeEditor.view.dom,
-        starts: window.imeStarts,
-      }));
+      run(() => {
+        // Node-view chrome and the visual line-number mirror are not editable code.
+        const content = window.imeEditor.view.dom.cloneNode(true);
+        content
+          .querySelectorAll('[contenteditable="false"]')
+          .forEach((node) => node.remove());
+        return {
+          text: window.imeEditor.state.doc.textContent,
+          dom: content.textContent,
+          composing: window.imeEditor.view.composing,
+          focused: document.activeElement === window.imeEditor.view.dom,
+          starts: window.imeStarts,
+        };
+      });
     const compose = async (text) => {
       await win.webContents.debugger.sendCommand("Input.imeSetComposition", {
         text,

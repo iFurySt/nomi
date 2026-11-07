@@ -55,6 +55,7 @@ jobs:
           NOMI_SLASH_PRODUCTION=1 node scripts/ci-desktop-step.mjs node scripts/check-notes-slash.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-note-icons.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-notes-enter-format.mjs
+          node scripts/ci-desktop-step.mjs node scripts/check-notes-code-block.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-canvas-shapes.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-notes-canvas.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-canvas-generation.mjs
