@@ -131,3 +131,13 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、全窗口保存失
 从公开 Release 重新下载 arm64 / x64 DMG，长度、SHA-256、Sparkle Ed25519 签名与公证票据均通过；两个 appcast 的签名、0.3.0 版本及下载地址通过。挂载 arm64 DMG 后，App 的严格深度签名、公证票据、Gatekeeper 和内嵌版本检查通过，验证卷已卸载。校验制品位于 ignored `.artifacts/desktop-030-verification/`。
 
 本版本包括文稿上下文 AI、可调整高度的代码块、目录留白、统一提示气泡和内嵌画布交互改进。仅保存、重启并检查隔离的 Nomi(Dev)；未操作正式版或用户正文。文稿 AI 使用隔离模拟流验证，未将其表述为真实在线推理验收；公开更新清单验证也不等同用户机器上的跨版本安装完成。
+
+## 0.3.1 发布验收
+
+[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.3.1) 已由 [双架构流水线](https://github.com/iFurySt/nomi/actions/runs/42359719101) 发布，tag 固定于 `d154896`。Apple Silicon / Intel 均通过类型、378 项单测、生产构建、桌面 / 文稿 / AI / 更新回归，以及签名、公证、stapling、原生 driver 和独立 App 更新初始化检查。
+
+首次预检发现导航测试仍查找已合并到顶部的旧正文面包屑，已更新为共享标题槽位，并补充仅一处面包屑、旧正文栏不存在的断言；隔离 Electron 导航回归通过后重新固定尚未公开的 tag，未覆盖已发布制品。
+
+公开下载的 arm64 / x64 DMG 均通过长度、SHA-256、Sparkle Ed25519 签名及公证票据验证；两个 appcast 的签名、0.3.1 版本和下载地址通过。挂载 arm64 DMG 后，App 的严格深度签名、公证票据、Gatekeeper 和内嵌版本检查通过，验证卷已卸载。校验制品位于 ignored `.artifacts/desktop-031-verification/`。
+
+本版本包含公式源码复制与编辑修复、表格列宽和行列操作、顶部面包屑及轻量保存提示、加载骨架、AI 未连接入口与自动更新调度。此次发布侧会话未启动或替换正式版，公开制品校验不等同用户机器上的跨版本安装完成。
