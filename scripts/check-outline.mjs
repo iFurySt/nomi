@@ -56,7 +56,7 @@ async function check({ output }) {
       if (await fn()) return;
       await wait(30);
     }
-    throw Error("Outline condition timed out");
+    throw Error("Outline condition timed out: " + fn);
   };
   const shot = async (name) =>
     writeFileSync(
@@ -71,6 +71,19 @@ async function check({ output }) {
       buttons: 0,
     });
     await wait(50);
+  };
+  const viewport = async (width) => {
+    await win.webContents.debugger.sendCommand(
+      "Emulation.setDeviceMetricsOverride",
+      {
+        width,
+        height: 900,
+        deviceScaleFactor: 1,
+        mobile: false,
+      },
+    );
+    await until(() => run((w) => innerWidth === w, width));
+    await wait(100);
   };
   const geom = () =>
     run(() => {
@@ -98,6 +111,12 @@ async function check({ output }) {
       "Emulation.setFocusEmulationEnabled",
       { enabled: true },
     );
+    await win.webContents.debugger.sendCommand("Emulation.setEmulatedMedia", {
+      features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+    });
+    // Hosted Macs can clamp native windows to a 1024px display. Exercise explicit
+    // CSS viewport sizes so the wide pinned mode is actually available.
+    await viewport(1200);
     const original = await geom();
     assert(
       Math.abs(
@@ -165,22 +184,21 @@ async function check({ output }) {
     await shot("pinned-hover");
     await run(() =>
       document
-        .querySelectorAll('.writing-outline [role="navigation"] button')[2]
+        .querySelectorAll('.writing-outline [role="navigation"] button')[1]
         .click(),
     );
     await until(() =>
       run(
         () =>
           document
-            .querySelectorAll('.writing-outline [role="navigation"] button')[2]
+            .querySelectorAll('.writing-outline [role="navigation"] button')[1]
             .getAttribute("aria-current") === "location",
       ),
     );
     await run(() => (document.documentElement.dataset.theme = "dark"));
     await move(600, 20);
     await shot("pinned-dark");
-    win.setSize(820, 900);
-    await wait(100);
+    await viewport(820);
     await until(() =>
       run(() => !document.querySelector(".writing-outline[data-pinned]")),
     );
@@ -192,8 +210,7 @@ async function check({ output }) {
       "Compact outline shifts text",
     );
     await shot("compact");
-    win.setSize(390, 900);
-    await wait(100);
+    await viewport(390);
     narrow = await geom();
     assert(
       Math.abs(
@@ -206,8 +223,7 @@ async function check({ output }) {
       "Mobile overflow",
     );
     await shot("mobile");
-    win.setSize(1200, 900);
-    await wait(100);
+    await viewport(1200);
     await until(() =>
       run(() => !!document.querySelector(".writing-outline[data-pinned]")),
     );
