@@ -41,8 +41,8 @@ async function checkEmbedded({ output, root }) {
   app.disableHardwareAcceleration();
   await app.whenReady();
   const win = new BrowserWindow({
-    width: 1300,
-    height: 950,
+    width: Number(process.env.NOMI_TEST_WIDTH || 1300),
+    height: Number(process.env.NOMI_TEST_HEIGHT || 950),
     show: false,
     webPreferences: {
       sandbox: true,
@@ -776,8 +776,10 @@ async function checkEmbedded({ output, root }) {
       width: window.innerWidth,
     }));
     const pinchPoint = {
-      x: pinchRect.x + pinchRect.width * 0.7,
-      y: pinchRect.y + pinchRect.height * 0.6,
+      // Native wheel client coordinates are integer CSS pixels, including on
+      // standard-DPI hosted Macs. Measure the same point Chromium receives.
+      x: Math.round(pinchRect.x + pinchRect.width * 0.7),
+      y: Math.round(pinchRect.y + pinchRect.height * 0.6),
     };
     const localAnchor = await run((p) => {
       const r = document
@@ -801,24 +803,29 @@ async function checkEmbedded({ output, root }) {
         ),
       "Trackpad pinch did not zoom preview",
     );
+    const gestureAfter = await run(
+      ({ p, anchor }) => {
+        const r = document
+          .querySelector(".embedded-canvas-world")
+          .getBoundingClientRect();
+        return {
+          selected: document.activeElement?.matches("[data-embedded-canvas]"),
+          width: window.innerWidth,
+          scroll: document.querySelector(".notes-scroll").scrollTop,
+          anchorX: Math.abs((p.x - r.left) / r.width - anchor.x),
+          anchorY: Math.abs((p.y - r.top) / r.height - anchor.y),
+        };
+      },
+      { p: pinchPoint, anchor: localAnchor },
+    );
     assert(
-      await run(
-        ({ p, anchor, before }) => {
-          const r = document
-            .querySelector(".embedded-canvas-world")
-            .getBoundingClientRect();
-          return (
-            document.activeElement?.matches("[data-embedded-canvas]") &&
-            window.innerWidth === before.width &&
-            document.querySelector(".notes-scroll").scrollTop ===
-              before.scroll &&
-            Math.abs((p.x - r.left) / r.width - anchor.x) < 0.001 &&
-            Math.abs((p.y - r.top) / r.height - anchor.y) < 0.001
-          );
-        },
-        { p: pinchPoint, anchor: localAnchor, before: gestureBefore },
-      ),
-      "Pinch must select canvas, keep its cursor anchor, and leave document viewport unchanged",
+      gestureAfter.selected &&
+        gestureAfter.width === gestureBefore.width &&
+        gestureAfter.scroll === gestureBefore.scroll &&
+        gestureAfter.anchorX < 0.001 &&
+        gestureAfter.anchorY < 0.001,
+      "Pinch invariant failed: " +
+        JSON.stringify({ before: gestureBefore, after: gestureAfter }),
     );
     assert(
       win.webContents.getZoomFactor() === 1,

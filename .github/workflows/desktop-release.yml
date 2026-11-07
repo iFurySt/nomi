@@ -53,6 +53,7 @@ jobs:
           node scripts/ci-desktop-step.mjs node scripts/check-notes-navigation.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-note-collections.mjs
           NOMI_SLASH_PRODUCTION=1 node scripts/ci-desktop-step.mjs node scripts/check-notes-slash.mjs
+          node scripts/ci-desktop-step.mjs node scripts/check-notes-canvas.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-note-icons.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-notes-enter-format.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-notes-code-block.mjs
@@ -60,7 +61,6 @@ jobs:
           node scripts/ci-desktop-step.mjs node scripts/check-outline.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-tooltips.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-canvas-shapes.mjs
-          node scripts/ci-desktop-step.mjs node scripts/check-notes-canvas.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-canvas-generation.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-chatgpt-login.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-update-ui.mjs
