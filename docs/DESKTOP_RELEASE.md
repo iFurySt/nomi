@@ -101,3 +101,13 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、全窗口保存失
 从公开地址下载的 arm64 / x64 DMG 均通过长度、SHA-256、Sparkle Ed25519 签名及 stapled 公证票据验证；两个 appcast 的签名、0.1.3 版本与下载地址通过。挂载 arm64 App 后，其严格深度签名、Gatekeeper、公证票据与内嵌版本检查通过。ignored `.artifacts/desktop-013-verification/` 保存本地校验制品。
 
 本机 0.1.3 开发 App 已重新构建、退出重启并在实际窗口确认左侧形状菜单、文稿内画布的 Close / 名称及 Esc 返回。包含内嵌画布的文稿需 0.1.3 或更新版本读取；旧版未知块的保护仍有效。此次验证没有替用户执行已安装版本的自动升级安装。
+
+## 0.2.0 发布验收
+
+[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.2.0) 已由 [双架构流水线](https://github.com/iFurySt/nomi/actions/runs/42336727087) 发布，tag 固定于 `b4d721b`。两个架构通过类型、357 单测、生产构建、桌面 / IME / 文稿 / 内嵌画布 / AI / 登录 / 更新回归，以及新增换行格式和 28 种形状指针矩阵；签名、公证、原生 driver 和独立 App 更新初始化通过。旧聚合 Canvas 脚本仍有 QUALITY_SCORE 记录的隐藏窗口命中时序限制，不列为通过项。
+
+发行预检修正了名称失焦测试中超出窄虚拟屏幕的固定点击坐标，增加 1000px 窗口回归后重新固定未发布的 tag。Intel 的 DMG 制作曾遇到构建机 `Resource busy`，单独重试成功；没有替换已发布版本制品。
+
+从公开地址重新下载 arm64 / x64 DMG，两者的长度、SHA-256、Sparkle Ed25519 签名、公证票据均通过；两个 appcast 的签名、0.2.0 版本与下载地址通过。挂载 arm64 App 后，其严格深度签名、公证票据、Gatekeeper 和内嵌版本检查通过。本地校验制品位于 ignored `.artifacts/desktop-020-verification/`。
+
+本机只重启了隔离的 Nomi(Dev)，实际窗口确认已打开并加载保存内容；未操作正式版、用户 Transformer 文稿或替用户安装升级。公开更新清单验证不等同已完成用户机器上的跨版本安装。
