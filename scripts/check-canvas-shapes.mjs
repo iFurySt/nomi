@@ -251,11 +251,11 @@ async function checkShapes({ output, toolsOnly, catalogOnly }) {
         y: item.y + item.height / 2,
       });
       await until(
-        () => run(() => !!document.querySelector('[role="tooltip"]')),
+        () => run(() => !!document.querySelector(".nomi-tooltip")),
         "item tooltip",
       );
       const tip = await run(() => {
-        const el = document.querySelector('[role="tooltip"]');
+        const el = document.querySelector(".nomi-tooltip");
         return {
           text: el.textContent,
           key: el.querySelector("kbd")?.textContent ?? null,

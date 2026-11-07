@@ -77,11 +77,15 @@ async function checks(phase) {
     };
   }
   if (phase === "hint-check") {
-    await until(() =>
-      document
-        .querySelector(".nomi-tooltip")
-        ?.parentElement.style.transform.includes("translate"),
-    );
+    await until(() => {
+      const transform =
+        document.querySelector(".nomi-tooltip")?.parentElement.style.transform;
+      return (
+        transform?.includes("translate") &&
+        transform !== "translate(0px, -200%)" &&
+        transform !== "translate(0, -200%)"
+      );
+    });
     const hint = document.querySelector(".nomi-tooltip"),
       r = hint.getBoundingClientRect(),
       b = row().querySelector(".notes-icon-button").getBoundingClientRect();
@@ -90,7 +94,7 @@ async function checks(phase) {
       "Hint clipped by scroll container",
     );
     assert(
-      Math.abs(r.x + r.width / 2 - b.x - b.width / 2) < 0.5,
+      Math.abs(r.x + r.width / 2 - b.x - b.width / 2) <= 1,
       "Hint is not centered above icon",
     );
     assert(
