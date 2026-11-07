@@ -111,3 +111,11 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、全窗口保存失
 从公开地址重新下载 arm64 / x64 DMG，两者的长度、SHA-256、Sparkle Ed25519 签名、公证票据均通过；两个 appcast 的签名、0.2.0 版本与下载地址通过。挂载 arm64 App 后，其严格深度签名、公证票据、Gatekeeper 和内嵌版本检查通过。本地校验制品位于 ignored `.artifacts/desktop-020-verification/`。
 
 本机只重启了隔离的 Nomi(Dev)，实际窗口确认已打开并加载保存内容；未操作正式版、用户 Transformer 文稿或替用户安装升级。公开更新清单验证不等同已完成用户机器上的跨版本安装。
+
+## 0.2.1 发布验收
+
+[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.2.1) 已由 [双架构流水线](https://github.com/iFurySt/nomi/actions/runs/42343928626) 发布，tag 固定于 `b2ee210`。Apple Silicon / Intel 两个架构均通过类型、361 单测、生产构建、既有桌面发布回归和新增代码块专项；签名、公证、stapling、原生 driver 与独立 App 更新初始化通过。
+
+从公开地址重新下载 arm64 / x64 DMG，长度、SHA-256、Sparkle Ed25519 签名与公证票据均验证通过；两个 appcast 的签名、0.2.1 版本及下载地址通过。挂载 arm64 DMG 后，App 的严格深度签名、公证票据、Gatekeeper 与内嵌版本检查通过，随后已卸载验证卷。制品位于 ignored `.artifacts/desktop-021-verification/`。
+
+本版本新增代码块说明、语言搜索切换、自动换行、逻辑行号和折叠。开发版已实际操作并重启确认设置保留；发布验证未启动、替换正式版或执行用户机器上的跨版本更新安装。后续悬停提示组件的开发不属于此 tag。
