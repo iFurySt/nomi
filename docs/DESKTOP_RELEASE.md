@@ -119,3 +119,13 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、全窗口保存失
 从公开地址重新下载 arm64 / x64 DMG，长度、SHA-256、Sparkle Ed25519 签名与公证票据均验证通过；两个 appcast 的签名、0.2.1 版本及下载地址通过。挂载 arm64 DMG 后，App 的严格深度签名、公证票据、Gatekeeper 与内嵌版本检查通过，随后已卸载验证卷。制品位于 ignored `.artifacts/desktop-021-verification/`。
 
 本版本新增代码块说明、语言搜索切换、自动换行、逻辑行号和折叠。开发版已实际操作并重启确认设置保留；发布验证未启动、替换正式版或执行用户机器上的跨版本更新安装。后续悬停提示组件的开发不属于此 tag。
+
+## 0.3.0 发布验收
+
+[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.3.0) 已由 [双架构流水线](https://github.com/iFurySt/nomi/actions/runs/42350813356) 发布，tag 固定于 `bd4efb6`。Apple Silicon / Intel 均通过类型、368 项单测、生产构建、桌面与文稿回归、28 种形状检查，以及文稿 AI、目录和统一 Tooltip 新增门禁；签名、公证、stapling、原生 driver 与独立 App 更新初始化通过。
+
+发行预检修正了新增 AI 后的斜杠菜单断言、共享 Tooltip 的定位等待与选择器、常驻滚动条和小屏幕下的目录测试，以及原生手势整数坐标下的缩放锚点回归。只重新固定尚未公开的版本 tag，没有覆盖已发布安装包。
+
+从公开 Release 重新下载 arm64 / x64 DMG，长度、SHA-256、Sparkle Ed25519 签名与公证票据均通过；两个 appcast 的签名、0.3.0 版本及下载地址通过。挂载 arm64 DMG 后，App 的严格深度签名、公证票据、Gatekeeper 和内嵌版本检查通过，验证卷已卸载。校验制品位于 ignored `.artifacts/desktop-030-verification/`。
+
+本版本包括文稿上下文 AI、可调整高度的代码块、目录留白、统一提示气泡和内嵌画布交互改进。仅保存、重启并检查隔离的 Nomi(Dev)；未操作正式版或用户正文。文稿 AI 使用隔离模拟流验证，未将其表述为真实在线推理验收；公开更新清单验证也不等同用户机器上的跨版本安装完成。
