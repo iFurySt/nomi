@@ -109,7 +109,7 @@ async function checkSlash({ output, report, entry }) {
       await js(
         "document.querySelectorAll('.writing-slash-menu [role=option]').length",
       ),
-      16,
+      17,
     );
     assert.equal(
       await js(
@@ -118,7 +118,8 @@ async function checkSlash({ output, report, entry }) {
       true,
     );
     await shot("menu-light");
-    await key("Down");
+    await key("Down"); // AI → text
+    await key("Down"); // text → heading 1
     await key("Return");
     await until("document.querySelector('.tiptap h1')");
     assert.equal(await js("ed.state.doc.textContent"), "");
@@ -170,9 +171,9 @@ async function checkSlash({ output, report, entry }) {
       ],
     });
     await type("/");
-    assert.equal(
-      await js("!!document.querySelector('.writing-slash-menu')"),
-      false,
+    assert.deepEqual(
+      await js("Array.from(document.querySelectorAll('.writing-slash-menu [role=option]'), el => el.textContent.trim())"),
+      ["AI"],
     );
     await command("/");
     await key("Up");
