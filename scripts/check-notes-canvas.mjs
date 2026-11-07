@@ -882,6 +882,11 @@ async function checkEmbedded({ output, root }) {
       "Redo failed",
     );
     await close();
+    win.setSize(1000, 950);
+    await until(
+      () => run(() => window.innerWidth <= 1000),
+      "Narrow name-editing viewport not ready",
+    );
     await run(() => document.querySelector("[data-embedded-canvas]").focus());
     await key("Return");
     await until(
@@ -895,7 +900,22 @@ async function checkEmbedded({ output, root }) {
     await nativeClick('[aria-label="画布名称"]');
     await key("A", ["meta"]);
     await win.webContents.insertText("学习流程");
-    const blank = { x: 1100, y: 180 };
+    // macOS CI can constrain BrowserWindow to a smaller virtual display.
+    // Find actual empty canvas space instead of clicking beyond its viewport.
+    const blank = await run(() => {
+      const viewport = document.querySelector(
+        ".embedded-canvas-modal .canvas-viewport",
+      );
+      const r = viewport.getBoundingClientRect();
+      for (const x of [0.85, 0.7, 0.9]) {
+        for (const y of [0.2, 0.4, 0.7]) {
+          const point = { x: r.x + r.width * x, y: r.y + r.height * y };
+          if (document.elementFromPoint(point.x, point.y) === viewport)
+            return point;
+        }
+      }
+      throw Error("No visible empty canvas space for name blur check");
+    });
     await mouse("mousePressed", blank);
     await mouse("mouseReleased", blank);
     assert(
