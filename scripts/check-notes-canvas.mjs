@@ -149,17 +149,66 @@ async function checkEmbedded({ output, root }) {
     );
     await run(() => {
       const e = document.querySelector(".tiptap").editor;
-      e.commands.setContent("/canvas", { contentType: "markdown" });
+      e.commands.setContent("/nomatchxyz", { contentType: "markdown" });
       e.commands.focus("end");
     });
     await until(
-      () => run(() => !!document.querySelector('[role="option"]')),
-      "Slash missing",
+      () => run(() => !!document.querySelector(".writing-slash-empty svg")),
+      "Missing compact empty state",
     );
-    await run(() =>
-      [...document.querySelectorAll('[role="option"]')]
-        .find((e) => e.textContent.trim() === "画布")
-        .click(),
+    assert(
+      await run(
+        () =>
+          !document.querySelector(".writing-slash-footer") &&
+          getComputedStyle(
+            document.querySelector(".writing-slash-empty .sr-only"),
+          ).position === "absolute",
+      ),
+      "Empty menu leaked instructions",
+    );
+    await shot("slash-empty");
+    for (const query of ["canvas", "画板", "huabu", "HUABAN", "huaban"]) {
+      await run((query) => {
+        const e = document.querySelector(".tiptap").editor;
+        e.commands.setContent("/" + query, { contentType: "markdown" });
+        e.commands.focus("end");
+      }, query);
+      await until(
+        () =>
+          run(() =>
+            [...document.querySelectorAll('[role="option"]')].some(
+              (e) => e.textContent.trim() === "画布",
+            ),
+          ),
+        "Canvas alias missing: " + query,
+      );
+    }
+    assert(
+      await run(
+        () =>
+          !document.querySelector(".writing-slash-footer") &&
+          !document.querySelector(".writing-slash-group"),
+      ),
+      "Filtered slash menu must stay compact",
+    );
+    await shot("slash-huaban");
+    await key("Return");
+    await until(
+      () =>
+        run(
+          () =>
+            !!document.querySelector(".embedded-canvas-modal .canvas-viewport"),
+        ),
+      "Enter must insert and open canvas directly",
+    );
+    assert(
+      await run(() => document.activeElement?.matches(".canvas-viewport")),
+      "Inserted canvas must receive editing focus",
+    );
+    await key("Escape");
+    await until(
+      () => run(() => !document.querySelector(".embedded-canvas-modal")),
+      "New canvas must close with Escape",
     );
     await until(
       () => run(() => !!document.querySelector("[data-embedded-canvas]")),
@@ -175,6 +224,48 @@ async function checkEmbedded({ output, root }) {
       ),
       "Article should show a preview without drawing controls",
     );
+    assert(
+      await run(
+        () =>
+          !document.querySelector(".embedded-canvas-hint") &&
+          !document
+            .querySelector("[data-embedded-canvas]")
+            .hasAttribute("title") &&
+          [
+            ...document.querySelectorAll(".writing-article [data-placeholder]"),
+          ].every((el) => !el.dataset.placeholder),
+      ),
+      "Article must not show canvas hints or writing placeholders",
+    );
+    assert(
+      await run(
+        () =>
+          document.querySelector(".embedded-canvas-empty")?.textContent ===
+          "画布暂无内容",
+      ),
+      "Empty canvas must use short empty state",
+    );
+    const emptyBox = await bounds("[data-embedded-canvas]");
+    await mouse("mouseMoved", { x: emptyBox.x + 40, y: emptyBox.y + 30 });
+    await shot("empty-hover");
+    const assertFullCanvas = async () => {
+      assert(
+        await run(() => {
+          const el = document.querySelector(".embedded-canvas-modal");
+          const r = el.getBoundingClientRect();
+          const css = getComputedStyle(el);
+          return (
+            Math.abs(r.x) < 1 &&
+            Math.abs(r.y) < 1 &&
+            Math.abs(r.width - innerWidth) < 1 &&
+            Math.abs(r.height - innerHeight) < 1 &&
+            css.borderTopWidth === "0px" &&
+            css.borderRadius === "0px"
+          );
+        }),
+        "Embedded canvas must fill the viewport without margins or borders",
+      );
+    };
     const initial = await bounds(".embedded-canvas-preview");
     await nativeClick("[data-embedded-canvas]", 2);
     await until(
@@ -190,7 +281,7 @@ async function checkEmbedded({ output, root }) {
         () =>
           !!document.querySelector('[aria-label="AI 生成"]') &&
           !!document.querySelector('[aria-label="连接工具"]') &&
-          !!document.querySelector('[aria-label="对齐吸附"]'),
+          !!document.querySelector('[aria-label="文本工具"]'),
       ),
       "Existing tools missing",
     );
@@ -211,10 +302,59 @@ async function checkEmbedded({ output, root }) {
       }),
       "Tool rail must be compact, vertical and left aligned",
     );
-    await click("模板");
+    await assertFullCanvas();
+    assert(
+      await run(() => {
+        const drag = document.querySelector(".embedded-canvas-window-drag");
+        const rect = drag.getBoundingClientRect();
+        const close = document
+          .querySelector('[aria-label="关闭画布"]')
+          .getBoundingClientRect();
+        return (
+          getComputedStyle(drag).getPropertyValue("-webkit-app-region") ===
+            "drag" &&
+          rect.top === 0 &&
+          rect.width === innerWidth &&
+          rect.height === 44 &&
+          document.elementFromPoint(innerWidth / 2, 20) === drag &&
+          close.top >= rect.bottom
+        );
+      }),
+      "Native window drag strip must cover only the top safe area",
+    );
+
+    assert(
+      await run(() => document.activeElement?.matches(".canvas-viewport")),
+      "Opening canvas must focus its surface, not Close",
+    );
+    await shot("initial-canvas-focus");
+
+    // Keyboard focus stays visible through fill, without the heavy black ring.
+    await key("Tab");
+    await run(() => document.querySelector('[aria-label="关闭画布"]').focus());
+    assert(
+      await run(() => {
+        const el = document.activeElement,
+          css = getComputedStyle(el);
+        return (
+          el.matches(":focus-visible") &&
+          css.outlineStyle === "none" &&
+          css.boxShadow === "none"
+        );
+      }),
+      "Close focus must not draw a black frame",
+    );
+    await nativeClick('[aria-label="模板"]');
     await until(
       () => run(() => !!document.querySelector(".canvas-template-item")),
       "Templates missing",
+    );
+    await run(() => document.querySelector(".canvas-template-item").focus());
+    assert(
+      await run(
+        () => getComputedStyle(document.activeElement).outlineStyle === "none",
+      ),
+      "Menu focus must not draw a black frame",
     );
     await key("Escape");
     assert(
@@ -237,6 +377,119 @@ async function checkEmbedded({ output, root }) {
       }),
       "Screen-reader text must not leak into canvas",
     );
+    assert(
+      await run(() => {
+        const bar = document
+          .querySelector(".canvas-toolbar")
+          .getBoundingClientRect();
+        const view = document
+          .querySelector(".canvas-viewport")
+          .getBoundingClientRect();
+        const header = document
+          .querySelector(".canvas-titlebar")
+          .getBoundingClientRect();
+        return (
+          Math.abs((bar.top + bar.bottom) / 2 - (view.top + view.bottom) / 2) <
+            2 &&
+          header.top >= 48 &&
+          document.querySelectorAll(".canvas-toolbar .canvas-tool-divider")
+            .length === 3 &&
+          !document.querySelector(".canvas-toolbar [aria-label='撤销画布修改']")
+        );
+      }),
+      "Tool rail must be centered and header clear of traffic lights",
+    );
+    const view = await bounds(".canvas-viewport");
+    const shapeButton = await bounds('[aria-label="添加形状"]');
+    await win.webContents.debugger.sendCommand("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: shapeButton.x + 16,
+      y: shapeButton.y + 16,
+    });
+    await until(
+      () => run(() => !!document.querySelector(".canvas-tool-menu")),
+      "Shape hover failed",
+    );
+    await shot("shapes-hover");
+    await mouse("mouseMoved", { x: view.width - 30, y: view.height - 30 });
+    await wait(250);
+    const textButton = await bounds('[aria-label="文本工具"]');
+    await win.webContents.debugger.sendCommand("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: textButton.x + 16,
+      y: textButton.y + 16,
+    });
+    await until(
+      () =>
+        run(
+          () =>
+            document.querySelector('[role="tooltip"]')?.textContent === "TextT",
+        ),
+      "Text tooltip/shortcut missing",
+    );
+    await shot("text-tooltip");
+    await mouse("mouseMoved", { x: view.width - 30, y: view.height - 30 });
+    await wait(250);
+    await run(() => document.querySelector(".canvas-viewport").focus());
+    await key("r");
+    await mouse("mousePressed", { x: 500, y: 350 });
+    await mouse("mouseMoved", { x: 700, y: 470 });
+    await key("Escape");
+    await mouse("mouseReleased", { x: 700, y: 470 });
+    assert(
+      await run(
+        () =>
+          !!document.querySelector(".embedded-canvas-modal") &&
+          !document.querySelector(".canvas-draw-preview") &&
+          !document.querySelector(".embedded-canvas-modal .shape-card"),
+      ),
+      "Escape must cancel drawing without exiting canvas",
+    );
+    await key("t");
+    await mouse("mousePressed", { x: 500, y: 350 });
+    await mouse("mouseReleased", { x: 500, y: 350 });
+    await until(
+      () => run(() => !!document.querySelector("[data-shape-text]")),
+      "T must insert editable text on click",
+    );
+    await nativeClick(".canvas-titlebar");
+    await click("撤销画布修改");
+    await until(
+      () =>
+        run(
+          () => !document.querySelector(".embedded-canvas-modal .shape-card"),
+        ),
+      "Text insertion undo failed",
+    );
+    for (const mode of ["line", "arrow", "rounded", "curve"]) {
+      await click("连接工具");
+      await until(
+        () => run(() => !!document.querySelector(".canvas-line-menu")),
+        "Line menu missing",
+      );
+      if (mode === "line") await shot("line-menu");
+      await run(
+        (mode) => document.querySelector(`[data-line-mode="${mode}"]`).click(),
+        mode,
+      );
+      await drag({ x: 450, y: 550 }, { x: 750, y: 650 });
+      await until(
+        async () => (await scene())?.board.connectors?.length === 1,
+        "Line draw failed",
+      );
+      const connector = (await scene()).board.connectors[0];
+      assert(
+        connector.routing ===
+          (["line", "arrow"].includes(mode) ? "straight" : mode) &&
+          connector.endArrow === (mode !== "line"),
+        "Wrong line mode",
+      );
+      await click("撤销画布修改");
+      await until(
+        async () => !(await scene())?.board.connectors?.length,
+        "Line undo failed",
+      );
+    }
     const addShape = async (type) => {
       await click("添加形状");
       await until(
@@ -248,6 +501,67 @@ async function checkEmbedded({ output, root }) {
         (type) =>
           document.querySelector(`[data-create-shape="${type}"]`).click(),
         type,
+      );
+      const count = await run(
+        () =>
+          document.querySelectorAll(".embedded-canvas-modal .shape-card")
+            .length,
+      );
+      const v = await bounds(".canvas-viewport");
+      // Reverse drag also checks normalization; selecting a tool alone adds nothing.
+      const from = { x: v.x + v.width / 2 + 100, y: v.y + v.height / 2 + 60 };
+      const to = { x: from.x - 200, y: from.y - 120 };
+      await mouse("mousePressed", from);
+      await mouse("mouseMoved", to);
+      await wait(90);
+      assert(
+        await run(
+          (count) =>
+            document.querySelectorAll(".embedded-canvas-modal .shape-card")
+              .length === count &&
+            !!document.querySelector(".canvas-draw-preview"),
+          count,
+        ),
+        "Drawing must preview without inserting",
+      );
+      await mouse("mouseReleased", to);
+      await until(
+        () =>
+          run(
+            (count) =>
+              document.querySelectorAll(".embedded-canvas-modal .shape-card")
+                .length ===
+              count + 1,
+            count,
+          ),
+        "Drag did not create shape",
+      );
+      await click("撤销画布修改");
+      await until(
+        () =>
+          run(
+            (count) =>
+              document.querySelectorAll(".embedded-canvas-modal .shape-card")
+                .length === count,
+            count,
+          ),
+        "Drawing undo failed",
+      );
+      await click("重做画布修改");
+      await until(
+        () =>
+          run(
+            (count) =>
+              document.querySelectorAll(".embedded-canvas-modal .shape-card")
+                .length ===
+              count + 1,
+            count,
+          ),
+        "Drawing redo failed",
+      );
+      await nativeClick(
+        ".embedded-canvas-modal .shape-card:last-of-type .canvas-card-body",
+        2,
       );
       await until(
         () => run(() => !!document.querySelector("[data-shape-text]")),
@@ -331,6 +645,118 @@ async function checkEmbedded({ output, root }) {
       "Preview clipped objects",
     );
     await shot("preview-light");
+    const savedBlock = () =>
+      run(async () =>
+        (
+          await window.canvasFixture.repository("local-device").load()
+        ).blocks.find((b) => b.type === "canvas"),
+      );
+    // Native hover must remain reachable across the gap into the floating toolbar.
+    const box = await bounds("[data-embedded-canvas]");
+    await mouse("mouseMoved", { x: box.x + box.width / 2, y: box.y + 12 });
+    const toolbar = await bounds(".embedded-canvas-toolbar");
+    await mouse("mouseMoved", {
+      x: toolbar.x + toolbar.width / 2,
+      y: toolbar.y + toolbar.height / 2,
+    });
+    assert(
+      await run(
+        () =>
+          getComputedStyle(document.querySelector(".embedded-canvas-controls"))
+            .visibility === "visible",
+      ),
+      "Hover toolbar became unreachable",
+    );
+    await nativeClick('[aria-label="放大画布预览"]');
+    assert(
+      await run(
+        () =>
+          document.querySelector(".embedded-canvas-zoom").textContent ===
+          "125%",
+      ),
+      "Preview zoom failed",
+    );
+    await nativeClick('[aria-label="适应画布预览"]');
+    const canvasDownloaded = new Promise((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(Error("Canvas download timed out")),
+        10000,
+      );
+      win.webContents.session.once("will-download", (_event, item) => {
+        const path = join(output, "canvas-download.zip");
+        item.setSavePath(path);
+        item.once("done", (_event, state) => {
+          clearTimeout(timeout);
+          state === "completed" ? resolve(path) : reject(Error(state));
+        });
+      });
+    });
+    await nativeClick('[aria-label="下载画布"]');
+    const downloadPath = await canvasDownloaded;
+    const canvasArchive = unzipSync(readFileSync(downloadPath));
+    assert(
+      Object.keys(canvasArchive).some((k) => k.endsWith("index.html")) &&
+        Object.keys(canvasArchive).some((k) => k.endsWith(".nomi.json")),
+      "Canvas download missing offline view or editable scene",
+    );
+    const unchangedScene = JSON.stringify(await scene());
+    for (const side of ["nw", "n", "ne", "e", "se", "s", "sw", "w"]) {
+      const b = await bounds("[data-embedded-canvas]");
+      await mouse("mouseMoved", { x: b.x + 20, y: b.y + 20 });
+      const handle = await bounds(`[data-resize="${side}"]`);
+      const from = {
+        x: handle.x + handle.width / 2,
+        y: handle.y + handle.height / 2,
+      };
+      await drag(from, {
+        x: from.x + (side.includes("w") ? 45 : side.includes("e") ? -45 : 0),
+        y: from.y + (side.includes("n") ? -50 : side.includes("s") ? 50 : 0),
+      });
+      await until(
+        async () => !!(await savedBlock()).preview,
+        "Resize was not persisted: " + side,
+      );
+      assert(
+        JSON.stringify(await scene()) === unchangedScene,
+        "Preview resize changed scene content",
+      );
+      await shot("resize-" + side);
+      await run(() => document.querySelector("[data-embedded-canvas]").focus());
+      await key("Z", ["meta"]);
+      await until(
+        async () => !(await savedBlock()).preview,
+        "Resize must undo in one step: " + side,
+      );
+      await key("Z", ["meta", "shift"]);
+      await until(
+        async () => !!(await savedBlock()).preview,
+        "Resize redo failed: " + side,
+      );
+      await click("恢复画布自动尺寸");
+      await until(
+        async () => !(await savedBlock()).preview,
+        "Auto size reset failed",
+      );
+      // Restore the earlier history position for the pre-existing scene undo checks.
+      await run(() => document.querySelector("[data-embedded-canvas]").focus());
+      await key("Z", ["meta"]);
+      await key("Z", ["meta"]);
+      await until(
+        async () => !(await savedBlock()).preview,
+        "History cleanup failed",
+      );
+    }
+    // Esc cancels a live resize without changing saved dimensions.
+    const cancelBox = await bounds("[data-embedded-canvas]");
+    await mouse("mouseMoved", { x: cancelBox.x + 20, y: cancelBox.y + 20 });
+    const cancelHandle = await bounds('[data-resize="s"]');
+    const start = { x: cancelHandle.x + 9, y: cancelHandle.y + 9 };
+    await run(() => document.querySelector("[data-embedded-canvas]").focus());
+    await mouse("mousePressed", start);
+    await mouse("mouseMoved", { x: start.x, y: start.y + 90 });
+    await key("Escape");
+    await mouse("mouseReleased", { x: start.x, y: start.y + 90 });
+    assert(!(await savedBlock()).preview, "Cancelled resize persisted");
     // A second block uses the same Canvas implementation with an independent scene.
     const plus = await run(() => {
       const frame = [...document.querySelectorAll(".writing-rich-frame")].at(
@@ -368,6 +794,18 @@ async function checkEmbedded({ output, root }) {
         ),
       "Second canvas insertion failed",
     );
+    await until(
+      () =>
+        run(
+          () =>
+            !!document.querySelector(".embedded-canvas-modal .canvas-viewport"),
+        ),
+      "Plus insertion must open canvas too",
+    );
+    await close();
+    await run(() =>
+      [...document.querySelectorAll("[data-embedded-canvas]")].at(-1).focus(),
+    );
     await key("Z", ["meta"]);
     await until(
       () =>
@@ -383,6 +821,28 @@ async function checkEmbedded({ output, root }) {
           document.querySelectorAll("[data-preview-placement]").length === 2,
       ),
       "Inserting/removing another canvas changed the first",
+    );
+    await key("Z", ["meta", "shift"]);
+    await until(
+      () =>
+        run(
+          () =>
+            document.querySelectorAll("[data-embedded-canvas]").length === 2,
+        ),
+      "Canvas insertion redo failed",
+    );
+    assert(
+      await run(() => !document.querySelector(".embedded-canvas-modal")),
+      "Redo must not reopen an already consumed editing request",
+    );
+    await key("Z", ["meta"]);
+    await until(
+      () =>
+        run(
+          () =>
+            document.querySelectorAll("[data-embedded-canvas]").length === 1,
+        ),
+      "Redo cleanup failed",
     );
     // Reopen without writing: camera and selection must not mutate scene content.
     const before = JSON.stringify(await scene());
@@ -422,15 +882,27 @@ async function checkEmbedded({ output, root }) {
       "Redo failed",
     );
     await close();
-    await nativeClick("[data-embedded-canvas]", 2);
+    await run(() => document.querySelector("[data-embedded-canvas]").focus());
+    await key("Return");
     await until(
       () => run(() => !!document.querySelector('[aria-label="画布名称"]')),
       "Name missing",
     );
+    assert(
+      await run(() => document.activeElement?.matches(".canvas-viewport")),
+      "Enter from document must focus canvas rather than Close",
+    );
     await nativeClick('[aria-label="画布名称"]');
     await key("A", ["meta"]);
     await win.webContents.insertText("学习流程");
-    await key("Return");
+    const blank = { x: 1100, y: 180 };
+    await mouse("mousePressed", blank);
+    await mouse("mouseReleased", blank);
+    assert(
+      await run(() => document.activeElement?.matches(".canvas-viewport")),
+      "Clicking canvas must finish name editing despite gesture preventDefault",
+    );
+    await shot("name-after-outside-click");
     await until(
       async () => (await scene())?.title === "学习流程",
       "Rename not saved",
@@ -452,6 +924,23 @@ async function checkEmbedded({ output, root }) {
     );
     await close();
     await run(() => (document.documentElement.dataset.theme = "dark"));
+    const gaps = await run(() => {
+      const canvas = document.querySelector(".writing-block-canvas");
+      const before = canvas.previousElementSibling?.querySelector(".tiptap");
+      const after = canvas.nextElementSibling?.querySelector(".tiptap");
+      if (!before?.editor || !after?.editor)
+        throw Error("Spacing fixture has no adjacent paragraphs");
+      before.editor.commands.setContent("Above", { contentType: "markdown" });
+      after.editor.commands.setContent("Below", { contentType: "markdown" });
+      const a = before.querySelector("p").getBoundingClientRect();
+      const b = canvas.getBoundingClientRect();
+      const c = after.querySelector("p").getBoundingClientRect();
+      return { before: b.top - a.bottom, after: c.top - b.bottom };
+    });
+    assert(
+      Math.abs(gaps.before - gaps.after) < 2,
+      "Unequal canvas paragraph gaps: " + JSON.stringify(gaps),
+    );
     await shot("preview-dark");
     win.setSize(420, 900);
     await wait(120);
@@ -469,6 +958,7 @@ async function checkEmbedded({ output, root }) {
         ),
       "Narrow editor failed",
     );
+    await assertFullCanvas();
     await shot("editor-narrow");
     await close();
     await until(
@@ -559,6 +1049,14 @@ async function checkEmbedded({ output, root }) {
     app.exit(0);
   } catch (error) {
     console.error(error);
+    console.error(
+      await run(() => ({
+        counts: [...document.querySelectorAll(".shape-card")].map(
+          (e) => e.closest(".canvas-workspace")?.className,
+        ),
+        text: document.body.innerText.slice(-1000),
+      })),
+    );
     await shot("failure");
     app.exit(1);
   }

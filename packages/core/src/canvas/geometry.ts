@@ -80,7 +80,7 @@ export function snapCanvasRect(
 }
 export function canvasPort(rect: CanvasRect, side: CanvasSide) {
   if (rect.shape) {
-    const p = canvasShapePort(rect.shape, side, rect.shapeStyle);
+    const p = canvasShapePort(rect.shape, side, rect.shapeStyle, rect);
     return { x: rect.x + p.x * rect.width, y: rect.y + p.y * rect.height };
   }
   return {
@@ -97,7 +97,7 @@ export function canvasBoundaryProjection(
 ) {
   const outline = (
     rect.shape
-      ? canvasShapeOutline(rect.shape, rect.shapeStyle)
+      ? canvasShapeOutline(rect.shape, rect.shapeStyle, rect)
       : [
           { x: 0, y: 0 },
           { x: 100, y: 0 },

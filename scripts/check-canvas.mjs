@@ -68,7 +68,9 @@ async function checks(phase, expected) {
     el.dispatchEvent(new Event("input", { bubbles: true }));
   };
   const noDialog = () =>
-    !document.querySelector('[role="dialog"]:not(.connector-panel)');
+    !document.querySelector(
+      '[role="dialog"]:not(.connector-panel):not(.canvas-tool-menu)',
+    );
   const choose = (label, value) => {
     const select = document.querySelector(`[aria-label="${label}"]`);
     select.value = value;
@@ -830,25 +832,40 @@ async function checks(phase, expected) {
       ["ellipse", "验证与理解", "blue"],
     ]) {
       const count = cards().length;
-      button("添加形状").click();
-      await until(() =>
-        document.querySelector(`[data-create-shape="${shape}"]`),
-      );
-      document.querySelector(`[data-create-shape="${shape}"]`).click();
-      await until(
-        () =>
-          cards().length === count + 1 &&
-          document.querySelector("[data-shape-text]"),
-      );
+      // Tool gestures are covered by check-notes-canvas; seed geometry for routing checks.
+      const next = await saved();
+      const blockId = `tools.${shape}`,
+        placeId = `tools.place.${shape}`;
+      next.blocks.push({
+        id: blockId,
+        type: "shape",
+        shape,
+        text: "",
+        tone,
+      });
+      next.board.placements.push({
+        id: placeId,
+        content: blockId,
+        x: 0,
+        y: 0,
+        width: 280,
+        height: 180,
+      });
+      await applyDsl(next);
+      await until(() => cards().length === count + 1);
+      card(placeId)
+        .querySelector(".canvas-card-body")
+        .dispatchEvent(
+          new MouseEvent("dblclick", { bubbles: true, detail: 2 }),
+        );
+      await until(() => document.querySelector("[data-shape-text]"));
       const editor = document.querySelector("[data-shape-text]");
       ids.push(editor.closest("[data-placement]").dataset.placement);
       input(editor, text);
-      choose("形状颜色", tone);
       await wait(30);
-      editor
-        .closest("[data-placement]")
-        .querySelector('[aria-label^="完成编辑"]')
-        .click();
+      editor.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
       await until(() => !document.querySelector("[data-shape-text]"));
       await until(
         () =>
@@ -965,9 +982,15 @@ async function checks(phase, expected) {
   if (phase === "tools-select-rectangle") {
     button("选择工具").click();
     const node = card(expected.id);
-    node.querySelector('[aria-label^="编辑 "]').click();
-    await until(() => node.querySelector('[aria-label^="完成编辑"]'));
-    node.querySelector('[aria-label^="完成编辑"]').click();
+    node
+      .querySelector(".canvas-card-body")
+      .dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    await until(() => node.querySelector("[data-shape-text]"));
+    node
+      .querySelector("[data-shape-text]")
+      .dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
     await wait(30);
     const rect = node.querySelector(".canvas-shape-content rect");
     assert(
@@ -1002,7 +1025,11 @@ async function checks(phase, expected) {
   if (phase === "tools-doubled") {
     await until(() => card(expected.id).querySelector("[data-shape-text]"));
     assert(cards().length === 5, "Double-clicking a shape created a new note");
-    card(expected.id).querySelector('[aria-label^="完成编辑"]').click();
+    card(expected.id)
+      .querySelector("[data-shape-text]")
+      .dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
     await wait(30);
     return;
   }
@@ -1036,11 +1063,15 @@ async function checks(phase, expected) {
   if (phase === "tools-port") {
     if (expected.direct) {
       button("选择工具").click();
-      card(expected.from).querySelector('[aria-label^="编辑 "]').click();
-      await until(() =>
-        card(expected.from).querySelector('[aria-label^="完成编辑"]'),
-      );
-      card(expected.from).querySelector('[aria-label^="完成编辑"]').click();
+      card(expected.from)
+        .querySelector(".canvas-card-body")
+        .dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+      await until(() => card(expected.from).querySelector("[data-shape-text]"));
+      card(expected.from)
+        .querySelector("[data-shape-text]")
+        .dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
       await wait(30);
     } else if (button("连接工具").getAttribute("aria-pressed") !== "true")
       button("连接工具").click();
@@ -1602,7 +1633,7 @@ async function checks(phase, expected) {
     await applyDsl(d);
     button("重置为 100%").click();
     card(source.id)
-      .querySelector(".canvas-card-header")
+      .querySelector(".canvas-card-body")
       .dispatchEvent(
         new PointerEvent("pointerdown", { bubbles: true, button: 2 }),
       );
@@ -1688,13 +1719,14 @@ async function checks(phase, expected) {
     button("选择工具").click();
     // Keyboard nudge is world-space and bypasses snapping; undo restores the exact layout.
     const p = card(expected.ids[0]);
-    p.querySelector(".canvas-card-header").dispatchEvent(
-      new PointerEvent("pointerdown", { bubbles: true, button: 2 }),
+    p.querySelector(".canvas-card-body").dispatchEvent(
+      new MouseEvent("dblclick", { bubbles: true }),
     );
-    p.querySelector('[aria-label^="编辑"]').click();
     await until(() => document.querySelector("[data-shape-text]"));
     input(document.querySelector("[data-shape-text]"), "收集问题 · 可编辑");
-    p.querySelector('[aria-label^="完成编辑"]').click();
+    p.querySelector("[data-shape-text]").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
     await wait(30);
     const before = (await saved()).board.placements.find(
       (x) => x.id === expected.ids[0],
@@ -2549,7 +2581,7 @@ const run=(phase,expected)=>win.webContents.executeJavaScript('('+${JSON.stringi
 const parity=(phase,expected)=>win.webContents.executeJavaScript('('+${JSON.stringify(canvasParityChecks.toString())}+')('+JSON.stringify(phase)+','+JSON.stringify(expected||null)+')');
 try{await win.loadFile(join(${JSON.stringify(output)},'index.html'));const initial=await run('ready');await run('arrow-tip-check');writeFileSync(join(${JSON.stringify(output)},'canvas-desktop.png'),(await win.webContents.capturePage()).toPNG());await win.webContents.executeJavaScript("document.documentElement.dataset.theme='dark'");await new Promise(r=>setTimeout(r,100));writeFileSync(join(${JSON.stringify(output)},'canvas-dark.png'),(await win.webContents.capturePage()).toPNG());await win.webContents.executeJavaScript("document.documentElement.dataset.theme='light'");
 const position=await win.webContents.executeJavaScript("(()=>{const r=document.querySelector('[data-placement=\\\"place.start\\\"] .canvas-card-header .canvas-card-kind').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()");
-win.webContents.sendInputEvent({type:'mouseMove',x:Math.round(position.x),y:Math.round(position.y)});win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,x:Math.round(position.x),y:Math.round(position.y)});win.webContents.sendInputEvent({type:'mouseMove',x:Math.round(position.x+64),y:Math.round(position.y+40)});await new Promise(r=>setTimeout(r,60));win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,x:Math.round(position.x+64),y:Math.round(position.y+40)});await new Promise(r=>setTimeout(r,100));await run('dragged',{x:64/initial.camera.zoom,y:40/initial.camera.zoom,source:initial.doc.blocks.find(b=>b.id==='text.start').source});
+win.webContents.sendInputEvent({type:'mouseMove',modifiers:['alt'],x:Math.round(position.x),y:Math.round(position.y)});win.webContents.sendInputEvent({type:'mouseDown',modifiers:['alt'],button:'left',clickCount:1,x:Math.round(position.x),y:Math.round(position.y)});win.webContents.sendInputEvent({type:'mouseMove',modifiers:['alt'],x:Math.round(position.x+64),y:Math.round(position.y+40)});await new Promise(r=>setTimeout(r,60));win.webContents.sendInputEvent({type:'mouseUp',modifiers:['alt'],button:'left',clickCount:1,x:Math.round(position.x+64),y:Math.round(position.y+40)});await new Promise(r=>setTimeout(r,100));await run('dragged',{x:64/initial.camera.zoom,y:40/initial.camera.zoom,source:initial.doc.blocks.find(b=>b.id==='text.start').source});
 const drag=async(pos,dx,dy,afterDown,beforeUp)=>{const x=Math.round(pos.x),y=Math.round(pos.y);win.webContents.sendInputEvent({type:'mouseMove',x,y});win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,x,y});if(afterDown)await afterDown();win.webContents.sendInputEvent({type:'mouseMove',x:x+dx,y:y+dy});await new Promise(r=>setTimeout(r,60));if(beforeUp)await beforeUp();win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,x:x+dx,y:y+dy});await new Promise(r=>setTimeout(r,100));};
 for(const direction of ['n','ne','e','se','s','sw','w','nw']) {
   const before=await run('resize-before',{direction});

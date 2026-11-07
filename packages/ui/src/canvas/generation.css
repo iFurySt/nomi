@@ -1,57 +1,202 @@
-.dialog-content.generation-dialog {
-  width: min(920px, calc(100vw - 32px));
-  max-width: 920px;
-}
-.generation-dialog label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.generation-dialog select {
-  max-width: 320px;
-  padding: 6px;
+.canvas-ai-composer {
+  position: absolute;
+  z-index: 40;
+  left: 50%;
+  top: 44%;
+  transform: translate(-50%, -50%);
+  width: min(580px, calc(100% - 140px));
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
   background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  box-shadow:
+    0 12px 40px #00000012,
+    0 2px 6px #00000006;
+  transition:
+    left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    top 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.generation-dialog textarea {
+.canvas-ai-composer.is-docked {
+  left: calc(100% - 320px);
+  top: 72px;
+  width: 300px;
+  transform: none;
+}
+.canvas-ai-composer .canvas-ai-close {
+  position: absolute;
+  right: 9px;
+  top: 9px;
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+.canvas-ai-composer textarea {
   display: block;
   width: 100%;
-  min-height: 100px;
-  resize: vertical;
-  margin: 14px 0 8px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
+  min-height: 94px;
+  max-height: 240px;
+  padding: 8px 22px 8px 0;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
   color: var(--text);
   font: inherit;
+  line-height: 1.6;
+  box-shadow: none;
 }
-.generation-hint,
-.generation-dialog .dialog-actions span {
-  font-size: 12px;
+.canvas-ai-composer textarea[hidden] {
+  display: none;
+}
+.canvas-ai-composer[data-busy="true"] .canvas-ai-reply {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.canvas-ai-composer textarea::placeholder {
   color: var(--muted);
+  opacity: 0.6;
 }
-.generation-preview {
-  margin: 16px 0;
-  max-height: 420px;
+.canvas-ai-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 6px;
+}
+.canvas-ai-controls select {
+  min-width: 0;
+  max-width: calc(100% - 48px);
+  border: 0;
+  padding: 5px;
+  color: var(--muted);
+  background: var(--surface);
+  font: inherit;
+  font-size: 12px;
+}
+.canvas-ai-composer .canvas-ai-send {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--surface);
+}
+.canvas-ai-composer .canvas-ai-send:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.canvas-ai-reply {
+  padding: 6px 18px 14px 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.canvas-ai-reply p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  max-height: 100px;
   overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--canvas);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.canvas-ai-reply [role="status"] {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.canvas-ai-error {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.canvas-ai-connect {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 100px;
+}
+.canvas-ai-connect a {
+  color: var(--text);
+}
+.is-thinking {
+  animation: canvas-ai-pulse 1.4s ease-in-out infinite;
+}
+@keyframes canvas-ai-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.canvas-generation-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  transform-origin: top left;
+  pointer-events: none;
 }
 .generation-object {
   position: absolute;
-  overflow: auto;
+  overflow: hidden;
   background: var(--surface);
+  animation: canvas-ai-appear 0.25s ease-out;
 }
 .generation-object .canvas-shape-content {
   height: 100%;
   width: 100%;
 }
-
 .generation-object.shape-card > .canvas-content {
   height: 100%;
   padding: 0;
+}
+.canvas-generation-layer [data-connector] {
+  animation: canvas-ai-appear 0.35s ease-out;
+}
+@keyframes canvas-ai-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 700px) {
+  .canvas-ai-composer {
+    width: calc(100% - 100px);
+    left: calc(50% + 22px);
+  }
+  .canvas-ai-composer.is-docked {
+    left: 76px;
+    top: auto;
+    bottom: 76px;
+    width: calc(100% - 92px);
+  }
+  .canvas-ai-composer.is-docked textarea {
+    min-height: 56px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-ai-composer {
+    transition: none;
+  }
+  .is-thinking,
+  .generation-object,
+  .canvas-generation-layer [data-connector] {
+    animation: none;
+  }
 }

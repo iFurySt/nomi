@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { SearchX } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/core";
 import { Selection } from "@tiptap/pm/state";
@@ -7,7 +8,7 @@ import { insertionNode } from "./RichBlockFrame";
 import "./slash-menu.css";
 
 const aliases: Record<InsertKind, string> = {
-  canvas: "canvas drawing draw sketch 画布 绘图 涂鸦 手绘",
+  canvas: "canvas drawing draw sketch huaban huabu 画板 画布 绘图 涂鸦 手绘",
   paragraph: "text plain 正文 文本",
   heading1: "h1 heading 标题 一级 #",
   heading2: "h2 heading 标题 二级 ##",
@@ -76,7 +77,7 @@ export function SlashMenu({
     top: 0,
     up: false,
     height: 360,
-    width: 300,
+    width: 260,
   });
   const menu = useRef<HTMLDivElement>(null);
   const active = useRef<Session | undefined>(undefined);
@@ -154,7 +155,7 @@ export function SlashMenu({
           close();
           return;
         }
-        const width = Math.min(300, innerWidth - 24);
+        const width = Math.min(260, innerWidth - 24);
         const below = innerHeight - caret.bottom - 16;
         const above = caret.top - 16;
         const up = below < 260 && above > below;
@@ -313,16 +314,24 @@ export function SlashMenu({
         aria-label="添加内容块"
       >
         {options.length === 0 && (
-          <p className="writing-slash-empty">没有匹配的内容块</p>
+          <div
+            className="writing-slash-empty"
+            role="status"
+            aria-label="无匹配内容块"
+          >
+            <SearchX size={22} strokeWidth={1.6} aria-hidden="true" />
+            <span className="sr-only">无匹配内容块</span>
+          </div>
         )}
         {options.map(([kind, label, Icon], index) => (
           <div key={kind}>
-            {(index === 0 ||
-              common.has(kind) !== common.has(options[index - 1][0])) && (
-              <div className="writing-slash-group">
-                {common.has(kind) ? "内容块" : "基础"}
-              </div>
-            )}
+            {!session.query &&
+              (index === 0 ||
+                common.has(kind) !== common.has(options[index - 1][0])) && (
+                <div className="writing-slash-group">
+                  {common.has(kind) ? "内容块" : "基础"}
+                </div>
+              )}
             <button
               type="button"
               tabIndex={-1}
@@ -340,10 +349,6 @@ export function SlashMenu({
             </button>
           </div>
         ))}
-      </div>
-      <div className="writing-slash-footer">
-        <span>输入关键词搜索</span>
-        <span>↑↓ 选择 · ↵ 插入 · esc 关闭</span>
       </div>
     </div>,
     document.body,

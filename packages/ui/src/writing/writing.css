@@ -1798,3 +1798,8 @@ body.notes-tree-dragging * {
   margin: 8px 0;
   background: transparent;
 }
+
+/* Paragraph-to-canvas spacing belongs to the outer block, not both layers. */
+.writing-block-markdown:has(+ .writing-block-canvas) .tiptap > :last-child {
+  margin-bottom: 0;
+}

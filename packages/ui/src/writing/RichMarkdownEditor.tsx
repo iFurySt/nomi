@@ -16,7 +16,7 @@ import { WritingHeading } from "./WritingHeading";
 import { SlashMenu } from "./SlashMenu";
 import { RichBlockFrame } from "./RichBlockFrame";
 import type { InsertKind } from "./BlockActions";
-import StarterKit from "@tiptap/starter-kit";
+import { WritingStarterKit } from "./WritingStarterKit";
 import { Markdown } from "@tiptap/markdown";
 import { InlineMath } from "@tiptap/extension-mathematics";
 import { WritingBlockMath } from "./WritingMath";
@@ -98,7 +98,7 @@ function RichMarkdownEditorContent({
   onBlockDrag,
   onBlockDragEnd,
   onBlockMove,
-  placeholder = "从这里开始写作…",
+  placeholder = "",
   hideBlockTools = false,
 }: {
   source: string;
@@ -148,7 +148,7 @@ function RichMarkdownEditorContent({
     extensions: [
       WritingComposition,
       WritingHeading,
-      StarterKit.configure({
+      WritingStarterKit.configure({
         heading: false,
         codeBlock: false,
         dropcursor: { class: "writing-native-dropcursor" },

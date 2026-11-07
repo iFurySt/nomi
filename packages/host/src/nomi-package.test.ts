@@ -77,7 +77,12 @@ it("round trips embedded native scenes, nested sources and originals through ext
       type: "add_block",
       noteId: f.doc.notes[0].id,
       asset,
-      block: { id: "canvas.inline", type: "canvas", scene },
+      block: {
+        id: "canvas.inline",
+        type: "canvas",
+        scene,
+        preview: { width: 65, height: 320 },
+      },
     },
   ]);
   await f.store.save({

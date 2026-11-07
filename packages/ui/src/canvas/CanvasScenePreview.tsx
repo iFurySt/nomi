@@ -12,9 +12,15 @@ import "./embedded-canvas.css";
 export function CanvasScenePreview({
   scene,
   content,
+  viewportHeight,
+  viewportWidth,
+  zoom = 1,
 }: {
   scene: CanvasDocument;
   content: (id: string) => ReactNode;
+  viewportHeight?: number;
+  viewportWidth?: number;
+  zoom?: number;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(720),
@@ -85,18 +91,72 @@ export function CanvasScenePreview({
   const sceneHeight = empty
     ? 160
     : Math.max(100, Math.max(...points.map((p) => p.y)) - top + 36);
-  const scale = Math.min(1, width / sceneWidth, 640 / sceneHeight);
-  const height = empty ? 160 : Math.max(120, sceneHeight * scale);
+  const fit = Math.min(
+    1,
+    width / sceneWidth,
+    (viewportHeight ?? 640) / sceneHeight,
+  );
+  const scale = fit * zoom;
+  const height =
+    viewportHeight ?? (empty ? 240 : Math.max(160, sceneHeight * fit));
   return (
     <div
       className="embedded-canvas-preview"
       ref={host}
-      style={{ height }}
+      style={{
+        height,
+        ...(viewportWidth
+          ? { width: `${viewportWidth}%`, margin: "0 auto" }
+          : {}),
+      }}
       data-scene-width={sceneWidth}
       data-scene-height={sceneHeight}
     >
       {empty ? (
-        <span className="embedded-canvas-empty">双击开始绘制</span>
+        <div className="embedded-canvas-empty">
+          <svg
+            width="88"
+            height="72"
+            viewBox="0 0 88 72"
+            fill="none"
+            aria-hidden="true"
+          >
+            <rect
+              x="19"
+              y="10"
+              width="53"
+              height="47"
+              rx="7"
+              fill="var(--canvas)"
+              stroke="currentColor"
+              opacity=".3"
+            />
+            <rect
+              x="12"
+              y="16"
+              width="53"
+              height="47"
+              rx="7"
+              fill="var(--canvas)"
+              stroke="currentColor"
+              opacity=".6"
+            />
+            <path
+              d="m20 51 12-13 10 10 8-7 8 10"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+            <circle cx="49" cy="30" r="4" fill="currentColor" opacity=".4" />
+            <path
+              d="M9 31 5 27m68 26 7 3M67 9l3-5"
+              stroke="var(--accent, #527bff)"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+          <span>画布暂无内容</span>
+        </div>
       ) : (
         <div className="embedded-canvas-picture" inert aria-hidden="true">
           <div

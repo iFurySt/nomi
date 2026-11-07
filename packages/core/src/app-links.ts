@@ -7,6 +7,6 @@ export function isAppExternalURL(value: string): boolean {
 /** App links only wake a window; they never carry OAuth credentials or navigate content. */
 export function isAuthReturnURL(value: string): boolean {
   return (
-    value === "nomi://auth/complete" || value === "nomi-local://auth/complete"
+    value === "nomi://auth/complete" || value === "nomi-dev://auth/complete"
   );
 }

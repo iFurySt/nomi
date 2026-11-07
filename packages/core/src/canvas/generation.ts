@@ -61,6 +61,36 @@ export function parseCanvasGeneration(text: string): CanvasDocument {
   return scene;
 }
 
+/** Only complete command objects become previews; incomplete JSON is never repaired. */
+export function canvasGenerationPrefix(text: string): string | undefined {
+  if (text.length > 32000) throw Error("生成内容过大，请缩小范围。");
+  const match = text.match(/^\s*(?:```(?:json)?\s*)?\{\s*"commands"\s*:\s*\[/);
+  if (!match) return;
+  let depth = 0,
+    quoted = false,
+    escaped = false,
+    end = -1;
+  for (let i = match[0].length; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (c === "\\") escaped = true;
+      else if (c === '"') quoted = false;
+      continue;
+    }
+    if (c === '"') quoted = true;
+    else if (c === "{" || c === "[") depth++;
+    else if (c === "}" || c === "]") {
+      if (depth === 0) break;
+      depth--;
+      if (depth === 0) end = i + 1;
+    }
+  }
+  return end < 0
+    ? undefined
+    : '{"commands":[' + text.slice(match[0].length, end) + "]}";
+}
+
 export function canvasGenerationCommands(
   scene: CanvasDocument,
   origin: { x: number; y: number },

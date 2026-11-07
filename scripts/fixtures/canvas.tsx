@@ -1,3 +1,6 @@
+import { CANVAS_SHAPES, canvasShapeNames } from "@nomi/core";
+import { CanvasShapeContent } from "../../packages/ui/src/canvas/CanvasShapeContent";
+import { ShapeGlyph } from "../../packages/ui/src/canvas/ShapeGlyph";
 // Real App / IndexedDB, synthetic files and isolated Electron profile only.
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -84,6 +87,20 @@ window.nomiDesktop = {
     platform: "darwin",
   }),
 };
+// Optional authenticated startup for local-library regression (no real account).
+const testAccount = localStorage.getItem("fixture.chatgpt-account");
+if (testAccount)
+  window.nomiDesktop.requestChatGPT = async () => ({
+    ok: true,
+    value: {
+      profiles: [
+        { id: testAccount, label: "Fixture", connected: true, sharing: false },
+      ],
+      activeProfileId: testAccount,
+      signingIn: false,
+      welcomeSeen: true,
+    },
+  });
 const put = IDBObjectStore.prototype.put;
 IDBObjectStore.prototype.put = function (value: any, key?: IDBValidKey) {
   if (fixture.failWrites && this.name === "documents")
@@ -93,6 +110,70 @@ IDBObjectStore.prototype.put = function (value: any, key?: IDBValidKey) {
 };
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    {location.search.includes("shape-catalog") ? (
+      <div
+        style={{
+          padding: 24,
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          gap: 24,
+          background: "#fff",
+          color: "#202124",
+        }}
+      >
+        {CANVAS_SHAPES.filter((shape) => shape !== "text").map((shape) => (
+          <section key={shape}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 14,
+                fontSize: 12,
+              }}
+            >
+              <svg
+                width="22"
+                height="22"
+                viewBox="-5 -5 110 110"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="7"
+              >
+                <ShapeGlyph shape={shape} />
+              </svg>
+              {canvasShapeNames[shape]}
+            </div>
+            <div style={{ width: 190, height: 104 }}>
+              <CanvasShapeContent
+                block={{
+                  id: `shape.${shape}`,
+                  type: "shape",
+                  shape,
+                  text: "",
+                  tone: "blue",
+                }}
+              />
+            </div>
+          </section>
+        ))}
+        <section style={{ gridColumn: "span 3" }}>
+          <div style={{ marginBottom: 14 }}>圆角矩形 · 650 × 64</div>
+          <div style={{ width: 650, height: 64 }}>
+            <CanvasShapeContent
+              block={{
+                id: "shape.wide",
+                type: "shape",
+                shape: "rounded-rectangle",
+                text: "",
+                tone: "blue",
+              }}
+            />
+          </div>
+        </section>
+      </div>
+    ) : (
+      <App />
+    )}
   </React.StrictMode>,
 );

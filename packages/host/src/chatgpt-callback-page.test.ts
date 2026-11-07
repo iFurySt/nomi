@@ -11,7 +11,7 @@ describe("OAuth browser return", () => {
     expect(page).toContain('nonce="test-nonce"');
     expect(page).not.toContain("Sign-in complete");
     expect(chatGPTCallbackPage(true, "test-nonce", true)).toContain(
-      "nomi-local://auth/complete",
+      "nomi-dev://auth/complete",
     );
   });
   it("does not auto-launch the app on rejected callbacks", () => {
@@ -21,7 +21,7 @@ describe("OAuth browser return", () => {
   });
   it("accepts only a credential-free window wake link", () => {
     expect(isAuthReturnURL("nomi://auth/complete")).toBe(true);
-    expect(isAuthReturnURL("nomi-local://auth/complete")).toBe(true);
+    expect(isAuthReturnURL("nomi-dev://auth/complete")).toBe(true);
     for (const url of [
       "nomi://auth/complete?code=secret",
       "nomi://auth/complete#secret",

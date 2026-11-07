@@ -932,8 +932,9 @@ describe("continuous canvas boundary binding", () => {
     };
     const e = dragCanvasEndpoint({ x: 1, y: 1 }, fixed, [r], null, 1),
       p = canvasEndpointPoint(e, [r])!;
-    expect(p.x).toBeGreaterThan(4);
-    expect(p.y).toBeGreaterThan(4);
+    expect(p.x).toBeGreaterThan(0);
+    expect(p.y).toBeGreaterThan(0);
+    expect(Math.hypot(p.x - 8, p.y - 8)).toBeCloseTo(8, 1);
     const rotated = {
       ...r,
       shape: "triangle" as const,
@@ -1067,7 +1068,7 @@ describe("continuous canvas boundary binding", () => {
           shape,
           shapeStyle: { rotation, flipX: true },
         };
-        const outline = canvasShapeOutline(shape, r.shapeStyle),
+        const outline = canvasShapeOutline(shape, r.shapeStyle, r),
           p = outline[Math.floor(outline.length / 3)];
         const query = {
           x: r.x + (p.x * r.width) / 100,

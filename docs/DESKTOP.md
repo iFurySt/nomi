@@ -32,13 +32,30 @@ pnpm check:interactive-native # 需要 swiftc；同源 DSL 语义验证
 make ci
 ```
 
-`pnpm build` 仅构建 Web renderer 和 Node main/preload。macOS launcher 生成本地 ad-hoc 签名的 `apps/desktop/dist/Nomi.app`，可用 `pnpm desktop` 启动；它不是可分发的 notarized release。
+`pnpm build` 仅构建 Web renderer 和 Node main/preload。macOS launcher 生成本地 ad-hoc 签名的 `apps/desktop/dist/Nomi(Dev).app`，可用 `pnpm desktop` 启动；它不是可分发的 notarized release。
+
+`node scripts/check-desktop-dev.mjs` 检查开发包名称、独立登录 scheme、无正式文稿关联以及不依赖启动器环境变量的直接启动。
 
 `pnpm smoke:desktop` 使用临时 Electron profile 和空本地 store，随后运行合成交互检查；不会读取正常账号。其他 UI smoke 的合成产物位于 git ignored `.artifacts/`。真实 ChatGPT 登录和实际推理需要独立人工授权验证，合成 smoke 不代表在 Nomi 中已经完成真实账号登录。
 
+## 开发版与正式版隔离
+
+`pnpm desktop` / `pnpm dev:desktop` 默认仅启动 **Nomi(Dev)**。macOS 生成 `apps/desktop/dist/Nomi(Dev).app`，也可以双击启动；该包引用当前 checkout 的构建结果，不是独立发行包。正式 DMG 仍为 Nomi.app。
+
+| 内容 | 正式版 | 开发版 |
+| --- | --- | --- |
+| macOS bundle ID | `com.ifuryst.nomi` | `com.ifuryst.nomi.dev` |
+| Electron userData | 既有 Nomi profile | 系统 appData 下 `Nomi(Dev)` |
+| 默认文稿库 | `Documents/Nomi` | `Documents/Nomi(Dev)` |
+| ChatGPT 凭据 | 既有 `nomi/data` | 开发 userData 下 `data` |
+| 登录回跳 | `nomi://auth/complete` | `nomi-dev://auth/complete` |
+| Sparkle / 默认文稿关联 | 正式配置 | 不启用 / 不注册 |
+
+开发版是独立空环境，不自动迁移正式文稿、目录设置、浏览器存储或登录态；测试使用合成内容。开发版凭据不采用正式版 `NOMI_DATA_DIR` 覆盖。单实例锁使用不同 userData，两版可同时运行；开发版只接受自己的登录唤醒链接。旧 `dist/Nomi.app` / `.local` 启动器保留但不再由脚本启动，不据此清理用户数据。后续验收只操作开发版，不抢用户正在使用的正式窗口。
+
 ## 数据与身份
 
-- Electron 展示名 `Nomi`，本地 macOS bundle id `com.ifuryst.nomi.local`，包命名空间 `@nomi/*`，preload `window.nomiDesktop`，IPC / localStorage 使用 Nomi namespace。
+- 正式 Electron 展示名 `Nomi`；本地开发版展示名 `Nomi(Dev)`、macOS bundle id `com.ifuryst.nomi.dev`，包命名空间 `@nomi/*`，preload `window.nomiDesktop`，IPC / localStorage 使用 Nomi namespace。
 - Electron profile 由应用名确定；ChatGPT host 的数据目录默认是 macOS `~/Library/Application Support/nomi/data`、Windows `%APPDATA%/nomi/data`、Linux `${XDG_CONFIG_HOME:-~/.config}/nomi/data`，可用 `NOMI_DATA_DIR` 覆盖。
 - 旧 SQLite / 数据源文件不会被清理代码删除，但 0.1.0 不再读取它们。ChatGPT 连接仍沿用原路径，不从 AIFi 自动迁移。
 - ChatGPT 注册与可续期会话在 `chatgpt/profiles.enc`，密钥在相邻 `chatgpt/vault.key`，目录 0700、文件 0600。同一操作系统用户可读文件密钥，这是当前加密边界。
@@ -56,7 +73,7 @@ Settings → General 位于 Appearance 上方，也是设置默认页。文稿�
 
 桌面账号菜单 → **Sign in with ChatGPT** 或 Settings → ChatGPT，在系统浏览器中完成 Nomi 自己的授权后返回。回调页只保留 Continue in Nomi 标题与 Open Nomi 按钮，并自动尝试唤回桌面；实际账号状态以交换凭据和身份验证完成后的 App 为准。等待状态与 Cancel 同行；首次启用订阅显示一次紧凑确认框及 Manage usage 入口，按 [官方 UI/UX 指南](https://developers.openai.com/siwc/ui-ux-guidelines) 保留说明。失败可就地重试或关闭提示，主动取消不显示连接错误；未验证的注册记录保留重试所需 client ID，但不冒充已连接账号。
 
-正式 macOS 包声明 `nomi://auth/complete`，本地开发包声明 `nomi-local://auth/complete`，两者仅用于唤醒窗口，不接受查询参数、不携带凭据、不导航文稿。OAuth 继续使用 `127.0.0.1` 的 HTTP callback；回调页设置 no-store / no-referrer 与 nonce CSP，并移除地址栏授权参数。参考 [Electron Deep Links](https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app) 与 [OpenAI OSS 登录协议](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)。可管理多个账号、选择账号提供的模型与 reasoning effort；可用性取决于实际账号权限和服务响应，不保证所有账号都可用。
+正式 macOS 包声明 `nomi://auth/complete`，本地开发包声明 `nomi-dev://auth/complete`，两者仅用于唤醒窗口，不接受查询参数、不携带凭据、不导航文稿。OAuth 继续使用 `127.0.0.1` 的 HTTP callback；回调页设置 no-store / no-referrer 与 nonce CSP，并移除地址栏授权参数。参考 [Electron Deep Links](https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app) 与 [OpenAI OSS 登录协议](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)。可管理多个账号、选择账号提供的模型与 reasoning effort；可用性取决于实际账号权限和服务响应，不保证所有账号都可用。
 
 路径为 `React UI → allowlisted preload → ChatGPTHost`。保留 PKCE / state / nonce、回调验证、JWT 校验、刷新与撤销、加密存储及账号偏好；renderer 不拿 token。0.1.0 没有独立 Chat 页面和金融工具，不启动 Codex app-server。保留 provider 适配为未来文稿 AI 能力使用，不宣称已接通笔记或家庭资料。家庭 server 的 SeedX 路径独立。
 

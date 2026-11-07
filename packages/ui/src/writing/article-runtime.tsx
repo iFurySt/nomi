@@ -72,6 +72,8 @@ function PublishedBlock({
         </ReactMarkdown>
       ) : block.type === "canvas" ? (
         <CanvasScenePreview
+          viewportHeight={block.preview?.height}
+          viewportWidth={block.preview?.width}
           scene={block.scene}
           content={(id) => {
             const note = block.scene.notes.find((n) => n.id === id);

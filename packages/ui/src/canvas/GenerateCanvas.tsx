@@ -1,81 +1,81 @@
 import { useEffect, useRef, useState } from "react";
+import { ArrowUp, Square, X, Sparkles } from "lucide-react";
 import {
+  canvasGenerationPrefix,
   parseCanvasGeneration,
-  canvasConnectorGeometry,
-  canvasGenerationCommands,
   type CanvasDocument,
-  type CanvasCommand,
 } from "@nomi/core";
-import {
-  respondWithChatGPT,
-  requestChatGPT,
-  type CanvasRepository,
-} from "@nomi/platform";
+import { respondWithChatGPT, requestChatGPT } from "@nomi/platform";
 import { useChatGPT } from "../chatgpt-context";
-import { Button, Modal } from "../components/primitives";
-import { CanvasContent } from "./CanvasContent";
 import "./generation.css";
 
 export function GenerateCanvas({
   onClose,
+  onStart,
+  onPreview,
   onInsert,
-  repository,
 }: {
   onClose: () => void;
-  onInsert: (commands: CanvasCommand[]) => boolean;
-  repository: CanvasRepository;
+  onStart: () => void;
+  onPreview: (scene?: CanvasDocument) => void;
+  onInsert: (scene: CanvasDocument) => boolean;
 }) {
   const connection = useChatGPT();
   const account = connection.status?.profiles.find(
     (p) => p.id === connection.status?.activeProfileId,
   );
-  const [prompt, setPrompt] = useState(""),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [received, setReceived] = useState(0),
-    [scene, setScene] = useState<CanvasDocument>();
+  const [prompt, setPrompt] = useState("");
+  const [sent, setSent] = useState("");
+  const [docked, setDocked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
   const request = useRef<string | undefined>(undefined);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const [previewWidth, setPreviewWidth] = useState(700);
-  useEffect(() => {
-    const element = previewRef.current;
-    if (!element) return;
-    const observer = new ResizeObserver(() =>
-      setPreviewWidth(element.clientWidth),
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [scene]);
+  const input = useRef<HTMLTextAreaElement>(null);
+  const callbacks = useRef({ onStart, onPreview, onInsert });
+  callbacks.current = { onStart, onPreview, onInsert };
   const cancel = () => {
     const id = request.current;
     request.current = undefined;
     if (id)
       void requestChatGPT("cancelResponse", { requestId: id }).catch(() => {});
+    callbacks.current.onPreview(undefined);
     setBusy(false);
+    if (id) setStatus("已停止");
   };
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    cancel();
+    return () => {
       const id = request.current;
       request.current = undefined;
       if (id)
         void requestChatGPT("cancelResponse", { requestId: id }).catch(
           () => {},
         );
-    },
-    [],
-  );
-  useEffect(() => {
-    cancel();
-    setScene(undefined);
+    };
   }, [account?.id]);
+  useEffect(() => {
+    if (!busy) input.current?.focus();
+  }, [busy]);
+  const close = () => {
+    cancel();
+    onClose();
+  };
   const generate = async () => {
-    if (!account?.sharing || !connection.model || busy) return;
+    const message = prompt.trim();
+    if (!message || !account?.sharing || !connection.model || request.current)
+      return;
     const id = crypto.randomUUID();
     request.current = id;
+    setSent(message);
+    setDocked(true);
     setBusy(true);
     setError("");
-    setScene(undefined);
-    setReceived(0);
+    setStatus("正在构思…");
+    callbacks.current.onStart();
+    let text = "",
+      previous = "",
+      streamError: Error | undefined;
     try {
       const result = await respondWithChatGPT(
         {
@@ -83,15 +83,40 @@ export function GenerateCanvas({
           profileId: account.id,
           model: connection.model,
           generation: "canvas",
-          messages: [{ role: "user", content: prompt.trim() }],
+          messages: [{ role: "user", content: message }],
         },
-        (text) => {
-          if (request.current === id) setReceived((n) => n + text.length);
+        (delta) => {
+          if (request.current !== id || streamError) return;
+          try {
+            text += delta;
+            const prefix = canvasGenerationPrefix(text);
+            if (prefix && prefix !== previous) {
+              previous = prefix;
+              const scene = parseCanvasGeneration(prefix);
+              callbacks.current.onPreview(scene);
+              setStatus("正在绘制…");
+            }
+          } catch (e) {
+            streamError = e as Error;
+            void requestChatGPT("cancelResponse", { requestId: id }).catch(
+              () => {},
+            );
+          }
         },
       );
-      if (request.current === id) setScene(parseCanvasGeneration(result.text));
+      if (request.current !== id) return;
+      if (streamError) throw streamError;
+      const scene = parseCanvasGeneration(result.text);
+      if (!callbacks.current.onInsert(scene))
+        throw Error("未能加入画布，请重试。");
+      callbacks.current.onPreview(undefined);
+      setStatus("已生成");
+      setPrompt("");
     } catch (e) {
-      if (request.current === id) setError((e as Error).message);
+      if (request.current !== id) return;
+      callbacks.current.onPreview(undefined);
+      setError("生成未完成，请重试。");
+      setStatus("");
     } finally {
       if (request.current === id) {
         request.current = undefined;
@@ -99,46 +124,69 @@ export function GenerateCanvas({
       }
     }
   };
-  const rects =
-    scene?.board.placements.map((p) => {
-      const block = scene.blocks.find((b) => b.id === p.content);
-      return {
-        ...p,
-        height: p.height ?? 240,
-        ...(block?.type === "shape"
-          ? { shape: block.shape, shapeStyle: block.shapeStyle }
-          : {}),
-      };
-    }) ?? [];
-  const left = Math.min(0, ...rects.map((p) => p.x)) - 30,
-    top = Math.min(0, ...rects.map((p) => p.y)) - 30;
-  const width = Math.max(700, ...rects.map((p) => p.x + p.width)) - left + 30,
-    height = Math.max(200, ...rects.map((p) => p.y + p.height)) - top + 30;
   return (
-    <Modal
-      open
-      onOpenChange={(open) => {
-        if (!open) {
-          cancel();
-          onClose();
-        }
+    <section
+      className={`canvas-ai-composer${docked ? " is-docked" : ""}`}
+      aria-label="画布 AI"
+      data-busy={busy}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Escape" && !e.nativeEvent.isComposing) close();
       }}
-      title="AI 生成"
-      description="描述你想绘制的图示或交互实验。预览确认后加入画布。"
-      className="generation-dialog"
     >
+      <button className="canvas-ai-close" aria-label="关闭 AI" onClick={close}>
+        <X size={16} />
+      </button>
+      {docked && (
+        <div className="canvas-ai-reply">
+          <p>{sent}</p>
+          <span role="status">
+            <Sparkles size={14} className={busy ? "is-thinking" : ""} />
+            {status}
+          </span>
+        </div>
+      )}
       {!account?.sharing ? (
-        <p>
-          请先在{" "}
-          <a href="#/settings/chatgpt" onClick={onClose}>
-            设置 → ChatGPT
-          </a>{" "}
-          中连接账号并授权使用套餐。
-        </p>
+        <div className="canvas-ai-connect">
+          <Sparkles size={22} />
+          <a href="#/settings/chatgpt" onClick={close}>
+            连接 ChatGPT
+          </a>
+        </div>
       ) : (
-        <>
-          <label>
-            模型
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void generate();
+          }}
+        >
+          <textarea
+            ref={input}
+            aria-label="生成需求"
+            placeholder="想在画布上画什么？"
+            value={prompt}
+            maxLength={2000}
+            readOnly={busy}
+            hidden={busy}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing &&
+                e.nativeEvent.keyCode !== 229
+              ) {
+                e.preventDefault();
+                void generate();
+              }
+            }}
+          />
+          {(error || connection.error) && (
+            <p className="canvas-ai-error" role="alert">
+              {error || "连接暂不可用，请重试。"}
+            </p>
+          )}
+          <div className="canvas-ai-controls">
             <select
               aria-label="生成模型"
               value={connection.model}
@@ -151,143 +199,28 @@ export function GenerateCanvas({
                 </option>
               ))}
             </select>
-          </label>
-          <textarea
-            aria-label="生成需求"
-            placeholder="例如：画出 Transformer 的主要模块和信息流；或者生成一个可调温度的概率分布实验。"
-            value={prompt}
-            maxLength={2000}
-            disabled={busy}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-          <p className="generation-hint">
-            仅发送你填写的描述，不自动读取文稿或附件。使用所选 ChatGPT
-            账号的可用额度。
-          </p>
-          {connection.error && <p role="alert">{connection.error}</p>}
-          {error && <p role="alert">{error}</p>}
-          <div className="dialog-actions">
             {busy ? (
-              <Button onClick={cancel}>停止生成</Button>
+              <button
+                type="button"
+                className="canvas-ai-send"
+                aria-label="停止生成"
+                onClick={cancel}
+              >
+                <Square size={14} fill="currentColor" />
+              </button>
             ) : (
-              <Button
-                variant="primary"
+              <button
+                type="submit"
+                className="canvas-ai-send"
+                aria-label="发送"
                 disabled={!prompt.trim() || !connection.model}
-                onClick={() => void generate()}
               >
-                {scene ? "重新生成" : "生成预览"}
-              </Button>
+                <ArrowUp size={18} />
+              </button>
             )}
-            <span role="status">
-              {busy
-                ? `正在生成${received ? ` · 已接收 ${received} 字符` : "…"}`
-                : ""}
-            </span>
           </div>
-        </>
+        </form>
       )}
-      {scene && (
-        <>
-          <div
-            ref={previewRef}
-            className="generation-preview"
-            aria-label="生成内容预览"
-          >
-            <div
-              style={{
-                position: "relative",
-                width,
-                height,
-                transformOrigin: "top left",
-                zoom: Math.min(1, previewWidth / width),
-              }}
-            >
-              <svg
-                width={width}
-                height={height}
-                style={{ position: "absolute", overflow: "visible" }}
-              >
-                <defs>
-                  <marker
-                    id="generation-arrow"
-                    viewBox="0 0 10 10"
-                    refX="9"
-                    refY="5"
-                    markerWidth="6"
-                    markerHeight="6"
-                    orient="auto-start-reverse"
-                  >
-                    <path
-                      d="M 1 1 L 9 5 L 1 9"
-                      fill="none"
-                      stroke="currentColor"
-                    />
-                  </marker>
-                </defs>
-                {scene.board.connectors?.map((c) => {
-                  const g = canvasConnectorGeometry(c, rects);
-                  return (
-                    g && (
-                      <path
-                        key={c.id}
-                        d={g.d}
-                        transform={`translate(${-left},${-top})`}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        strokeDasharray={
-                          c.style === "solid" ? undefined : "6 5"
-                        }
-                        markerEnd={
-                          c.endArrow ? "url(#generation-arrow)" : undefined
-                        }
-                      />
-                    )
-                  );
-                })}
-              </svg>
-              {scene.board.placements.map((p) => (
-                <div
-                  key={p.id}
-                  className={`generation-object${scene.blocks.find((b) => b.id === p.content)?.type === "shape" ? " shape-card" : ""}`}
-                  style={{
-                    left: p.x - left,
-                    top: p.y - top,
-                    width: p.width,
-                    height: p.height ?? 240,
-                  }}
-                >
-                  <CanvasContent
-                    document={scene}
-                    contentId={p.content}
-                    profile="ai-preview"
-                    repository={repository}
-                    editing={false}
-                    onEdit={() => {}}
-                    onAttach={() => {}}
-                    onInteractive={() => {}}
-                    endGroup={() => {}}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="dialog-actions">
-            <Button
-              variant="primary"
-              onClick={() => {
-                if (onInsert(canvasGenerationCommands(scene, { x: 0, y: 0 })))
-                  onClose();
-              }}
-            >
-              加入画布
-            </Button>
-            <span>
-              {scene.board.placements.length} 个对象 · 可继续编辑 · ⌘Z 撤销
-            </span>
-          </div>
-        </>
-      )}
-    </Modal>
+    </section>
   );
 }

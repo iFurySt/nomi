@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   canvasShapeTextColor,
   type CanvasBlock,
@@ -15,6 +16,25 @@ export function CanvasShapeContent({
   onEdit?: (commands: CanvasCommand[], group?: string) => void;
   endGroup?: () => void;
 }) {
+  const host = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 100, height: 100 });
+  useLayoutEffect(() => {
+    const el = host.current!;
+    const measure = () => {
+      const width = el.clientWidth,
+        height = el.clientHeight;
+      if (width && height)
+        setSize((old) =>
+          old.width === width && old.height === height
+            ? old
+            : { width, height },
+        );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   const id = b.id;
   const s = b.shapeStyle ?? {},
     t = s.text ?? {};
@@ -49,6 +69,7 @@ export function CanvasShapeContent({
           : b.text;
   return (
     <div
+      ref={host}
       key={b.id}
       className={`canvas-shape-content shape-tone-${b.tone}`}
       style={{
@@ -78,7 +99,7 @@ export function CanvasShapeContent({
                 : undefined,
         }}
       >
-        <ShapeGlyph shape={b.shape} style={s} />
+        <ShapeGlyph shape={b.shape} style={s} size={size} />
       </svg>
       {editing ? (
         <textarea
@@ -110,7 +131,7 @@ export function CanvasShapeContent({
               {displayText}
             </a>
           ) : (
-            displayText || "双击输入文字"
+            displayText
           )}
         </span>
       )}

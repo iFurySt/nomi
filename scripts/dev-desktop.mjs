@@ -62,7 +62,11 @@ if (!ready && !stopping) {
   desktop = spawn(electronPath, [resolve(root, "apps/desktop")], {
     cwd: root,
     stdio: "inherit",
-    env: { ...process.env, NOMI_DEV_URL: "http://127.0.0.1:5173" },
+    env: {
+      ...process.env,
+      NOMI_DEV_APP: "1",
+      NOMI_DEV_URL: "http://127.0.0.1:5173",
+    },
   });
   desktop.on("error", (error) => {
     console.error(error.message);

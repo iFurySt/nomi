@@ -20,30 +20,32 @@ export interface CanvasNote {
   blocks: string[];
 }
 export const CANVAS_SHAPES = [
-  "rectangle",
   "rounded-rectangle",
-  "ellipse",
+  "stadium",
   "diamond",
-  "triangle",
-  "right-triangle",
+  "rectangle",
+  "ellipse",
+  "cylinder",
+  "chevron",
+  "tag",
   "parallelogram",
   "trapezoid",
+  "callout",
+  "speech-bubble",
+  "right-triangle",
+  "triangle",
+  "star",
   "hexagon",
   "pentagon",
   "octagon",
-  "star",
-  "cylinder",
-  "cube",
-  "chevron",
   "arrow-left",
   "arrow-right",
   "arrow-both",
-  "cross",
   "cloud",
-  "speech-bubble",
-  "callout",
   "brace-left",
   "brace-right",
+  "cross",
+  "cube",
   "document",
   "text",
 ] as const;
@@ -310,6 +312,11 @@ function validateCanvasDocument(
       text(b.source, 200000);
     } else if (b.type === "canvas") {
       if (embedded) bad("画布内不能再次嵌入画布。");
+      if (b.preview !== undefined) {
+        const preview = record(b.preview);
+        finite(preview.width, 20, 100);
+        finite(preview.height, 160, 1200);
+      }
       validateCanvasDocument(b.scene, false, true);
       for (const a of (b.scene as CanvasDocument).assets) {
         const original = assets.find((p) => p.id === a.id);
@@ -913,6 +920,7 @@ export function resizeCanvasPlacement(
   dx: number,
   dy: number,
   limits = { minWidth: 160, minHeight: 120, maxWidth: 1600, maxHeight: 2400 },
+  preserveAspect = false,
 ): Pick<Placement, "x" | "y" | "width" | "height"> {
   const clamp = (n: number, min: number, max: number) =>
     Math.max(min, Math.min(max, n));
@@ -922,6 +930,27 @@ export function resizeCanvasPlacement(
     east = direction.includes("e"),
     north = direction.includes("n"),
     south = direction.includes("s");
+  if (preserveAspect && direction.length === 2) {
+    const sx = 1 + (west ? -dx : dx) / width;
+    const sy = 1 + (north ? -dy : dy) / height;
+    const requested = Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy;
+    const scale = clamp(
+      requested,
+      Math.max(limits.minWidth / width, limits.minHeight / height),
+      Math.min(
+        limits.maxWidth / width,
+        limits.maxHeight / height,
+        west ? (x + width + 1e6) / width : Infinity,
+        north ? (y + height + 1e6) / height : Infinity,
+      ),
+    );
+    return {
+      x: west ? x + width * (1 - scale) : x,
+      y: north ? y + height * (1 - scale) : y,
+      width: width * scale,
+      height: height * scale,
+    };
+  }
   // Coordinates and dimensions are bounded together, preserving the fixed edge.
   const nextWidth = west
     ? clamp(
@@ -946,6 +975,24 @@ export function resizeCanvasPlacement(
     y: north ? y + height - nextHeight! : y,
     width: nextWidth,
     ...(nextHeight !== undefined ? { height: nextHeight } : {}),
+  };
+}
+/** Drag creation keeps its starting corner fixed, including reverse drags at limits. */
+export function drawCanvasRect(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  square = false,
+) {
+  const dx = end.x - start.x,
+    dy = end.y - start.y;
+  const length = Math.max(Math.abs(dx), Math.abs(dy));
+  const width = Math.max(20, Math.min(1600, square ? length : Math.abs(dx)));
+  const height = square ? width : Math.max(20, Math.min(2400, Math.abs(dy)));
+  return {
+    x: start.x - (dx < 0 ? width : 0),
+    y: start.y - (dy < 0 ? height : 0),
+    width,
+    height,
   };
 }
 export function screenToWorld(

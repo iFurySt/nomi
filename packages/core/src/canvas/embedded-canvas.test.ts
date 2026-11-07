@@ -131,3 +131,29 @@ it("keeps nested originals in note exports and remaps asset identities on indepe
   });
   expect(exported.markdown).toContain("画布绘图");
 });
+
+it("round trips responsive preview dimensions without changing the scene", () => {
+  const { doc, block } = fixture();
+  const next = applyCanvasCommands(doc, doc.revision, [
+    {
+      type: "set_canvas",
+      block: { ...block, preview: { width: 60, height: 320 } },
+    },
+  ]);
+  expect(parseCanvasDocument(next).blocks.at(-1)).toEqual({
+    ...block,
+    preview: { width: 60, height: 320 },
+  });
+  for (const preview of [
+    { width: 0, height: 320 },
+    { width: 101, height: 320 },
+    { width: 50, height: 0 },
+    { width: 50, height: Infinity },
+  ]) {
+    expect(() =>
+      applyCanvasCommands(doc, doc.revision, [
+        { type: "set_canvas", block: { ...block, preview } },
+      ]),
+    ).toThrow();
+  }
+});

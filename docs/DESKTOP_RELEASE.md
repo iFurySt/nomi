@@ -5,7 +5,7 @@
 ## 制品与身份
 
 - 版本：根目录和 `apps/desktop/package.json` 保持一致；发布 tag 为 `desktop-vX.Y.Z`。
-- 正式 bundle id：`com.ifuryst.nomi`，开发启动器为 `com.ifuryst.nomi.local`。两者应用名为 Nomi，沿用同一文稿配置；不要同时编辑同一库。
+- 正式 bundle id：`com.ifuryst.nomi`，应用名 Nomi；开发启动器为 `com.ifuryst.nomi.dev`、应用名 `Nomi(Dev)`。开发版独立 userData、默认文稿库与凭据，不注册正式文件关联、不启用 Sparkle，详见 [开发隔离](DESKTOP.md#开发版与正式版隔离)。
 - `Nomi-X.Y.Z-mac-arm64.dmg` / `Nomi-X.Y.Z-mac-x64.dmg` 分别适用于 Apple Silicon / Intel，随包有 SHA-256。
 - DMG 内含独立 `Nomi.app` 和 Applications 快捷入口。renderer、PDF 资源、原生更新模块全部随包，不引用 checkout；`.nomi` 包注册保持一致。
 - Developer ID 签名、hardened runtime、Apple 公证及 stapling 后才能公开发布。App 和 DMG 都验证。原生嵌套 helper 必须先于 framework 主二进制签名；Apple 票据服务未就绪 / 网络错误只做有界重试，不跳过票据验证。`--unsigned` 只用于本机检查，不上传正式 Release。

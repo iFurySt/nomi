@@ -35,7 +35,13 @@ import {
   isAuthReturnURL,
 } from "../../../packages/core/src/app-links";
 import { allowsClipboardWrite } from "../../../packages/host/src/renderer-permissions";
-app.setName("Nomi");
+const developmentApp = process.env.NOMI_DEV_APP === "1" || !app.isPackaged;
+const applicationName = developmentApp ? "Nomi(Dev)" : "Nomi";
+app.setName(applicationName);
+// Set before requesting the single-instance lock or creating Chromium sessions.
+if (developmentApp) {
+  app.setPath("userData", join(app.getPath("appData"), "Nomi(Dev)"));
+}
 const devUrl = process.env.NOMI_DEV_URL;
 const updateSmoke = process.argv.includes("--update-smoke");
 const smoke = process.argv.includes("--smoke") || updateSmoke;
@@ -83,7 +89,10 @@ function focusNomi() {
 }
 app.on("open-url", (event, url) => {
   event.preventDefault();
-  if (isAuthReturnURL(url)) {
+  if (
+    isAuthReturnURL(url) &&
+    url === `${developmentApp ? "nomi-dev" : "nomi"}://auth/complete`
+  ) {
     if (app.isReady()) focusNomi();
     else void app.whenReady().then(focusNomi);
   }
@@ -210,7 +219,7 @@ app.on("before-quit", (event) => {
 });
 async function createWindow() {
   const window = new BrowserWindow({
-    title: "Nomi",
+    title: applicationName,
     icon: join(__dirname, "brand/app-icon.png"),
     width: 1360,
     height: 1000,
@@ -228,6 +237,11 @@ async function createWindow() {
       sandbox: true,
     },
   });
+  if (developmentApp)
+    window.on("page-title-updated", (event) => {
+      event.preventDefault();
+      window.setTitle(applicationName);
+    });
   let closePrepared = false,
     closePending = false;
   window.on("close", (event) => {
@@ -330,7 +344,7 @@ if (primaryInstance)
       if (brandIcon.isEmpty()) throw Error("Nomi app icon is unavailable.");
       app.dock?.setIcon(brandIcon);
       app.setAboutPanelOptions({
-        applicationName: "Nomi",
+        applicationName,
         applicationVersion: app.getVersion(),
         iconPath,
       });
@@ -338,17 +352,14 @@ if (primaryInstance)
         devUrl ||
           pathToFileURL(join(__dirname, "../../web/dist/index.html")).href,
         flushWindowDocuments,
-        app.isPackaged &&
-          !devUrl &&
-          (!smoke || updateSmoke) &&
-          !process.execPath.includes("/apps/desktop/dist/Nomi.app/"),
+        app.isPackaged && !devUrl && (!smoke || updateSmoke) && !developmentApp,
       );
       Menu.setApplicationMenu(
         Menu.buildFromTemplate([
           ...(process.platform === "darwin"
             ? [
                 {
-                  label: "Nomi",
+                  label: applicationName,
                   submenu: [
                     { role: "about" as const },
                     {
@@ -453,7 +464,7 @@ if (primaryInstance)
         join(app.getPath("userData"), "document-directory.json"),
         smokeProfile
           ? join(smokeProfile, "Documents", "Nomi")
-          : join(app.getPath("documents"), "Nomi"),
+          : join(app.getPath("documents"), applicationName),
       );
       documentStore = documents;
       registerDocumentStorage(
@@ -469,13 +480,17 @@ if (primaryInstance)
       }));
       chatGPTHost = new ChatGPTHost(
         new ChatGPTStore(
-          smokeProfile ? join(smokeProfile, "data") : defaultDataDir(),
+          smokeProfile
+            ? join(smokeProfile, "data")
+            : developmentApp
+              ? join(app.getPath("userData"), "data")
+              : defaultDataDir(),
         ),
         (url) => shell.openExternal(url),
         undefined,
         undefined,
         undefined,
-        process.execPath.includes("/dist/Nomi.app/"),
+        developmentApp,
       );
       ipcMain.handle(
         "nomi:chatgpt",

@@ -5,6 +5,8 @@ export interface EmbeddedCanvasBlock {
   id: string;
   type: "canvas";
   scene: CanvasDocument;
+  /** Responsive document preview; independent of scene coordinates. */
+  preview?: { width: number; height: number };
 }
 export function emptyCanvasScene(id: string): CanvasDocument {
   return {

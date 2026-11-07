@@ -11,7 +11,11 @@ window.nomiDesktop = {
   }),
 };
 let mode = "diagram";
-Object.assign(window, { aiFixture: { mode: (v: string) => (mode = v) } });
+let requests = 0;
+const listeners = new Set<(e: any) => void>();
+Object.assign(window, {
+  aiFixture: { mode: (v: string) => (mode = v), requests: () => requests },
+});
 window.nomiDesktop.requestChatGPT = async (method, params: any) => {
   if (method === "status")
     return {
@@ -37,7 +41,7 @@ window.nomiDesktop.requestChatGPT = async (method, params: any) => {
   if (method === "cancelResponse") return { ok: true, value: null };
   if (method === "respond") {
     const output = mode;
-    await new Promise((r) => setTimeout(r, output === "slow" ? 1000 : 50));
+    requests++;
     const block = (id: string, x: number) => ({
       type: "add_block",
       block: { id, type: "shape", shape: "rectangle", text: id, tone: "blue" },
@@ -67,6 +71,18 @@ window.nomiDesktop.requestChatGPT = async (method, params: any) => {
         },
       },
     ];
+    const emit = (text: string) =>
+      listeners.forEach((fn) => fn({ requestId: params.requestId, text }));
+    emit('{"commands":[');
+    for (let i = 0; i < commands.length; i++) {
+      await new Promise((r) => setTimeout(r, output === "slow" ? 500 : 220));
+      const encoded = (i ? "," : "") + JSON.stringify(commands[i]);
+      // Split inside strings/objects, as a real transport does.
+      for (let j = 0; j < encoded.length; j += 37)
+        emit(encoded.slice(j, j + 37));
+    }
+    emit("]}");
+    await new Promise((r) => setTimeout(r, 450));
     return {
       ok: true,
       value: {
@@ -76,7 +92,12 @@ window.nomiDesktop.requestChatGPT = async (method, params: any) => {
   }
   return { ok: false, error: "Unsupported fixture request" };
 };
-window.nomiDesktop.onChatGPTDelta = () => () => {};
+window.nomiDesktop.onChatGPTDelta = (fn) => {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+};
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -75,6 +75,7 @@ export function Modal({
   keepEscape = false,
   closeText,
   hideHeader = false,
+  initialFocus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -86,6 +87,7 @@ export function Modal({
   keepEscape?: boolean;
   closeText?: string;
   hideHeader?: boolean;
+  initialFocus?: string;
 }) {
   const previousFocus = useRef<HTMLElement | null>(null);
   const wasOpen = useRef(false);
@@ -115,7 +117,12 @@ export function Modal({
           onOpenAutoFocus={(event) => {
             // Let form fields receive focus; otherwise focus the close control.
             const content = event.currentTarget as HTMLElement;
-            if (!content.querySelector("input, textarea")) {
+            if (initialFocus) {
+              event.preventDefault();
+              (
+                content.querySelector<HTMLElement>(initialFocus) ?? content
+              ).focus({ preventScroll: true });
+            } else if (!content.querySelector("input, textarea")) {
               event.preventDefault();
               content.querySelector<HTMLButtonElement>("[data-close]")?.focus();
             }

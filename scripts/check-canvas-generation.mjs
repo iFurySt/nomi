@@ -29,47 +29,211 @@ await writeFile(
   join(output, "index.html"),
   '<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="renderer.css"><body><div id="root"></div><script src="renderer.js"></script></body></html>',
 );
+async function checkAI({ output }) {
+  const { app, BrowserWindow } = require("electron");
+  const { writeFileSync } = require("node:fs");
+  const { join } = require("node:path");
+  const assert = require("node:assert/strict");
+  app.disableHardwareAcceleration();
+  app.setPath("userData", join(output, "profile"));
+  await app.whenReady();
+  const win = new BrowserWindow({
+    width: 1120,
+    height: 820,
+    show: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+  const js = (fn, arg) =>
+    win.webContents.executeJavaScript(`(${fn})(${JSON.stringify(arg)})`);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const until = async (fn) => {
+    for (let i = 0; i < 200; i++) {
+      if (await js(fn)) return;
+      await wait(20);
+    }
+    throw Error("Timeout: " + fn);
+  };
+  const shot = async (name) => {
+    await wait(80);
+    writeFileSync(
+      join(output, name + ".png"),
+      (await win.webContents.capturePage()).toPNG(),
+    );
+  };
+  const click = (label) =>
+    js((s) => document.querySelector(`[aria-label="${s}"]`).click(), label);
+  const prompt = (value) =>
+    js((v) => {
+      const el = document.querySelector('[aria-label="生成需求"]');
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      ).set.call(el, v);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.focus();
+    }, value);
+  const enter = async () => {
+    for (const type of ["keyDown", "keyUp"])
+      win.webContents.sendInputEvent({ type, keyCode: "Return" });
+    await wait(40);
+  };
+  try {
+    await win.loadFile(join(output, "index.html"), { hash: "/canvas" });
+    win.webContents.debugger.attach("1.3");
+    await win.webContents.debugger.sendCommand(
+      "Emulation.setFocusEmulationEnabled",
+      { enabled: true },
+    );
+    await until(() => !!document.querySelector('[aria-label="AI 生成"]'));
+    await click("AI 生成");
+    await until(
+      () =>
+        document.querySelector('[aria-label="生成模型"]')?.value ===
+        "test-model",
+    );
+    await prompt("画出输入到输出");
+    await shot("composer");
+    await js(() =>
+      document.querySelector('[aria-label="生成需求"]').dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          isComposing: true,
+          bubbles: true,
+        }),
+      ),
+    );
+    assert.equal(
+      await js(() => window.aiFixture.requests()),
+      0,
+      "IME must not submit",
+    );
+    await enter();
+    await until(
+      () => document.querySelectorAll(".generation-object").length === 1,
+    );
+    assert.equal(
+      await js(
+        () =>
+          document.querySelectorAll(
+            ".canvas-generation-layer .canvas-connection-line",
+          ).length,
+      ),
+      0,
+    );
+    assert.equal(
+      await js(
+        () => document.querySelectorAll(".canvas-viewport .shape-card").length,
+      ),
+      0,
+      "partial response is not persisted",
+    );
+    await shot("first-block");
+    await until(
+      () =>
+        document.querySelectorAll(".generation-object").length === 2 &&
+        document.querySelectorAll(
+          ".canvas-generation-layer .canvas-connection-line",
+        ).length === 1,
+    );
+    await shot("streamed-diagram");
+    await until(
+      () =>
+        !document.querySelector(".canvas-generation-layer") &&
+        !!document.querySelector(".canvas-viewport .shape-card"),
+    );
+    assert.equal(
+      await js(
+        () => document.querySelectorAll(".canvas-viewport .shape-card").length,
+      ),
+      2,
+    );
+    assert.equal(
+      await js(() =>
+        document
+          .querySelector(".canvas-ai-composer")
+          .classList.contains("is-docked"),
+      ),
+      true,
+    );
+    await shot("completed");
+    await click("撤销画布修改");
+    await until(() => !document.querySelector(".canvas-viewport .shape-card"));
+    await js(() => window.aiFixture.mode("invalid"));
+    await prompt("invalid result");
+    await enter();
+    await until(() => !!document.querySelector(".canvas-ai-error"));
+    assert.equal(
+      await js(() => !!document.querySelector(".canvas-generation-layer")),
+      false,
+    );
+    assert.equal(
+      await js(
+        () => document.querySelectorAll(".canvas-viewport .shape-card").length,
+      ),
+      0,
+    );
+    await js(() => window.aiFixture.mode("slow"));
+    await enter();
+    await until(() => !!document.querySelector(".generation-object"));
+    await click("停止生成");
+    await wait(2100);
+    assert.equal(
+      await js(() => !!document.querySelector(".canvas-generation-layer")),
+      false,
+      "late output after stop",
+    );
+    assert.equal(
+      await js(
+        () => document.querySelectorAll(".canvas-viewport .shape-card").length,
+      ),
+      0,
+    );
+    await enter();
+    await until(() => !!document.querySelector('[aria-label="停止生成"]'));
+    await click("关闭 AI");
+    await wait(2100);
+    assert.equal(
+      await js(
+        () => document.querySelectorAll(".canvas-viewport .shape-card").length,
+      ),
+      0,
+      "late output after close",
+    );
+    await click("AI 生成");
+    await prompt("另一个图示");
+    await js(() => (document.documentElement.dataset.theme = "dark"));
+    await shot("dark");
+    win.setSize(390, 820);
+    await until(() => innerWidth === 390);
+    await shot("mobile");
+    assert.equal(
+      await js(() => {
+        const r = document
+          .querySelector(".canvas-ai-composer")
+          .getBoundingClientRect();
+        return r.left >= 0 && r.right <= innerWidth;
+      }),
+      true,
+    );
+    console.log(
+      "Canvas AI: PASS (IME, streaming blocks/lines, atomic commit/undo, invalid output, stop/close late results, dark/mobile)",
+    );
+    app.exit(0);
+  } catch (e) {
+    console.error(e);
+    await shot("failure");
+    app.exit(1);
+  }
+}
 await writeFile(
   join(output, "main.cjs"),
-  `
-const {app,BrowserWindow}=require('electron');
-const {writeFileSync}=require('node:fs');
-const assert=require('node:assert/strict');
-app.disableHardwareAcceleration();
-app.setPath('userData',${JSON.stringify(join(output, "profile"))});
-app.whenReady().then(async()=>{
- const win=new BrowserWindow({width:1120,height:820,show:true,webPreferences:{contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});
- const js=async s=>{try{return await win.webContents.executeJavaScript(s)}catch(e){console.error(s);throw e}};
- const until=async(s)=>{for(let i=0;i<200;i++){if(await js(s))return;await new Promise(r=>setTimeout(r,30));}throw Error('Timeout: '+s);};
- const shot=async(name)=>{await js('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');writeFileSync(${JSON.stringify(report)}+'/'+name+'.png',(await win.webContents.capturePage()).toPNG());};
- try {
- await win.loadFile(${JSON.stringify(join(output, "index.html"))},{hash:'/canvas'});
- await until("document.querySelector('[title*=AI]')");
- const click=label=>js('Array.from(document.querySelectorAll(\"button\")).find(b=>b.textContent.trim()==='+JSON.stringify(label)+').click()');
- await js("document.querySelector('[title*=AI]').click()");
- await until("document.querySelector('[aria-label=生成模型]')?.value==='test-model'");
- await js("(()=>{const t=document.querySelector('[aria-label=生成需求]');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(t,'画出输入到输出');t.dispatchEvent(new Event('input',{bubbles:true}));})()");
- await click('生成预览');await until("document.querySelector('[aria-label=生成内容预览]')");
- assert.equal(await js("document.querySelectorAll('.generation-object').length"),2);await shot('preview');
- assert.equal(await js("document.querySelectorAll('.generation-object.shape-card').length===2 && [...document.querySelectorAll('.generation-object.shape-card')].every(o=>{const a=o.getBoundingClientRect(),b=o.querySelector('.canvas-shape-content').getBoundingClientRect();return Math.abs(a.x-b.x)<1&&Math.abs(a.y-b.y)<1&&Math.abs(a.width-b.width)<1&&Math.abs(a.height-b.height)<1})"),true);
- await click('加入画布');await until("!document.querySelector('.generation-dialog')");
- assert.equal(await js("[...document.querySelectorAll('.canvas-shape-content')].some(x=>x.textContent==='Input')"),true);
- await js("document.querySelector('[aria-label=撤销画布修改]').click()");
- await until("![...document.querySelectorAll('.canvas-shape-content')].some(x=>x.textContent==='Input')");
- await js("document.querySelector('[title*=AI]').click();window.aiFixture.mode('invalid')");
- await js("(()=>{const t=document.querySelector('[aria-label=生成需求]');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(t,'test');t.dispatchEvent(new Event('input',{bubbles:true}));})()");
- await click('生成预览');await until("document.querySelector('.generation-dialog [role=alert]')");
- assert.equal(await js("!!document.querySelector('.generation-preview')"),false);
- await js("window.aiFixture.mode('slow')");await click('生成预览');await click('停止生成');
- await new Promise(r=>setTimeout(r,1200));assert.equal(await js("!!document.querySelector('.generation-preview')"),false);
- await js("document.documentElement.dataset.theme='dark'");await shot('dark');
- win.setSize(390,820);await until("innerWidth===390");await shot('mobile');
- console.log('Canvas generation UI: PASS (preview, apply, undo, invalid output, cancellation, dark/mobile)');
- app.exit(0);
- }catch(e){console.error(e);await shot('failure');app.exit(1);}
-});setTimeout(()=>app.exit(1),60000);
-`,
+  `(${checkAI})(${JSON.stringify({ output })});setTimeout(()=>require('electron').app.exit(1),60000);`,
 );
+
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const child = spawn(require("electron"), [join(output, "main.cjs")], {
@@ -79,3 +243,5 @@ const child = spawn(require("electron"), [join(output, "main.cjs")], {
 process.exitCode = await new Promise((resolve) =>
   child.on("exit", (code) => resolve(code ?? 1)),
 );
+
+console.log(output);

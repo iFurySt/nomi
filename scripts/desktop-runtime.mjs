@@ -26,14 +26,14 @@ export function desktopRuntime() {
   const identity = JSON.stringify({
     version,
     iconHash: createHash("sha256").update(readFileSync(icon)).digest("hex"),
-    schema: 6,
+    schema: 7,
     entryPath: join(root, "apps/desktop/dist/main.cjs"),
     applicationVersion: JSON.parse(
       readFileSync(join(root, "apps/desktop/package.json"), "utf8"),
     ).version,
   });
-  const output = join(root, "apps/desktop/dist/Nomi.app");
-  const stamp = join(dirname(output), "nomi-runtime.json");
+  const output = join(root, "apps/desktop/dist/Nomi(Dev).app");
+  const stamp = join(dirname(output), "nomi-dev-runtime.json");
   const target = join(output, "Contents/MacOS/Electron");
   if (
     existsSync(stamp) &&
@@ -58,21 +58,21 @@ export function desktopRuntime() {
   writeFileSync(
     join(entry, "package.json"),
     JSON.stringify({
-      name: "nomi",
-      productName: "Nomi",
+      name: "nomi-dev",
+      productName: "Nomi(Dev)",
       version: appPackage.version,
       main: "index.cjs",
     }),
   );
   writeFileSync(
     join(entry, "index.cjs"),
-    `require(${JSON.stringify(join(root, "apps/desktop/dist/main.cjs"))});\n`,
+    `process.env.NOMI_DEV_APP = "1";\nrequire(${JSON.stringify(join(root, "apps/desktop/dist/main.cjs"))});\n`,
   );
   const plist = join(output, "Contents/Info.plist");
   for (const [key, value] of Object.entries({
-    CFBundleName: "Nomi",
-    CFBundleDisplayName: "Nomi",
-    CFBundleIdentifier: "com.ifuryst.nomi.local",
+    CFBundleName: "Nomi(Dev)",
+    CFBundleDisplayName: "Nomi(Dev)",
+    CFBundleIdentifier: "com.ifuryst.nomi.dev",
     CFBundleIconFile: "nomi.icns",
     LSApplicationCategoryType: "public.app-category.productivity",
   }))
@@ -81,7 +81,7 @@ export function desktopRuntime() {
       `Set :${key} ${value}`,
       plist,
     ]);
-  // Register a directory document package, not an executable application bundle.
+  // Dev owns only its auth-return scheme; never claim production .nomi files.
   for (const key of [
     "UTExportedTypeDeclarations",
     "CFBundleDocumentTypes",
@@ -96,28 +96,9 @@ export function desktopRuntime() {
   const declarations = [
     "Add :CFBundleURLTypes array",
     "Add :CFBundleURLTypes:0 dict",
-    "Add :CFBundleURLTypes:0:CFBundleURLName string Nomi Local",
+    "Add :CFBundleURLTypes:0:CFBundleURLName string Nomi Dev",
     "Add :CFBundleURLTypes:0:CFBundleURLSchemes array",
-    "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string nomi-local",
-    "Add :UTExportedTypeDeclarations array",
-    "Add :UTExportedTypeDeclarations:0 dict",
-    "Add :UTExportedTypeDeclarations:0:UTTypeIdentifier string com.ifuryst.nomi.document",
-    "Add :UTExportedTypeDeclarations:0:UTTypeDescription string Nomi Document",
-    "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo array",
-    "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo:0 string com.apple.package",
-    "Add :UTExportedTypeDeclarations:0:UTTypeConformsTo:1 string public.composite-content",
-    "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification dict",
-    "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension array",
-    "Add :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0 string nomi",
-    "Add :CFBundleDocumentTypes array",
-    "Add :CFBundleDocumentTypes:0 dict",
-    "Add :CFBundleDocumentTypes:0:CFBundleTypeName string Nomi Document",
-    "Add :CFBundleDocumentTypes:0:CFBundleTypeRole string Editor",
-    "Add :CFBundleDocumentTypes:0:LSHandlerRank string Owner",
-    "Add :CFBundleDocumentTypes:0:LSTypeIsPackage bool true",
-    "Add :CFBundleDocumentTypes:0:CFBundleTypeIconFile string nomi.icns",
-    "Add :CFBundleDocumentTypes:0:LSItemContentTypes array",
-    "Add :CFBundleDocumentTypes:0:LSItemContentTypes:0 string com.ifuryst.nomi.document",
+    "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string nomi-dev",
   ];
   for (const command of declarations)
     execFileSync("/usr/libexec/PlistBuddy", ["-c", command, plist]);

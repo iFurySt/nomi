@@ -97,6 +97,7 @@ export function Notes({ profile }: { profile: string }) {
   const [error, setError] = useState(""),
     [message, setMessage] = useState("");
   const [experimentOpen, setExperimentOpen] = useState(false);
+  const [canvasToOpen, setCanvasToOpen] = useState<string>();
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [referenceQuery, setReferenceQuery] = useState("");
   const [formula, setFormula] = useState<string>();
@@ -421,11 +422,7 @@ export function Notes({ profile }: { profile: string }) {
         scene: emptyCanvasScene(newCanvasId("scene")),
       };
       insertContent(note.id, block);
-      requestAnimationFrame(() =>
-        document
-          .querySelector<HTMLElement>(`[data-embedded-canvas="${block.id}"]`)
-          ?.focus(),
-      );
+      setCanvasToOpen(block.id);
       return;
     }
     if (kind === "asset") {
@@ -1008,18 +1005,18 @@ export function Notes({ profile }: { profile: string }) {
                               selection?.addRange(range);
                               return true;
                             }}
-                            placeholder={
-                              rows[0].block.id === id
-                                ? "从这里开始写作…"
-                                : "继续写作…"
-                            }
                             onChange={(source, isolated) =>
                               attempt(() => writeText(row, source, isolated))
                             }
                           />
                         )
                       ) : block.type === "canvas" ? (
-                        <EmbeddedCanvasBlock block={block} profile={profile} />
+                        <EmbeddedCanvasBlock
+                          block={block}
+                          profile={profile}
+                          autoOpen={canvasToOpen === block.id}
+                          onAutoOpened={() => setCanvasToOpen(undefined)}
+                        />
                       ) : block.type === "drawing" ? (
                         <DrawingSurface block={block} />
                       ) : block.type === "note-reference" ? (

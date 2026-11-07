@@ -4,6 +4,7 @@ import { desktopRuntime } from "./desktop-runtime.mjs";
 const desktop = fileURLToPath(new URL("../apps/desktop", import.meta.url));
 const child = spawn(desktopRuntime(), [desktop, ...process.argv.slice(2)], {
   stdio: "inherit",
+  env: { ...process.env, NOMI_DEV_APP: "1" },
 });
 for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () => child.kill(signal));

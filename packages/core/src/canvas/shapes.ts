@@ -1,6 +1,8 @@
 import type { CanvasShape, CanvasShapeStyle, CanvasPoint } from "./document";
 export const canvasShapeNames: Record<CanvasShape, string> = {
   rectangle: "矩形",
+  stadium: "胶囊形",
+  tag: "五边箭头",
   "rounded-rectangle": "圆角矩形",
   ellipse: "椭圆",
   diamond: "菱形",
@@ -28,6 +30,13 @@ export const canvasShapeNames: Record<CanvasShape, string> = {
   text: "文本",
 };
 const poly: Partial<Record<CanvasShape, number[][]>> = {
+  tag: [
+    [0, 0],
+    [75, 0],
+    [100, 50],
+    [75, 100],
+    [0, 100],
+  ],
   diamond: [
     [50, 0],
     [100, 50],
@@ -67,8 +76,8 @@ const poly: Partial<Record<CanvasShape, number[][]>> = {
   pentagon: [
     [50, 0],
     [100, 38],
-    [82, 100],
-    [18, 100],
+    [81, 100],
+    [19, 100],
     [0, 38],
   ],
   octagon: [
@@ -143,7 +152,18 @@ export function canvasShapePolygon(
   shape: CanvasShape,
   style: CanvasShapeStyle = {},
 ) {
-  return poly[shape]?.map(([x, y]) => {
+  let vertices = poly[shape];
+  if (shape === "star" && vertices) {
+    const xs = vertices.map((p) => p[0]),
+      ys = vertices.map((p) => p[1]);
+    const left = Math.min(...xs),
+      top = Math.min(...ys);
+    vertices = vertices.map(([x, y]) => [
+      ((x - left) * 100) / (Math.max(...xs) - left),
+      ((y - top) * 100) / (Math.max(...ys) - top),
+    ]);
+  }
+  return vertices?.map(([x, y]) => {
     if (style.flipX) x = 100 - x;
     if (style.flipY) y = 100 - y;
     for (let i = 0; i < (style.rotation ?? 0) / 90; i++) [x, y] = [100 - y, x];
@@ -151,11 +171,18 @@ export function canvasShapePolygon(
   });
 }
 // Flatten only our fixed semantic outlines. No user supplied path is evaluated.
-const outlineCache = new Map<CanvasShape, CanvasPoint[]>();
-function curvedOutline(shape: CanvasShape): CanvasPoint[] | undefined {
+export interface CanvasShapeSize {
+  width: number;
+  height: number;
+}
+const outlineCache = new Map<string, CanvasPoint[]>();
+function curvedOutline(
+  shape: CanvasShape,
+  size?: CanvasShapeSize,
+): CanvasPoint[] | undefined {
   if (shape === "brace-left" || shape === "brace-right") return undefined;
-  if (outlineCache.has(shape)) return outlineCache.get(shape);
-  const path = canvasShapePaths[shape];
+  const path = canvasShapePath(shape, size);
+  if (path && outlineCache.has(path)) return outlineCache.get(path);
   if (!path) return undefined;
   const tokens = path.match(/[MLHVCQZ]|-?\d+(?:\.\d+)?/g)!;
   const points: CanvasPoint[] = [];
@@ -201,7 +228,8 @@ function curvedOutline(shape: CanvasShape): CanvasPoint[] | undefined {
     }
     points.push(p);
   }
-  outlineCache.set(shape, points);
+  if (outlineCache.size >= 256) outlineCache.clear();
+  outlineCache.set(path, points);
   return points;
 }
 /** Closed semantic outline in the same 100×100 space as ShapeGlyph. Open
@@ -209,6 +237,7 @@ function curvedOutline(shape: CanvasShape): CanvasPoint[] | undefined {
 export function canvasShapeOutline(
   shape: CanvasShape,
   style: CanvasShapeStyle = {},
+  size?: CanvasShapeSize,
 ): CanvasPoint[] {
   const polygon = canvasShapePolygon(shape, style);
   if (polygon) return polygon;
@@ -218,24 +247,12 @@ export function canvasShapeOutline(
           x: 50 + 50 * Math.cos((i * Math.PI) / 128),
           y: 50 + 50 * Math.sin((i * Math.PI) / 128),
         }))
-      : shape === "rounded-rectangle"
-        ? [
-            [92, 8, -90],
-            [92, 92, 0],
-            [8, 92, 90],
-            [8, 8, 180],
-          ].flatMap(([cx, cy, start]) =>
-            Array.from({ length: 17 }, (_, i) => ({
-              x: cx + 8 * Math.cos(((start + (i * 90) / 16) * Math.PI) / 180),
-              y: cy + 8 * Math.sin(((start + (i * 90) / 16) * Math.PI) / 180),
-            })),
-          )
-        : (curvedOutline(shape) ?? [
-            { x: 0, y: 0 },
-            { x: 100, y: 0 },
-            { x: 100, y: 100 },
-            { x: 0, y: 100 },
-          ]);
+      : (curvedOutline(shape, localSize(size, style)) ?? [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+          { x: 100, y: 100 },
+          { x: 0, y: 100 },
+        ]);
   return points.map((p) => {
     let { x, y } = p;
     if (style.flipX) x = 100 - x;
@@ -249,17 +266,9 @@ export function canvasShapePort(
   shape: CanvasShape,
   side: "n" | "e" | "s" | "w",
   style?: CanvasShapeStyle,
+  size?: CanvasShapeSize,
 ): CanvasPoint {
-  const points =
-      canvasShapePolygon(shape, style) ??
-      curvedOutline(shape)?.map((p) => {
-        let { x, y } = p;
-        if (style?.flipX) x = 100 - x;
-        if (style?.flipY) y = 100 - y;
-        for (let i = 0; i < (style?.rotation ?? 0) / 90; i++)
-          [x, y] = [100 - y, x];
-        return { x, y };
-      }),
+  const points = canvasShapeOutline(shape, style, size),
     dx = side === "e" ? 1 : side === "w" ? -1 : 0,
     dy = side === "s" ? 1 : side === "n" ? -1 : 0;
   let best = 50;
@@ -278,10 +287,41 @@ export function canvasShapePort(
   return { x: (50 + dx * best) / 100, y: (50 + dy * best) / 100 };
 }
 
+export function localSize(
+  size: CanvasShapeSize = { width: 100, height: 100 },
+  style: CanvasShapeStyle = {},
+): CanvasShapeSize {
+  return (style.rotation ?? 0) % 180
+    ? { width: size.height, height: size.width }
+    : size;
+}
+/** Canonical outlines; decorative dimensions are measured before normalization. */
+export function canvasShapePath(
+  shape: CanvasShape,
+  size: CanvasShapeSize = { width: 100, height: 100 },
+): string | undefined {
+  const w = Math.max(1, size.width),
+    h = Math.max(1, size.height);
+  if (shape === "rounded-rectangle" || shape === "stadium") {
+    const r =
+      shape === "stadium" ? Math.min(w, h) / 2 : Math.min(8, w / 2, h / 2);
+    const x = (r / w) * 100,
+      y = (r / h) * 100,
+      k = 0.5522847498;
+    return `M${x} 0 H${100 - x} C${100 - x + k * x} 0 100 ${y - k * y} 100 ${y} V${100 - y} C100 ${100 - y + k * y} ${100 - x + k * x} 100 ${100 - x} 100 H${x} C${x - k * x} 100 0 ${100 - y + k * y} 0 ${100 - y} V${y} C0 ${y - k * y} ${x - k * x} 0 ${x} 0 Z`;
+  }
+  if (shape === "speech-bubble") {
+    const x = (Math.min(8, w / 2, h * 0.3) / w) * 100,
+      y = (Math.min(8, w / 2, h * 0.3) / h) * 100;
+    return `M${x} 0 H${100 - x} Q100 0 100 ${y} V${80 - y} Q100 80 ${100 - x} 80 H40 L30 100 L25 80 H${x} Q0 80 0 ${80 - y} V${y} Q0 0 ${x} 0 Z`;
+  }
+  return canvasShapePaths[shape];
+}
+
 export const canvasShapePaths: Partial<Record<CanvasShape, string>> = {
   cylinder:
     "M0 15 C0 -5 100 -5 100 15 V85 C100 105 0 105 0 85 Z M0 15 C0 35 100 35 100 15",
-  cube: "M0 20 L25 0 H100 V80 L75 100 H0 Z M0 20 H75 V100 M75 20 L100 0 M75 20 L75 100 M75 100 L100 80",
+  cube: "M0 20 L25 0 H100 V80 L75 100 H0 Z M0 20 H75 V100 M75 20 L100 0 M75 100 L100 80",
   "speech-bubble":
     "M12 0 H88 Q100 0 100 12 V68 Q100 80 88 80 H60 L50 100 L40 80 H12 Q0 80 0 68 V12 Q0 0 12 0 Z",
   callout: "M50 0 C-10 0 -10 75 25 80 L15 100 L45 85 C110 95 125 0 50 0 Z",

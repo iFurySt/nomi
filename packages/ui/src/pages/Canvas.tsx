@@ -1,5 +1,11 @@
-import { CanvasToolMenu } from "../canvas/CanvasToolMenu";
+import {
+  CanvasToolMenu,
+  CanvasToolButton,
+  CanvasLineToolIcon,
+} from "../canvas/CanvasToolMenu";
+import { CanvasShapeCursor } from "../canvas/CanvasShapeCursor";
 import { ShapeGlyph } from "../canvas/ShapeGlyph";
+import { CanvasGenerationPreview } from "../canvas/CanvasGenerationPreview";
 import { GenerateCanvas } from "../canvas/GenerateCanvas";
 import {
   useEffect,
@@ -13,6 +19,7 @@ import type {
   DragEvent as ReactDragEvent,
 } from "react";
 import {
+  Type,
   Sparkles,
   Shapes,
   LayoutTemplate,
@@ -32,18 +39,18 @@ import {
   Trash2,
   Pencil,
   Check,
-  Layers,
   Download,
   X,
-  Magnet,
   MoveUpRight,
 } from "lucide-react";
 import {
+  canvasGenerationCommands,
   newCanvasId,
   parseCanvasDocument,
   screenToWorld,
   zoomCanvasAt,
   resizeCanvasPlacement,
+  drawCanvasRect,
   snapCanvasLayout,
   snapCanvasResize,
   canvasSelectionBounds,
@@ -81,7 +88,7 @@ import {
   writeCanvasCamera,
   type CanvasAssetWrite,
 } from "@nomi/platform";
-import { useChatGPT } from "../chatgpt-context";
+import { LOCAL_WORKSPACE_PROFILE } from "../canvas/workspaceIdentity";
 import { Modal, Button } from "../components/primitives";
 import { useCanvasDocument } from "../canvas/useCanvasDocument";
 import { CanvasContent, NoteTitle } from "../canvas/CanvasContent";
@@ -112,13 +119,12 @@ import {
 } from "../canvas/selectionClipboard";
 import "../canvas/canvas.css";
 export function Canvas() {
-  const { status } = useChatGPT();
-  const profile = status?.activeProfileId ?? "local-device";
+  const profile = LOCAL_WORKSPACE_PROFILE;
   return <CanvasWorkspace key={profile} profile={profile} />;
 }
 type Gesture = {
   pointer: number;
-  kind: "pan" | "move" | "resize" | "connect" | "segment" | "marquee";
+  kind: "pan" | "move" | "resize" | "connect" | "segment" | "marquee" | "draw";
   members?: CanvasRect[];
   toggleOff?: string[];
   selection?: string[];
@@ -157,10 +163,17 @@ export function CanvasWorkspace({
   onClose?: () => void;
 }) {
   const [generating, setGenerating] = useState(false);
+  const [generationDraft, setGenerationDraft] = useState<CanvasDocument>();
+  const generationBase = useRef({ x: 0, y: 0 });
+  const generationOrigin = useRef({ x: 0, y: 0 });
   const data = useCanvasDocument(profile),
     doc = data.document;
   const viewport = useRef<HTMLDivElement>(null),
     fileInput = useRef<HTMLInputElement>(null);
+  // The lazy editor can mount after the dialog's opening autofocus event.
+  useEffect(() => {
+    if (embedded && doc) viewport.current?.focus({ preventScroll: true });
+  }, [embedded, !!doc]);
   const [camera, setCamera] = useState<CanvasCamera>(
     () =>
       readCanvasCamera(profile, data.document?.id ?? "document.home") ?? {
@@ -170,15 +183,32 @@ export function CanvasWorkspace({
       },
   );
   const cameraRef = useRef(camera),
-    [tool, setTool] = useState<"select" | "hand" | "connect">("select"),
+    [tool, setTool] = useState<
+      "select" | "hand" | "connect" | "shape" | "text"
+    >("select"),
     toolRef = useRef(tool);
+  const [drawShape, setDrawShape] =
+    useState<Extract<CanvasBlock, { type: "shape" }>["shape"]>(
+      "rounded-rectangle",
+    );
+  const [drawPreview, setDrawPreview] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [lineMode, setLineMode] = useState<
+    "line" | "arrow" | "rounded" | "curve"
+  >("rounded");
+  const lineRouting =
+    lineMode === "line" || lineMode === "arrow" ? "straight" : lineMode;
   const [selection, setSelection] = useState<string[]>([]);
   const selected = selection.at(-1) ?? null;
   const setSelected = (id: string | null) => setSelection(id ? [id] : []);
   const [editing, setEditing] = useState<string | null>(null),
     [focus, setFocus] = useState<string | null>(null);
-  const [snap, setSnap] = useState(true),
-    [guides, setGuides] = useState<CanvasGuide[]>([]);
+  const snap = true;
+  const [guides, setGuides] = useState<CanvasGuide[]>([]);
   const [heights, setHeights] = useState<Record<string, number>>({});
   const [selectedConnector, setSelectedConnector] = useState<string | null>(
     null,
@@ -371,10 +401,10 @@ export function CanvasWorkspace({
   };
   const createShape = (
     shape: Extract<CanvasBlock, { type: "shape" }>["shape"],
+    rect: { x: number; y: number; width: number; height: number },
   ) => {
     const b = newCanvasId("shape"),
-      p = newCanvasId("place"),
-      point = center();
+      p = newCanvasId("place");
     const result = edit([
       {
         type: "add_block",
@@ -382,15 +412,14 @@ export function CanvasWorkspace({
         placement: {
           id: p,
           content: b,
-          x: point.x - 140,
-          y: point.y - 90,
-          width: 280,
-          height: 180,
+          ...rect,
         },
       },
     ]);
     if (result) {
-      startEditing(p);
+      setSelected(p);
+      setTool("select");
+      if (shape === "text") startEditing(p);
     }
   };
   const selectConnector = (id: string) => {
@@ -721,11 +750,11 @@ export function CanvasWorkspace({
       const dialogs = [...document.querySelectorAll('[role="dialog"]')];
       const dialog = dialogs.at(-1);
       if (
-        embedded &&
+        (embedded || editing !== null) &&
         event.key === "Escape" &&
         !event.isComposing &&
         isTyping(event.target) &&
-        viewport.current?.closest('[role="dialog"]') === dialog
+        (!dialog || viewport.current?.closest('[role="dialog"]') === dialog)
       ) {
         (event.target as HTMLElement).blur();
         finishEditing();
@@ -739,6 +768,41 @@ export function CanvasWorkspace({
             viewport.current?.closest('[role="dialog"]') !== dialog))
       )
         return;
+      if (
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.isComposing &&
+        !gesture.current
+      ) {
+        const shortcuts = {
+          v: "select",
+          h: "hand",
+          t: "text",
+          r: "shape",
+          d: "shape",
+          o: "shape",
+          l: "connect",
+        } as const;
+        const next =
+          shortcuts[event.key.toLowerCase() as keyof typeof shortcuts];
+        if (next) {
+          event.preventDefault();
+          finishEditing();
+          if (next === "shape") {
+            const shapeKeys = {
+              r: "rounded-rectangle",
+              d: "diamond",
+              o: "ellipse",
+            } as const;
+            setDrawShape(
+              shapeKeys[event.key.toLowerCase() as keyof typeof shapeKeys],
+            );
+          }
+          if (next === "connect") setLineMode("line");
+          setTool(next);
+        }
+      }
       if (event.code === "Space") {
         event.preventDefault();
         space.current = true;
@@ -747,7 +811,13 @@ export function CanvasWorkspace({
       if (event.key === "Escape") {
         if (event.isComposing) return;
         const active = gesture.current;
-        if (embedded && !active && !editing && !connection) {
+        if (
+          embedded &&
+          !active &&
+          !editing &&
+          !connection &&
+          toolRef.current === "select"
+        ) {
           onClose?.();
           return;
         }
@@ -756,6 +826,7 @@ export function CanvasWorkspace({
         else if (active && viewport.current?.hasPointerCapture(active.pointer))
           viewport.current.releasePointerCapture(active.pointer);
         gesture.current = null;
+        setDrawPreview(null);
         previewRef.current = null;
         setGesturePreview(null);
         setSelected(null);
@@ -1056,9 +1127,47 @@ export function CanvasWorkspace({
       setSelectedConnector(null);
     }
   };
+  const drawingRect = (g: Gesture, event: ReactPointerEvent) => {
+    const r = viewport.current!.getBoundingClientRect();
+    const a = screenToWorld(g.camera, {
+      x: g.start.x - r.left,
+      y: g.start.y - r.top,
+    });
+    const b = screenToWorld(g.camera, {
+      x: event.clientX - r.left,
+      y: event.clientY - r.top,
+    });
+    const rect = drawCanvasRect(a, b, event.shiftKey);
+    if (snap && !event.altKey && !event.shiftKey) {
+      const candidate = {
+        ...rect,
+        id: "drawing",
+        content: "drawing",
+        shape: tool === "text" ? "text" : drawShape,
+      };
+      const direction =
+        `${b.y < a.y ? "n" : "s"}${b.x < a.x ? "w" : "e"}` as CanvasResizeDirection;
+      const result = snapCanvasResize(
+        candidate,
+        candidate,
+        direction,
+        g.others ?? [],
+        g.camera.zoom,
+      );
+      setGuides(result.guides);
+      const { x, y, width, height } = result.rect;
+      return { x, y, width, height };
+    }
+    setGuides([]);
+    return rect;
+  };
   const move = (event: ReactPointerEvent) => {
     const g = gesture.current;
     if (!g || g.pointer !== event.pointerId) return;
+    if (g.kind === "draw") {
+      setDrawPreview(drawingRect(g, event));
+      return;
+    }
     const dx = event.clientX - g.start.x,
       dy = event.clientY - g.start.y;
     if (g.kind === "marquee") {
@@ -1264,10 +1373,10 @@ export function CanvasWorkspace({
             id: "preview.connection",
             from: draft.from,
             to: target,
-            routing: "rounded",
+            routing: lineRouting,
             style: "solid",
             startArrow: false,
-            endArrow: true,
+            endArrow: lineMode !== "line",
             label: "",
           };
       updateConnection({
@@ -1351,27 +1460,14 @@ export function CanvasWorkspace({
               maxWidth: 1600,
               maxHeight: 2400,
             };
-      let wx = dx / g.camera.zoom,
-        wy = dy / g.camera.zoom;
-      if (event.shiftKey && g.direction!.length === 2) {
-        const ratio = bounds.width / g.height!;
-        if (Math.abs(wx) > Math.abs(wy * ratio))
-          wy =
-            (wx / ratio) *
-            (g.direction === "ne" || g.direction === "sw" ? -1 : 1);
-        else
-          wx =
-            wy *
-            ratio *
-            (g.direction === "ne" || g.direction === "sw" ? -1 : 1);
-      }
       let resized = resizeCanvasPlacement(
         bounds,
         g.height!,
         g.direction!,
-        wx,
-        wy,
+        dx / g.camera.zoom,
+        dy / g.camera.zoom,
         limits,
+        event.shiftKey,
       );
       if (snap && !event.altKey && !event.shiftKey && members.length <= 1) {
         const snapped = snapCanvasResize(
@@ -1444,6 +1540,24 @@ export function CanvasWorkspace({
   const end = (event: ReactPointerEvent, cancel = false) => {
     const g = gesture.current;
     if (!g || g.pointer !== event.pointerId) return;
+    if (g.kind === "draw") {
+      const rect = drawingRect(g, event);
+      const clicked =
+        Math.hypot(event.clientX - g.start.x, event.clientY - g.start.y) < 4;
+      if (!cancel)
+        createShape(
+          tool === "text" ? "text" : drawShape,
+          clicked
+            ? {
+                ...rect,
+                width: tool === "text" ? 240 : 180,
+                height: tool === "text" ? 48 : 120,
+              }
+            : rect,
+        );
+      setDrawPreview(null);
+      setGuides([]);
+    }
     if (g.kind === "connect") {
       const draft = connectionRef.current;
       const dragged =
@@ -1489,10 +1603,10 @@ export function CanvasWorkspace({
                     id,
                     from: draft.from,
                     to: target,
-                    routing: "rounded",
+                    routing: lineRouting,
                     style: "solid",
                     startArrow: false,
-                    endArrow: true,
+                    endArrow: lineMode !== "line",
                     label: "",
                   },
             },
@@ -2086,9 +2200,63 @@ export function CanvasWorkspace({
       }
     })().catch((error) => setMessage((error as Error).message));
   };
+  const frameGeneration = (scene: CanvasDocument) => {
+    const rects = scene.board.placements.map((p) => ({
+      ...p,
+      height: p.height ?? 240,
+    }));
+    if (!rects.length) return;
+    const bounds = canvasSelectionBounds(rects);
+    generationOrigin.current = {
+      x: generationBase.current.x - bounds.x,
+      y: generationBase.current.y - bounds.y,
+    };
+    const v = viewport.current;
+    if (!v) return;
+    const narrow = v.clientWidth <= 700;
+    const availableWidth = Math.max(100, v.clientWidth - (narrow ? 120 : 440));
+    const availableHeight = Math.max(
+      100,
+      v.clientHeight - (narrow ? 340 : 180),
+    );
+    const zoom = Math.max(
+      0.1,
+      Math.min(
+        1,
+        availableWidth / bounds.width,
+        availableHeight / bounds.height,
+      ),
+    );
+    pan({
+      x:
+        90 +
+        availableWidth / 2 -
+        (generationBase.current.x + bounds.width / 2) * zoom,
+      y:
+        90 +
+        availableHeight / 2 -
+        (generationBase.current.y + bounds.height / 2) * zoom,
+      zoom,
+    });
+  };
+
   return (
     <div
       className={`canvas-workspace ${embedded ? "is-embedded" : ""} tool-${tool} ${connection ? "is-connecting" : ""} ${connection?.reconnect ? "is-reconnecting" : ""} ${dragOver ? "is-file-over" : ""}`}
+      onPointerDownCapture={(event) => {
+        const active = document.activeElement;
+        if (
+          active instanceof HTMLInputElement &&
+          active.classList.contains("canvas-name") &&
+          event.currentTarget.contains(active) &&
+          event.target !== active
+        ) {
+          // Canvas gestures prevent the browser's default focus transfer.
+          active.blur();
+          if (viewport.current?.contains(event.target as Node))
+            viewport.current.focus({ preventScroll: true });
+        }
+      }}
       onPointerUp={(event) => {
         if (gesture.current) end(event);
       }}
@@ -2185,188 +2353,7 @@ export function CanvasWorkspace({
       <span className="sr-only canvas-save-status" role="status">
         {data.saveError ? "尚未保存" : data.saving ? "保存中…" : "已保存到本机"}
       </span>
-      {generating && (
-        <GenerateCanvas
-          repository={data.repository}
-          onClose={() => setGenerating(false)}
-          onInsert={(commands) => {
-            const point = {
-              x: Math.max(
-                center().x,
-                ...rectangles.map((r) => r.x + r.width + 80),
-              ),
-              y: center().y,
-            };
-            const shifted = commands.map((c) =>
-              c.type === "add_block" && c.placement
-                ? {
-                    ...c,
-                    placement: {
-                      ...c.placement,
-                      x: c.placement.x + point.x,
-                      y: c.placement.y + point.y,
-                    },
-                  }
-                : c,
-            );
-            data.endGroup();
-            const result = edit(shifted);
-            if (result) {
-              const placed = shifted.flatMap((c) =>
-                c.type === "add_block" && c.placement
-                  ? [{ ...c.placement, height: c.placement.height ?? 300 }]
-                  : [],
-              );
-              setSelection(placed.map((p) => p.id));
-              const bounds = canvasSelectionBounds(placed),
-                v = viewport.current;
-              if (v) {
-                const zoom = Math.max(
-                  0.15,
-                  Math.min(
-                    1,
-                    (v.clientWidth - 160) / bounds.width,
-                    (v.clientHeight - 160) / bounds.height,
-                  ),
-                );
-                pan({
-                  x: v.clientWidth / 2 - (bounds.x + bounds.width / 2) * zoom,
-                  y: v.clientHeight / 2 - (bounds.y + bounds.height / 2) * zoom,
-                  zoom,
-                });
-                saveView();
-              }
-            }
-            return !!result;
-          }}
-        />
-      )}
-      <div
-        className="canvas-toolbar"
-        role="toolbar"
-        aria-label="画布工具栏"
-        aria-orientation="vertical"
-      >
-        <CanvasToolMenu label="模板" icon={<LayoutTemplate size={18} />}>
-          {(close) => (
-            <button
-              className="canvas-template-item"
-              aria-label="添加体验样例"
-              disabled={addingExamples}
-              onClick={() => {
-                close();
-                void addExamples();
-              }}
-            >
-              <Shapes size={20} />
-              <span>全部内容示例</span>
-            </button>
-          )}
-        </CanvasToolMenu>
-        <button
-          aria-label="AI 生成"
-          title="AI 生成图示或交互实验"
-          onClick={() => {
-            finishEditing();
-            setGenerating(true);
-          }}
-        >
-          <Sparkles size={18} />
-        </button>
-        <button
-          aria-label="选择工具"
-          title="选择"
-          aria-pressed={tool === "select"}
-          onClick={() => setTool("select")}
-        >
-          <MousePointer2 size={18} />
-        </button>
-        <button
-          aria-label="平移工具"
-          title="平移（空格）"
-          aria-pressed={tool === "hand"}
-          onClick={() => setTool("hand")}
-        >
-          <Hand size={18} />
-        </button>
-        <span className="canvas-tool-divider" />
-        <button
-          aria-label="新建笔记"
-          title="新建笔记"
-          onClick={() => createNote()}
-        >
-          <FilePlus2 size={18} />
-        </button>
-        <button
-          aria-label="添加图片或文件"
-          title="添加图片或文件"
-          onClick={() => attach()}
-        >
-          <ImagePlus size={18} />
-        </button>
-        <button
-          aria-label="添加交互块"
-          title="添加交互实验"
-          onClick={() => addInteractive()}
-        >
-          <FlaskConical size={18} />
-        </button>
-        <span className="canvas-tool-divider" />
-        <CanvasToolMenu label="添加形状" icon={<Shapes size={18} />}>
-          {(close) => (
-            <div className="selection-shape-grid">
-              {CANVAS_SHAPES.map((shape) => (
-                <button
-                  key={shape}
-                  data-create-shape={shape}
-                  aria-label={`添加${canvasShapeNames[shape]}`}
-                  title={canvasShapeNames[shape]}
-                  onClick={() => {
-                    close();
-                    createShape(shape);
-                  }}
-                >
-                  <svg viewBox="-8 -8 116 116">
-                    {shape === "text" ? (
-                      <text
-                        x="50"
-                        y="75"
-                        textAnchor="middle"
-                        fontSize="78"
-                        fill="currentColor"
-                        stroke="none"
-                      >
-                        T
-                      </text>
-                    ) : (
-                      <ShapeGlyph shape={shape} />
-                    )}
-                  </svg>
-                </button>
-              ))}
-            </div>
-          )}
-        </CanvasToolMenu>
-        <button
-          aria-label="连接工具"
-          title="连接：从对象边缘拖向另一个对象"
-          aria-pressed={tool === "connect"}
-          onClick={() => {
-            finishEditing();
-            setTool(tool === "connect" ? "select" : "connect");
-          }}
-        >
-          <MoveUpRight size={18} />
-        </button>
-        <button
-          aria-label="对齐吸附"
-          title="对齐吸附（Alt 临时关闭）"
-          aria-pressed={snap}
-          onClick={() => setSnap(!snap)}
-        >
-          <Magnet size={17} />
-        </button>
-        <span className="canvas-tool-divider" />
+      <div className={`canvas-history ${embedded ? "embedded-history" : ""}`}>
         <button
           aria-label="撤销画布修改"
           title="撤销（⌘/Ctrl Z）"
@@ -2383,18 +2370,225 @@ export function CanvasWorkspace({
         >
           <Redo2 size={18} />
         </button>
-        <span className="canvas-tool-divider" />
-        <button
-          aria-label="画布内容"
-          title="画布内容"
-          aria-pressed={outline}
-          onClick={() => setOutline(!outline)}
+      </div>
+      {generating && (
+        <GenerateCanvas
+          onClose={() => {
+            setGenerationDraft(undefined);
+            setGenerating(false);
+          }}
+          onStart={() => {
+            finishEditing();
+            setTool("select");
+            setSelection([]);
+            setSelectedConnector(null);
+            setGenerationDraft(undefined);
+            generationBase.current = {
+              x: Math.max(
+                center().x,
+                ...rectangles.map((r) => r.x + r.width + 80),
+              ),
+              y: center().y,
+            };
+          }}
+          onPreview={(scene) => {
+            if (scene) frameGeneration(scene);
+            setGenerationDraft(scene);
+          }}
+          onInsert={(scene) => {
+            frameGeneration(scene);
+            data.endGroup();
+            const result = edit(
+              canvasGenerationCommands(scene, generationBase.current),
+            );
+            data.endGroup();
+            if (result) saveView();
+            return !!result;
+          }}
+        />
+      )}
+      {generationDraft && (
+        <CanvasGenerationPreview
+          scene={generationDraft}
+          camera={camera}
+          origin={generationOrigin.current}
+          repository={data.repository}
+        />
+      )}
+
+      <div
+        className="canvas-toolbar"
+        role="toolbar"
+        aria-label="画布工具栏"
+        aria-orientation="vertical"
+      >
+        <CanvasToolButton
+          aria-label="AI 生成"
+          label="AI"
+          onClick={() => {
+            finishEditing();
+            setGenerating(true);
+          }}
         >
-          <Layers size={18} />
-        </button>
-        <button
+          <Sparkles size={18} />
+        </CanvasToolButton>
+        <CanvasToolButton
+          aria-label="选择工具"
+          label="Select"
+          shortcut="V"
+          aria-pressed={tool === "select"}
+          onClick={() => setTool("select")}
+        >
+          <MousePointer2 size={18} />
+        </CanvasToolButton>
+        <CanvasToolButton
+          aria-label="平移工具"
+          label="Hand"
+          shortcut="H"
+          aria-pressed={tool === "hand"}
+          onClick={() => setTool("hand")}
+        >
+          <Hand size={18} />
+        </CanvasToolButton>
+        <span className="canvas-tool-divider" />
+        <CanvasToolMenu
+          label="添加形状"
+          active={tool === "shape"}
+          onSelect={() => {
+            finishEditing();
+            setTool("shape");
+          }}
+          icon={
+            <svg className="canvas-tool-glyph" viewBox="-8 -8 116 116">
+              <ShapeGlyph shape={drawShape} />
+            </svg>
+          }
+        >
+          {(close) => (
+            <div className="selection-shape-grid">
+              {CANVAS_SHAPES.filter((shape) => shape !== "text").map(
+                (shape) => (
+                  <CanvasToolButton
+                    key={shape}
+                    side="top"
+                    label={canvasShapeNames[shape]}
+                    shortcut={
+                      shape === "rounded-rectangle"
+                        ? "R"
+                        : shape === "diamond"
+                          ? "D"
+                          : shape === "ellipse"
+                            ? "O"
+                            : undefined
+                    }
+                    data-create-shape={shape}
+                    aria-label={`添加${canvasShapeNames[shape]}`}
+                    aria-pressed={drawShape === shape}
+                    onClick={() => {
+                      close();
+                      finishEditing();
+                      setDrawShape(shape);
+                      setTool("shape");
+                    }}
+                  >
+                    <svg viewBox="-8 -8 116 116">
+                      <ShapeGlyph shape={shape} />
+                    </svg>
+                  </CanvasToolButton>
+                ),
+              )}
+            </div>
+          )}
+        </CanvasToolMenu>
+        <CanvasToolButton
+          label="Text"
+          shortcut="T"
+          aria-label="文本工具"
+          aria-pressed={tool === "text"}
+          onClick={() => {
+            finishEditing();
+            setTool("text");
+          }}
+        >
+          <Type size={19} />
+        </CanvasToolButton>
+        <CanvasToolMenu
+          label="连接工具"
+          compact
+          active={tool === "connect"}
+          onSelect={() => {
+            finishEditing();
+            setTool("connect");
+          }}
+          icon={<CanvasLineToolIcon mode={lineMode} />}
+        >
+          {(close) => (
+            <>
+              {(["line", "arrow", "rounded", "curve"] as const).map(
+                (mode, i) => (
+                  <CanvasToolButton
+                    key={mode}
+                    label={["直线", "直线箭头", "折线箭头", "曲线箭头"][i]}
+                    shortcut={mode === "line" ? "L" : undefined}
+                    data-line-mode={mode}
+                    aria-label={["直线", "直线箭头", "折线箭头", "曲线箭头"][i]}
+                    aria-pressed={lineMode === mode}
+                    onClick={() => {
+                      close();
+                      finishEditing();
+                      setLineMode(mode);
+                      setTool("connect");
+                    }}
+                  >
+                    <CanvasLineToolIcon mode={mode} />
+                  </CanvasToolButton>
+                ),
+              )}
+            </>
+          )}
+        </CanvasToolMenu>
+        <span className="canvas-tool-divider" />
+        <CanvasToolButton
+          aria-label="新建笔记"
+          label="笔记"
+          onClick={() => createNote()}
+        >
+          <FilePlus2 size={18} />
+        </CanvasToolButton>
+        <CanvasToolButton
+          aria-label="添加图片或文件"
+          label="图片"
+          onClick={() => attach()}
+        >
+          <ImagePlus size={18} />
+        </CanvasToolButton>
+        <CanvasToolButton
+          aria-label="添加交互块"
+          label="交互实验"
+          onClick={() => addInteractive()}
+        >
+          <FlaskConical size={18} />
+        </CanvasToolButton>
+        <span className="canvas-tool-divider" />
+        <CanvasToolMenu label="模板" icon={<LayoutTemplate size={18} />}>
+          {(close) => (
+            <button
+              className="canvas-template-item"
+              aria-label="添加体验样例"
+              disabled={addingExamples}
+              onClick={() => {
+                close();
+                void addExamples();
+              }}
+            >
+              <Shapes size={20} />
+              <span>全部内容示例</span>
+            </button>
+          )}
+        </CanvasToolMenu>
+        <CanvasToolButton
           aria-label="编辑文档 DSL"
-          title="文档 DSL"
+          label="DSL"
           onClick={() => {
             sourceRevision.current = doc.revision;
             setDsl(JSON.stringify(doc, null, 2));
@@ -2402,8 +2596,33 @@ export function CanvasWorkspace({
           }}
         >
           <Code2 size={18} />
-        </button>
+        </CanvasToolButton>
       </div>
+      <CanvasShapeCursor
+        viewport={viewport}
+        active={tool === "shape" && !generating && dsl === null && !focus}
+        shape={drawShape}
+        camera={camera}
+      />
+      {drawPreview && (
+        <svg
+          className="canvas-draw-preview"
+          style={{
+            left: drawPreview.x * camera.zoom + camera.x,
+            top: drawPreview.y * camera.zoom + camera.y,
+            width: drawPreview.width * camera.zoom,
+            height: drawPreview.height * camera.zoom,
+          }}
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          {tool === "text" ? (
+            <rect x="0" y="0" width="100" height="100" />
+          ) : (
+            <ShapeGlyph shape={drawShape} size={drawPreview} />
+          )}
+        </svg>
+      )}
       {activeConnector && !connection ? (
         <ConnectorToolbar
           key={activeConnector.id}
@@ -2462,12 +2681,35 @@ export function CanvasWorkspace({
       <div
         ref={viewport}
         className="canvas-viewport"
+        data-tool={tool}
         tabIndex={0}
         aria-label="无限画布"
         data-camera={JSON.stringify(camera)}
         style={{
           backgroundSize: `${24 * camera.zoom}px ${24 * camera.zoom}px`,
           backgroundPosition: `${camera.x}px ${camera.y}px`,
+        }}
+        onPointerDownCapture={(event) => {
+          if (
+            event.button !== 0 ||
+            space.current ||
+            (tool !== "shape" && tool !== "text")
+          )
+            return;
+          event.preventDefault();
+          event.stopPropagation();
+          finishEditing();
+          setSelected(null);
+          setSelectedConnector(null);
+          viewport.current!.focus({ preventScroll: true });
+          viewport.current!.setPointerCapture(event.pointerId);
+          gesture.current = {
+            kind: "draw",
+            others: rectangles,
+            pointer: event.pointerId,
+            start: { x: event.clientX, y: event.clientY },
+            camera: cameraRef.current,
+          };
         }}
         onPointerDown={(event) => {
           const target = event.target as Element;
@@ -2734,111 +2976,115 @@ export function CanvasWorkspace({
                     finishEditing();
                 }}
               >
-                <header
-                  className="canvas-card-header"
-                  inert={p.locked ? true : undefined}
-                  onPointerDown={(event) =>
-                    tool === "connect" && !space.current
-                      ? connectFrom(event, { placement: p.id, side: "e" })
-                      : begin(
-                          event,
-                          space.current || tool === "hand" ? "pan" : "move",
-                          p,
-                        )
-                  }
-                >
-                  <span className="canvas-card-kind">
-                    {note ? (
-                      <FilePlus2 size={15} />
-                    ) : block?.type === "interactive" ? (
-                      <FlaskConical size={15} />
-                    ) : (
-                      <Paperclip size={15} />
-                    )}
-                  </span>
-                  {note ? (
-                    <NoteTitle
-                      note={note}
-                      onEdit={edit}
-                      endGroup={data.endGroup}
-                    />
-                  ) : (
-                    <strong>{title}</strong>
-                  )}
-                  <div
-                    className="canvas-card-actions"
-                    onPointerDown={(event) => event.stopPropagation()}
+                {block?.type !== "shape" && (
+                  <header
+                    className="canvas-card-header"
+                    inert={p.locked ? true : undefined}
+                    onPointerDown={(event) =>
+                      tool === "connect" && !space.current
+                        ? connectFrom(event, { placement: p.id, side: "e" })
+                        : begin(
+                            event,
+                            space.current || tool === "hand" ? "pan" : "move",
+                            p,
+                          )
+                    }
                   >
-                    {(note || block?.type === "shape") && (
-                      <>
-                        <button
-                          aria-label={`${editing === p.id ? "完成编辑" : "编辑"} ${title}`}
-                          className={
-                            editing === p.id ? "canvas-edit-done" : undefined
-                          }
-                          title={editing === p.id ? "完成编辑" : "在画布中编辑"}
-                          onClick={() => {
-                            if (editing === p.id) finishEditing();
-                            else startEditing(p.id);
-                          }}
-                        >
-                          {editing === p.id ? (
-                            <>
-                              <Check size={15} />
-                              <span>完成</span>
-                            </>
-                          ) : (
-                            <Pencil size={15} />
-                          )}
-                        </button>
-                        {note && (
-                          <button
-                            aria-label={`聚焦 ${title}`}
-                            title="放大编辑与实时预览"
-                            onClick={() => expandNote(note.id)}
-                          >
-                            <Maximize2 size={15} />
-                          </button>
-                        )}
-                      </>
+                    <span className="canvas-card-kind">
+                      {note ? (
+                        <FilePlus2 size={15} />
+                      ) : block?.type === "interactive" ? (
+                        <FlaskConical size={15} />
+                      ) : (
+                        <Paperclip size={15} />
+                      )}
+                    </span>
+                    {note ? (
+                      <NoteTitle
+                        note={note}
+                        onEdit={edit}
+                        endGroup={data.endGroup}
+                      />
+                    ) : (
+                      <strong>{title}</strong>
                     )}
-                    <button
-                      aria-label={`连接 ${title}`}
-                      title="从此对象连线"
-                      onClick={() => {
-                        finishEditing();
-                        setSelected(p.id);
-                        setTool("connect");
-                      }}
+                    <div
+                      className="canvas-card-actions"
+                      onPointerDown={(event) => event.stopPropagation()}
                     >
-                      <MoveUpRight size={15} />
-                    </button>
-                    <button
-                      aria-label={`复制摆放 ${title}`}
-                      title="复制摆放（共享同一内容）"
-                      onClick={() =>
-                        edit([
-                          {
-                            type: "duplicate_placement",
-                            id: p.id,
-                            newId: newCanvasId("place"),
-                          },
-                        ])
-                      }
-                    >
-                      <Copy size={14} />
-                    </button>
-                    <button
-                      aria-label={`移出画布 ${title}`}
-                      title="移出画布，保留内容"
-                      onClick={() =>
-                        edit([{ type: "remove_placement", id: p.id }])
-                      }
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </header>
+                      {note && (
+                        <>
+                          <button
+                            aria-label={`${editing === p.id ? "完成编辑" : "编辑"} ${title}`}
+                            className={
+                              editing === p.id ? "canvas-edit-done" : undefined
+                            }
+                            title={
+                              editing === p.id ? "完成编辑" : "在画布中编辑"
+                            }
+                            onClick={() => {
+                              if (editing === p.id) finishEditing();
+                              else startEditing(p.id);
+                            }}
+                          >
+                            {editing === p.id ? (
+                              <>
+                                <Check size={15} />
+                                <span>完成</span>
+                              </>
+                            ) : (
+                              <Pencil size={15} />
+                            )}
+                          </button>
+                          {note && (
+                            <button
+                              aria-label={`聚焦 ${title}`}
+                              title="放大编辑与实时预览"
+                              onClick={() => expandNote(note.id)}
+                            >
+                              <Maximize2 size={15} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                      <button
+                        aria-label={`连接 ${title}`}
+                        title="从此对象连线"
+                        onClick={() => {
+                          finishEditing();
+                          setSelected(p.id);
+                          setTool("connect");
+                        }}
+                      >
+                        <MoveUpRight size={15} />
+                      </button>
+                      <button
+                        aria-label={`复制摆放 ${title}`}
+                        title="复制摆放（共享同一内容）"
+                        onClick={() =>
+                          edit([
+                            {
+                              type: "duplicate_placement",
+                              id: p.id,
+                              newId: newCanvasId("place"),
+                            },
+                          ])
+                        }
+                      >
+                        <Copy size={14} />
+                      </button>
+                      <button
+                        aria-label={`移出画布 ${title}`}
+                        title="移出画布，保留内容"
+                        onClick={() =>
+                          edit([{ type: "remove_placement", id: p.id }])
+                        }
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </header>
+                )}
                 <div
                   className="canvas-card-body"
                   onDoubleClick={(event) => {
@@ -2859,29 +3105,6 @@ export function CanvasWorkspace({
                 >
                   {content(p.content, editing === p.id)}
                 </div>
-                {block?.type === "shape" && editing === p.id && (
-                  <select
-                    className="canvas-legacy-tone"
-                    aria-label="形状颜色"
-                    value={block.tone}
-                    onChange={(e) =>
-                      edit([
-                        {
-                          type: "set_shape",
-                          block: {
-                            ...block,
-                            tone: e.target.value as typeof block.tone,
-                          },
-                        },
-                      ])
-                    }
-                  >
-                    <option value="neutral">默认</option>
-                    <option value="sage">浅绿</option>
-                    <option value="sand">浅沙</option>
-                    <option value="blue">浅蓝</option>
-                  </select>
-                )}
                 <div className="canvas-card-controls">
                   {resizeDirections.map(({ direction, label }) => (
                     <button
@@ -2907,7 +3130,20 @@ export function CanvasWorkspace({
                       data-port={side}
                       style={(() => {
                         const r = rectangles.find((r) => r.id === p.id)!,
-                          anchor = canvasPort(r, side),
+                          // Idle connection handles must stay outside the resize box.
+                          // During linking they mark the real shape boundary.
+                          anchor = connection
+                            ? canvasPort(r, side)
+                            : {
+                                x:
+                                  r.x +
+                                  r.width *
+                                    (side === "w" ? 0 : side === "e" ? 1 : 0.5),
+                                y:
+                                  r.y +
+                                  r.height *
+                                    (side === "n" ? 0 : side === "s" ? 1 : 0.5),
+                              },
                           offset = connection ? 0 : 24 / camera.zoom;
                         return {
                           left:

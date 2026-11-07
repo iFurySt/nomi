@@ -97,9 +97,11 @@
   background: var(--interaction-hover);
   color: var(--text);
 }
-.canvas-workspace button:focus-visible {
-  outline: 2px solid var(--muted);
-  outline-offset: 2px;
+.canvas-workspace button:focus-visible,
+.canvas-workspace input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  background-color: var(--interaction-hover);
 }
 .canvas-toolbar {
   position: absolute;
@@ -171,8 +173,7 @@
 }
 .canvas-card.selected {
   z-index: 2;
-  outline: 1.5px solid var(--text);
-  outline-offset: 3px;
+  outline: none;
 }
 .canvas-card-header {
   padding: 12px 12px 12px 16px;
@@ -1229,26 +1230,6 @@
   box-shadow: none;
   border-radius: 0;
 }
-.shape-card > .canvas-card-header {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + 44px / var(--canvas-zoom, 1));
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: 8px;
-  min-height: 32px;
-  min-width: 100%;
-  width: max-content;
-  opacity: 0;
-  pointer-events: none;
-}
-.shape-card.selected > .canvas-card-header,
-.shape-card:hover > .canvas-card-header,
-.shape-card:focus-within > .canvas-card-header {
-  opacity: 1;
-  pointer-events: auto;
-}
 .shape-card .canvas-content {
   padding: 0;
   overflow: visible !important;
@@ -1777,22 +1758,7 @@
 .canvas-selection > button {
   pointer-events: auto;
 }
-.shape-card.selected:not(.is-editing-card) > .canvas-card-header {
-  opacity: 0;
-  pointer-events: none;
-}
-.shape-card.is-editing-card > .canvas-card-header {
-  opacity: 1;
-  pointer-events: auto;
-}
-.canvas-legacy-tone {
-  position: absolute;
-  top: 4px;
-  right: 8px;
-  font-size: 11px;
-  opacity: 0.7;
-  z-index: 2;
-}
+
 .canvas-guides .canvas-measure line {
   stroke-dasharray: none;
 }
@@ -1838,8 +1804,8 @@
   width: 34px;
 }
 .canvas-workspace.is-embedded .canvas-toolbar {
-  top: 88px;
-  max-height: calc(100% - 160px);
+  top: 50%;
+  max-height: calc(100% - 192px);
 }
 .canvas-outline {
   left: 80px;
@@ -1884,6 +1850,164 @@
   background: var(--interaction-hover);
 }
 .canvas-tool-menu button:focus-visible {
-  outline: 2px solid var(--muted);
-  outline-offset: -2px;
+  outline: none;
+  box-shadow: none;
+  background-color: var(--interaction-hover);
+}
+
+/* Tool chrome stays in screen space; the drawing scene alone follows zoom. */
+.canvas-toolbar {
+  top: 50%;
+  transform: translateY(-50%);
+  max-height: calc(100% - 96px);
+}
+.canvas-titlebar {
+  top: 52px;
+  left: 16px;
+  width: 232px;
+  box-sizing: border-box;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 10px;
+}
+.canvas-titlebar .canvas-name {
+  width: 0;
+  flex: 1;
+  font-size: 13px;
+}
+.canvas-titlebar > button {
+  flex-shrink: 0;
+}
+.canvas-history {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 4;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 3px 14px #00000005;
+}
+.canvas-history.embedded-history {
+  top: 52px;
+  left: 256px;
+}
+.canvas-history button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+}
+.canvas-history button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.canvas-tool-glyph {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 9;
+}
+.canvas-tool-menu.canvas-line-menu {
+  width: 48px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.canvas-line-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.canvas-line-menu button:hover,
+.canvas-line-menu button[aria-pressed="true"],
+.canvas-tool-menu .selection-shape-grid button[aria-pressed="true"] {
+  background: var(--interaction-hover);
+  color: var(--canvas-accent);
+}
+.canvas-tool-tip {
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #24262a;
+  color: white;
+  font-size: 12px;
+  line-height: 20px;
+  pointer-events: none;
+  box-shadow: 0 4px 14px #00000016;
+}
+.canvas-tool-tip kbd {
+  min-width: 20px;
+  padding: 0 4px;
+  text-align: center;
+  border-radius: 4px;
+  background: #ffffff26;
+  font: inherit;
+}
+.canvas-tool-tip svg {
+  fill: #24262a;
+}
+.canvas-viewport[data-tool="shape"],
+.canvas-viewport[data-tool="text"] {
+  cursor: crosshair;
+}
+.canvas-draw-preview {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+  overflow: visible;
+  fill: #4d7cff0d;
+  stroke: var(--canvas-accent);
+  stroke-width: 1.5px;
+}
+.canvas-draw-preview * {
+  vector-effect: non-scaling-stroke;
+}
+@media (max-width: 360px) {
+  .canvas-titlebar {
+    width: 200px;
+  }
+  .canvas-history.embedded-history {
+    left: 224px;
+  }
+}
+
+/* Default-size placement ghost: cursor anchors its upper-left corner. */
+.canvas-shape-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  visibility: hidden;
+  pointer-events: none;
+  overflow: visible;
+  opacity: 0.45;
+  fill: var(--surface, white);
+  stroke: var(--text);
+  stroke-width: 1.5px;
+}
+.canvas-shape-cursor * {
+  vector-effect: non-scaling-stroke;
 }

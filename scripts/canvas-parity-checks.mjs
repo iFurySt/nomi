@@ -67,9 +67,15 @@ export async function canvasParityChecks(phase, expected) {
         new KeyboardEvent("keydown", { key, bubbles: true, ...more }),
       );
   const select = async (id) => {
-    card(id).querySelector('[aria-label^="编辑 "]').click();
+    card(id)
+      .querySelector(".canvas-card-body")
+      .dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     await until(() => card(id).querySelector("[data-shape-text]"));
-    card(id).querySelector('[aria-label^="完成编辑"]').click();
+    card(id)
+      .querySelector("[data-shape-text]")
+      .dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
     await wait(40);
   };
   const more = async (label) => {
@@ -91,7 +97,9 @@ export async function canvasParityChecks(phase, expected) {
     [...document.querySelectorAll(".canvas-dsl-actions button")]
       .find((b) => b.textContent.includes("应用"))
       .click();
-    await until(() => !document.querySelector('[role="dialog"]'));
+    await until(
+      () => !document.querySelector('[role="dialog"]:not(.canvas-tool-menu)'),
+    );
     await until(async () => (await saved()).revision > d.revision);
   };
   const ids = ["parity.place.a", "parity.place.b", "parity.place.c"];
@@ -162,7 +170,7 @@ export async function canvasParityChecks(phase, expected) {
     button("切换形状").click();
     await wait(20);
     assert(
-      document.querySelectorAll(".selection-shape-grid button").length === 26,
+      document.querySelectorAll(".selection-shape-grid button").length === 28,
       "Shape catalog incomplete",
     );
     document
@@ -173,8 +181,8 @@ export async function canvasParityChecks(phase, expected) {
       r = el.getBoundingClientRect(),
       port = point(el.querySelector('[data-port="e"]'));
     assert(
-      Math.abs(port.x - (r.left + r.width * 0.75 + 24)) < 1.5,
-      "Triangle port not on outline ray",
+      Math.abs(port.x - (r.right + 24)) < 1.5,
+      "Idle triangle connection handle overlaps its resize box",
     );
     button("形状填充").click();
     await wait(20);

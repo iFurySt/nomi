@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { parseCanvasGeneration, canvasGenerationCommands } from "./generation";
+import {
+  parseCanvasGeneration,
+  canvasGenerationCommands,
+  canvasGenerationPrefix,
+} from "./generation";
 import { applyCanvasCommands, createCanvasDocument } from "./document";
 import { temperatureProgram } from "../interactive";
 const block = (id: string, x = 0) => ({
@@ -77,6 +81,44 @@ describe("generated canvas scenes", () => {
     expect(() => parseCanvasGeneration("x".repeat(32001))).toThrow();
     expect(() =>
       parseCanvasGeneration('{"commands":[],"extra":true}'),
+    ).toThrow();
+  });
+});
+
+describe("streamed scene boundaries", () => {
+  it("accepts every chunk boundary without exposing incomplete objects", () => {
+    const a = block("a"),
+      b = block("b", 350);
+    a.block.text = 'braces } [ and quote " plus backslash \\';
+    const prefix = '{"commands":[';
+    const first = JSON.stringify(a);
+    const second = JSON.stringify(b);
+    const source =
+      prefix + first + "," + second + "," + JSON.stringify(connection) + "]}";
+    for (let i = 0; i <= source.length; i++) {
+      const partial = canvasGenerationPrefix(source.slice(0, i));
+      if (i < prefix.length + first.length) expect(partial).toBeUndefined();
+      else {
+        const scene = parseCanvasGeneration(partial!);
+        expect(scene.blocks.length).toBe(
+          i < prefix.length + first.length + 1 + second.length ? 1 : 2,
+        );
+        expect(scene.blocks[0]).toMatchObject({ text: a.block.text });
+      }
+    }
+  });
+  it("validates previews and final envelopes independently", () => {
+    const text = JSON.stringify({ commands: [block("a")] });
+    expect(
+      parseCanvasGeneration(canvasGenerationPrefix("```json\n" + text)!).blocks,
+    ).toHaveLength(1);
+    const invalid = '{"commands":[{"type":"remove_placement","id":"private"}';
+    expect(() =>
+      parseCanvasGeneration(canvasGenerationPrefix(invalid)!),
+    ).toThrow();
+    expect(() => canvasGenerationPrefix("x".repeat(32001))).toThrow();
+    expect(() =>
+      parseCanvasGeneration(text.slice(0, -1) + ',"extra":true}'),
     ).toThrow();
   });
 });

@@ -82,7 +82,7 @@ async function checkSlash({ output, report, entry }) {
     await js(
       `(()=>{window.ed=document.querySelector('.tiptap').editor;ed.commands.setContent(${JSON.stringify(content)});ed.commands.focus('end')})()`,
     );
-    await wait(80);
+    await until("document.activeElement === ed.view.dom");
   };
   const command = async (text) => {
     await reset();
@@ -203,8 +203,10 @@ async function checkSlash({ output, report, entry }) {
     await key("Escape");
     await until("!document.querySelector('.writing-math-popover')");
     assert.equal(await js("ed.state.doc.textContent"), "/math");
-    // Real Chromium marked text: slash filtering must not claim IME Enter or deletion.
+    // The math popover restores focus after closing. Wait for the editor before IME input.
+    await until("!document.querySelector('.writing-math-popover')");
     await command("/");
+    await until("document.activeElement === ed.view.dom");
     await win.webContents.debugger.sendCommand("Input.imeSetComposition", {
       text: "biaoti",
       selectionStart: 6,

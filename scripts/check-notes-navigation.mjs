@@ -109,6 +109,16 @@ app.whenReady().then(async()=>{
  await js("location.hash='/notes?note=nav.leaf'");
  await until("document.querySelector('.notes-breadcrumb')");
  assert.equal(await js("!!document.querySelector('.sidebar-collapsed')"),true);
+ for (const account of ['fixture-account-a', 'fixture-account-b', '']) {
+   await js('localStorage.setItem("fixture.chatgpt-account",'+JSON.stringify(account)+')');
+   await new Promise(resolve=>{win.webContents.once('did-finish-load',resolve);win.reload();});
+   await until("[...document.querySelectorAll('[data-note-row]')].some(e=>e.dataset.noteRow==='nav.leaf')");
+   await js("location.hash='/canvas'");
+   await until("document.querySelector('.canvas-workspace')");
+   await js("location.hash='/notes?note=nav.leaf'");
+   await until("[...document.querySelectorAll('[data-note-row][data-selected]')].some(e=>e.dataset.noteRow==='nav.leaf')");
+   assert.equal(await js("document.querySelectorAll('[data-note-row]').length"),3);
+ }
  console.log('Notes navigation: PASS (ancestor/current icons, root, parent navigation, revision unchanged, dark/narrow, settings always visible, shortcut ignored, collapse preference retained)');
  app.exit(0);
  }catch(e){console.error(e);await shot('failure');app.exit(1);}
