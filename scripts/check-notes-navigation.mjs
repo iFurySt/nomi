@@ -77,7 +77,9 @@ app.whenReady().then(async()=>{
  await new Promise(r=>{win.webContents.once('did-finish-load',r);win.reload();});
  await until("document.querySelector('.notes-breadcrumb [aria-current=page]')?.textContent.includes('交互学习')");
  assert.equal(await js("[...document.querySelectorAll('.notes-breadcrumb button .notes-breadcrumb-title')].map(x=>x.textContent).join('/')"),'学习资料/人工智能');
- assert.equal(await js("document.querySelector('.notes-topbar .notes-breadcrumb')!==null"),true);
+ assert.equal(await js("document.querySelector('.workspace-title-slot .notes-breadcrumb')!==null"),true);
+ assert.equal(await js("document.querySelectorAll('.notes-breadcrumb').length"),1);
+ assert.equal(await js("document.querySelector('.notes-topbar')===null"),true);
  await js("(async()=>{window.navRevision=(await window.canvasFixture.repository('local-device').load()).revision})()");
  await shot('breadcrumb-light');
  await js("document.querySelector('.notes-breadcrumb button').click()");
