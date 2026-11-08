@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   parseCanvasGeneration,
+  parseNoteGeneration,
+  NOTE_INTERACTION_REQUIRED,
+  NOTE_INTERACTION_UNSUPPORTED,
   canvasGenerationCommands,
   canvasGenerationPrefix,
 } from "./generation";
@@ -120,5 +123,63 @@ describe("streamed scene boundaries", () => {
     expect(() =>
       parseCanvasGeneration(text.slice(0, -1) + ',"extra":true}'),
     ).toThrow();
+  });
+});
+
+describe("native note interactions", () => {
+  const intro = {
+    ...block("intro"),
+    block: { id: "intro", type: "markdown", source: "Explore the result" },
+  };
+  const lab = {
+    ...block("lab"),
+    block: { id: "lab", type: "interactive", program: temperatureProgram },
+  };
+  const response = (commands: unknown[]) => JSON.stringify({ commands });
+  it("streams explanations then commits an independently validated interactive block", () => {
+    expect(parseNoteGeneration(response([intro]), true).blocks[0].type).toBe(
+      "markdown",
+    );
+    expect(() => parseNoteGeneration(response([intro]))).toThrow(
+      NOTE_INTERACTION_REQUIRED,
+    );
+    const result = parseNoteGeneration(response([intro, lab]));
+    expect(result.blocks.map((b) => b.type)).toEqual([
+      "markdown",
+      "interactive",
+    ]);
+    expect(result.blocks[1]).toMatchObject({ program: temperatureProgram });
+  });
+  it("rejects diagrams and inert programs instead of wrapping them in a canvas", () => {
+    expect(() =>
+      parseNoteGeneration(response([block("a"), block("b"), connection])),
+    ).toThrow(NOTE_INTERACTION_REQUIRED);
+    const inert = structuredClone(temperatureProgram);
+    inert.root = "message";
+    inert.nodes = [
+      {
+        id: "message",
+        component: "Text",
+        version: 1,
+        props: { text: "Only a static explanation" },
+      },
+    ];
+    expect(() =>
+      parseNoteGeneration(
+        response([{ ...lab, block: { ...lab.block, program: inert } }]),
+      ),
+    ).toThrow(NOTE_INTERACTION_REQUIRED);
+    expect(() =>
+      parseNoteGeneration(response([lab, block("a")]), true),
+    ).toThrow(NOTE_INTERACTION_REQUIRED);
+  });
+  it("reports unsupported interactions without relaxing the portable capability boundary", () => {
+    expect(() =>
+      parseNoteGeneration('{"error":"unsupported_interaction"}'),
+    ).toThrow(NOTE_INTERACTION_UNSUPPORTED);
+    const invalid = structuredClone(lab);
+    invalid.block.program.requires.hostEffects = ["network"] as never;
+    expect(() => parseNoteGeneration(response([invalid]))).toThrow();
+    expect(() => parseNoteGeneration("x".repeat(32001))).toThrow();
   });
 });

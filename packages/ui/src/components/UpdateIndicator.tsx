@@ -20,8 +20,9 @@ export function UpdateIndicator() {
   }, []);
   const phase = status?.phase;
   useEffect(() => {
-    if (phase === "ready" || phase === "error") setOpen(true);
-  }, [phase]);
+    if (status?.error) setOpen(true);
+    else if (!status?.cancellable) setOpen(false);
+  }, [phase, status?.error, status?.cancellable]);
   if (
     !railVisible ||
     !status?.available ||
@@ -44,6 +45,11 @@ export function UpdateIndicator() {
               if (phase === "available") {
                 event.preventDefault();
                 void action("download");
+              } else if (phase === "ready" && !status.error) {
+                event.preventDefault();
+                void action("install");
+              } else if (active && !status.cancellable) {
+                event.preventDefault();
               }
             }}
           >
@@ -78,7 +84,7 @@ export function UpdateIndicator() {
                     cy="16"
                     r="12"
                     pathLength="100"
-                    strokeDasharray={`${progress === undefined ? 26 : Math.max(1, progress * 100)} 100`}
+                    strokeDasharray={`${progress === undefined ? 26 : Math.max(0, Math.min(100, progress * 100))} 100`}
                   />
                 </svg>
               ) : phase === "ready" ? (
@@ -102,32 +108,14 @@ export function UpdateIndicator() {
           aria-label="Nomi 更新"
           onOpenAutoFocus={(event) => event.preventDefault()}
         >
-          <strong>
-            {phase === "ready"
-              ? "更新已就绪"
-              : phase === "error"
-                ? "更新未完成"
-                : "Nomi 更新"}
-          </strong>
-          {phase !== "error" && (
-            <p aria-live="polite">
-              {phase === "ready"
-                ? `重启后使用${status.nextVersion ? ` Nomi ${status.nextVersion}` : "新版本"}。文稿会先保存。`
-                : label}
-            </p>
-          )}
+          <strong>{status.error ? "更新未完成" : "Nomi 更新"}</strong>
+          {!status.error && <p aria-live="polite">{label}</p>}
           {status.error && <p role="alert">{status.error}</p>}
           <div className="update-popover-actions">
             {phase === "ready" && (
-              <>
-                <Button onClick={() => setOpen(false)}>稍后</Button>
-                <Button
-                  variant="primary"
-                  onClick={() => void action("install")}
-                >
-                  重启并更新
-                </Button>
-              </>
+              <Button variant="primary" onClick={() => void action("install")}>
+                重试更新
+              </Button>
             )}
             {phase === "error" && (
               <Button

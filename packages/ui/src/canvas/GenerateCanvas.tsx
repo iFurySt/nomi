@@ -1,8 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import type { Editor } from "@tiptap/core";
 import { ArrowUp, Square, X, Sparkles } from "lucide-react";
 import {
   canvasGenerationPrefix,
   parseCanvasGeneration,
+  parseNoteGeneration,
+  NOTE_INTERACTION_REQUIRED,
+  NOTE_INTERACTION_UNSUPPORTED,
   type CanvasDocument,
   type NoteGenerationContext,
 } from "@nomi/core";
@@ -16,8 +26,12 @@ export function GenerateCanvas({
   onPreview,
   onInsert,
   noteContext,
+  anchor,
+  onBusyChange,
 }: {
   noteContext?: NoteGenerationContext;
+  anchor?: { editor: Editor; position: number };
+  onBusyChange?: (busy: boolean) => void;
   onClose: () => void;
   onStart: () => void;
   onPreview: (scene?: CanvasDocument) => void;
@@ -36,8 +50,56 @@ export function GenerateCanvas({
   const request = useRef<string | undefined>(undefined);
   const input = useRef<HTMLTextAreaElement>(null);
   const connect = useRef<HTMLAnchorElement>(null);
-  const callbacks = useRef({ onStart, onPreview, onInsert });
-  callbacks.current = { onStart, onPreview, onInsert };
+  const history = useRef<
+    Array<{ role: "user" | "assistant"; content: string; source?: "chatgpt" }>
+  >([]);
+  const [hasResult, setHasResult] = useState(false);
+  const composer = useRef<HTMLElement>(null);
+  const [anchorStyle, setAnchorStyle] = useState<CSSProperties>();
+  const callbacks = useRef({ onStart, onPreview, onInsert, onBusyChange });
+  callbacks.current = { onStart, onPreview, onInsert, onBusyChange };
+  useLayoutEffect(() => {
+    if (!anchor || docked) return;
+    let frame = 0;
+    const place = () => {
+      if (anchor.editor.isDestroyed) return;
+      const rect = anchor.editor.view.coordsAtPos(
+        Math.min(anchor.position, anchor.editor.state.doc.content.size),
+      );
+      const width = Math.min(
+        account?.sharing ? 520 : 300,
+        window.innerWidth - 32,
+      );
+      const height = composer.current?.offsetHeight ?? 180;
+      const below = rect.bottom + 10;
+      const top =
+        below + height <= window.innerHeight - 16
+          ? below
+          : rect.top - height - 10;
+      setAnchorStyle({
+        left: Math.max(16, Math.min(rect.left, window.innerWidth - width - 16)),
+        top: Math.max(16, Math.min(top, window.innerHeight - height - 16)),
+        width,
+        bottom: "auto",
+        transform: "none",
+      });
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(place);
+    };
+    place();
+    window.addEventListener("scroll", schedule, true);
+    window.addEventListener("resize", schedule);
+    const observer = new ResizeObserver(schedule);
+    if (composer.current) observer.observe(composer.current);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule, true);
+      window.removeEventListener("resize", schedule);
+      observer.disconnect();
+    };
+  }, [anchor, docked, account?.sharing]);
   const cancel = () => {
     const id = request.current;
     request.current = undefined;
@@ -45,10 +107,12 @@ export function GenerateCanvas({
       void requestChatGPT("cancelResponse", { requestId: id }).catch(() => {});
     callbacks.current.onPreview(undefined);
     setBusy(false);
+    callbacks.current.onBusyChange?.(false);
     if (id) setStatus("已停止");
   };
   useEffect(() => {
     cancel();
+    history.current = [];
     return () => {
       const id = request.current;
       request.current = undefined;
@@ -77,6 +141,7 @@ export function GenerateCanvas({
     setSent(message);
     setDocked(true);
     setBusy(true);
+    callbacks.current.onBusyChange?.(true);
     setError("");
     setStatus("正在构思…");
     callbacks.current.onStart();
@@ -91,7 +156,7 @@ export function GenerateCanvas({
           model: connection.model,
           generation: noteContext ? "note" : "canvas",
           ...(noteContext ? { noteContext } : {}),
-          messages: [{ role: "user", content: message }],
+          messages: [...history.current, { role: "user", content: message }],
         },
         (delta) => {
           if (request.current !== id || streamError) return;
@@ -100,7 +165,9 @@ export function GenerateCanvas({
             const prefix = canvasGenerationPrefix(text);
             if (prefix && prefix !== previous) {
               previous = prefix;
-              const scene = parseCanvasGeneration(prefix);
+              const scene = noteContext
+                ? parseNoteGeneration(prefix, true)
+                : parseCanvasGeneration(prefix);
               callbacks.current.onPreview(scene);
               setStatus("正在绘制…");
             }
@@ -114,9 +181,20 @@ export function GenerateCanvas({
       );
       if (request.current !== id) return;
       if (streamError) throw streamError;
-      const scene = parseCanvasGeneration(result.text);
+      const scene = noteContext
+        ? parseNoteGeneration(result.text)
+        : parseCanvasGeneration(result.text);
       if (!callbacks.current.onInsert(scene))
         throw Error("插入位置已改变，请重新选择。");
+      // The latest successful exchange contains the complete current result.
+      // Failed/cancelled output must never become the basis for an edit.
+      if (noteContext) {
+        history.current = [
+          { role: "user", content: message },
+          { role: "assistant", source: "chatgpt", content: result.text },
+        ];
+        setHasResult(true);
+      }
       callbacks.current.onPreview(undefined);
       setStatus("已生成");
       setPrompt("");
@@ -124,7 +202,12 @@ export function GenerateCanvas({
       if (request.current !== id) return;
       callbacks.current.onPreview(undefined);
       setError(
-        e instanceof Error && e.message === "插入位置已改变，请重新选择。"
+        e instanceof Error &&
+          [
+            "插入位置已改变，请重新选择。",
+            NOTE_INTERACTION_REQUIRED,
+            NOTE_INTERACTION_UNSUPPORTED,
+          ].includes(e.message)
           ? e.message
           : "生成未完成，请重试。",
       );
@@ -133,11 +216,14 @@ export function GenerateCanvas({
       if (request.current === id) {
         request.current = undefined;
         setBusy(false);
+        callbacks.current.onBusyChange?.(false);
       }
     }
   };
   return (
     <section
+      ref={composer}
+      style={!docked ? anchorStyle : undefined}
       className={`canvas-ai-composer${docked ? " is-docked" : ""}`}
       aria-label={noteContext ? "文稿 AI" : "画布 AI"}
       data-busy={busy}
@@ -176,7 +262,13 @@ export function GenerateCanvas({
           <textarea
             ref={input}
             aria-label="生成需求"
-            placeholder={noteContext ? "想做什么？" : "想在画布上画什么？"}
+            placeholder={
+              noteContext
+                ? hasResult
+                  ? "继续调整…"
+                  : "想生成什么交互块？"
+                : "想在画布上画什么？"
+            }
             value={prompt}
             maxLength={2000}
             readOnly={busy}

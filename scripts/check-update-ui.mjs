@@ -61,19 +61,21 @@ app.whenReady().then(async()=>{
  await until("!document.querySelector('.rail-update')");
  await js("window.updateFixture.set({phase:'downloading',progress:undefined})");
  await until("document.querySelector('.update-ring.spinning')");
- await js("window.updateFixture.set({phase:'ready',nextVersion:'0.2.0'})");
- await until("document.querySelector('.update-popover')?.textContent.includes('重启并更新')");
- assert.equal(await js("window.updateFixture.actions.includes('install')"),false);
- await shot('ready');
+ // Host owns restart; renderer never asks for a second confirmation.
+ await js("window.updateFixture.set({phase:'extracting'})");
+ await until("document.querySelector('.update-ring.spinning')");
+ await js("window.updateFixture.set({phase:'installing'})");
+ await until("document.querySelector('.rail-update')?.getAttribute('aria-label').includes('重启')");
+ assert.equal(await js("!!document.querySelector('.update-popover')"),false);
+ await shot('installing');
  await js("document.documentElement.dataset.theme='dark'");
  await until("getComputedStyle(document.documentElement).getPropertyValue('--frame').trim() === '#161616'");
  await new Promise(r=>setTimeout(r,120));
- await shot('ready-dark');
- await js("[...document.querySelectorAll('.update-popover button')].find(x=>x.textContent==='稍后').click()");
- await until("!document.querySelector('.update-popover')");
- await js("document.querySelector('.rail-update').focus();document.querySelector('.rail-update').click()");
- await until("document.querySelector('.update-popover')");
- await js("[...document.querySelectorAll('.update-popover button')].find(x=>x.textContent==='重启并更新').click()");
+ await shot('installing-dark');
+ await js("window.updateFixture.set({phase:'ready',error:'文稿尚未保存，更新已暂停。请保存后重试。'})");
+ await until("document.querySelector('.update-popover [role=alert]')");
+ await shot('save-paused');
+ await js("[...document.querySelectorAll('.update-popover button')].find(x=>x.textContent==='重试更新').click()");
  await until("window.updateFixture.get().phase==='installing'");
  assert.equal(await js("window.updateFixture.actions.filter(x=>x==='install').length"),1);
  await js("window.updateFixture.set({phase:'error',error:'下载失败，请重试。',canCheck:true})");
@@ -90,7 +92,7 @@ app.whenReady().then(async()=>{
  await shot('mobile');
  await js("window.updateFixture.set({phase:'idle',available:false,reason:'开发版本不执行自动更新'})");
  await until("!document.querySelector('.rail-update')");
- console.log('Update UI: PASS (compact rail, download, progress, cancel, later, restart, error, dark/mobile)');app.exit(0);
+ console.log('Update UI: PASS (compact rail, download, progress, cancel, no confirmation, restart, save retry, error, dark/mobile)');app.exit(0);
  }catch(error){console.error(error);await shot('failure');app.exit(1);}
 });setTimeout(()=>app.exit(1),45000);
 `,

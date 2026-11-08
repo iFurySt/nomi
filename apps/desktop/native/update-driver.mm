@@ -16,7 +16,7 @@
 - (BOOL)install {
   if (![self.phase isEqual:@"ready"] || !self.choice) return NO;
   void (^reply)(SPUUserUpdateChoice) = self.choice; self.choice = nil;
-  self.phase = @"installing"; self.terminationStarted = [NSDate date];
+  self.phase = @"installing"; self.failure = @""; self.terminationStarted = [NSDate date];
   reply(SPUUserUpdateChoiceInstall); return YES;
 }
 - (BOOL)cancel {

@@ -2,6 +2,7 @@ import type { Editor } from "@tiptap/core";
 import {
   newCanvasId,
   type CanvasBlock,
+  type CanvasCommand,
   type CanvasDocument,
   type CanvasNote,
   type NoteGenerationContext,
@@ -55,13 +56,50 @@ export function noteAIContext(
   };
 }
 
-/** Preserve native experiments/prose; diagrams remain an editable embedded canvas. */
+/** Note generation inserts native blocks, never silently wraps them in a canvas. */
 export function generatedNoteBlocks(scene: CanvasDocument): CanvasBlock[] {
   if (
-    scene.blocks.some((b) => b.type === "shape") ||
+    scene.blocks.some(
+      (b) => b.type !== "markdown" && b.type !== "interactive",
+    ) ||
     scene.board.connectors?.length
-  ) {
-    return [{ id: newCanvasId("canvas"), type: "canvas", scene }];
-  }
+  )
+    throw Error("文稿 AI 仅支持正文和交互块。");
   return scene.blocks.map((b) => ({ ...b, id: newCanvasId("ai") }));
+}
+
+/** Replace only the still-intact result of this chat; leave surrounding edits alone. */
+export function reviseNoteGeneration(
+  document: CanvasDocument,
+  noteId: string,
+  previous: CanvasBlock[],
+  next: CanvasBlock[],
+): CanvasCommand[] {
+  const note = document.notes.find((n) => n.id === noteId);
+  const start = note?.blocks.indexOf(previous[0]?.id) ?? -1;
+  if (
+    !note ||
+    start < 0 ||
+    !previous.length ||
+    !next.length ||
+    previous.some(
+      (block, i) =>
+        note.blocks[start + i] !== block.id ||
+        JSON.stringify(document.blocks.find((b) => b.id === block.id)) !==
+          JSON.stringify(block),
+    )
+  )
+    throw Error("插入位置已改变，请重新选择。");
+  return [
+    ...next.map((block): CanvasCommand => ({ type: "add_block", block })),
+    {
+      type: "set_note_blocks",
+      id: noteId,
+      blocks: [
+        ...note.blocks.slice(0, start),
+        ...next.map((b) => b.id),
+        ...note.blocks.slice(start + previous.length),
+      ],
+    },
+  ];
 }

@@ -128,10 +128,35 @@ async function checkAI({ output }) {
       );
     });
     await aiEnter();
+    await wait(400);
+    await shot("composer");
+    const anchor = await js(() => {
+      const editor = document.querySelector(".tiptap").editor;
+      const caret = editor.view.coordsAtPos(22);
+      const popup = document
+        .querySelector('[aria-label="文稿 AI"]')
+        .getBoundingClientRect();
+      return {
+        bottom: caret.bottom,
+        left: caret.left,
+        popupTop: popup.top,
+        popupLeft: popup.left,
+      };
+    });
+    assert.ok(
+      Math.abs(anchor.popupTop - anchor.bottom - 10) < 2,
+      "Composer opens below the selection " + JSON.stringify(anchor),
+    );
+    assert.ok(
+      Math.abs(anchor.popupLeft - anchor.left) < 2,
+      "Composer follows cursor horizontally",
+    );
     await shot("composer");
     await prompt("Create an interactive temperature experiment");
     await enter();
-    await until(() => !!document.querySelector(".note-ai-preview"));
+    await until(() => !!document.querySelector(".note-ai-skeleton"));
+    await shot("loading");
+    await until(() => !!document.querySelector(".note-ai-preview-block"));
     const payload = await js(() => window.aiFixture.lastRequest());
     assert.equal(payload.generation, "note");
     assert.equal(payload.noteContext.selected, "selected words");
@@ -145,7 +170,25 @@ async function checkAI({ output }) {
       0,
     );
     await shot("streaming");
-    await until(() => !document.querySelector('[aria-label="文稿 AI"]'));
+    await until(
+      () =>
+        document.querySelector('[aria-label="文稿 AI"]')?.dataset.busy ===
+        "false",
+    );
+    assert.equal(
+      await js(
+        () =>
+          document.querySelector('.canvas-ai-reply [role="status"]')
+            ?.textContent,
+      ),
+      "已生成",
+    );
+    assert.equal(
+      await js(
+        () => document.querySelector('[aria-label="生成需求"]').placeholder,
+      ),
+      "继续调整…",
+    );
     await wait(900);
     let saved = await doc();
     let note;
@@ -161,6 +204,122 @@ async function checkAI({ output }) {
     assert.equal(ordered[2].type, "interactive");
     assert.match(ordered[3].source, /after.*Following paragraph/s);
     await shot("inserted");
+    await prompt("Simplify the explanation and keep the working slider");
+    await enter();
+    await until(() => !!document.querySelector(".note-ai-skeleton"));
+    await until(
+      () =>
+        document.querySelector('[aria-label="文稿 AI"]')?.dataset.busy ===
+        "false",
+    );
+    await wait(900);
+    const revisionPayload = await js(() => window.aiFixture.lastRequest());
+    assert.equal(revisionPayload.messages.length, 3);
+    assert.equal(revisionPayload.messages[1].source, "chatgpt");
+    assert.match(revisionPayload.messages[1].content, /Generated explanation/);
+    saved = await doc();
+    const revisedOrder = saved.notes.find((n) => n.id === noteId).blocks;
+    assert.equal(
+      revisedOrder.length,
+      4,
+      "Continuation replaces, never appends duplicates",
+    );
+    assert.equal(revisedOrder[0], ordered[0].id);
+    assert.equal(revisedOrder[3], ordered[3].id);
+    assert.match(
+      saved.blocks.find((b) => b.id === revisedOrder[1]).source,
+      /Revised explanation/,
+    );
+    await shot("continued");
+    // A failed or stopped revision leaves the successful result intact.
+    await js(() => window.aiFixture.mode("unsupported"));
+    await prompt("Unsupported revision");
+    await enter();
+    await until(() => !!document.querySelector(".canvas-ai-error"));
+    assert.deepEqual(
+      (await doc()).notes.find((n) => n.id === noteId).blocks,
+      revisedOrder,
+    );
+    await js(() => window.aiFixture.mode("slow"));
+    await prompt("Cancelled revision");
+    await enter();
+    await click("停止生成");
+    await wait(2100);
+    assert.deepEqual(
+      (await doc()).notes.find((n) => n.id === noteId).blocks,
+      revisedOrder,
+    );
+    // Undo restores the first result in one step, without touching original prose.
+    await js(() =>
+      document.body.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "z",
+          metaKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    await wait(900);
+    assert.deepEqual(
+      (await doc()).notes.find((n) => n.id === noteId).blocks,
+      ordered.map((b) => b.id),
+    );
+    // After undo, an old chat cannot overwrite a now-different result.
+    await js(() => window.aiFixture.mode("note"));
+    await prompt("Stale revision");
+    await enter();
+    await until(() =>
+      document
+        .querySelector(".canvas-ai-error")
+        ?.textContent.includes("插入位置"),
+    );
+    assert.deepEqual(
+      (await doc()).notes.find((n) => n.id === noteId).blocks,
+      ordered.map((b) => b.id),
+    );
+    await click("关闭 AI");
+    const probabilities = await js(() =>
+      [...document.querySelectorAll("[data-probability]")].map(
+        (el) => el.textContent,
+      ),
+    );
+    await js(() => {
+      const slider = document.querySelector(
+        '.canvas-interactive input[type="range"]',
+      );
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      ).set.call(slider, "2.5");
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+      slider.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await until(
+      () =>
+        document.querySelector(".learning-slider output")?.textContent ===
+        "2.50",
+    );
+    await js(() =>
+      document
+        .querySelector('.canvas-interactive input[type="range"]')
+        .dispatchEvent(new PointerEvent("pointerup", { bubbles: true })),
+    );
+    const changedProbabilities = await js(() =>
+      [...document.querySelectorAll("[data-probability]")].map(
+        (el) => el.textContent,
+      ),
+    );
+    assert.notDeepEqual(
+      changedProbabilities,
+      probabilities,
+      "Slider must change live numerical results",
+    );
+    assert.equal(
+      await js(() => !!document.querySelector(".learning-alert")),
+      false,
+    );
+    await shot("interactive-changed");
     await js(() =>
       document.body.dispatchEvent(
         new KeyboardEvent("keydown", {
@@ -183,6 +342,42 @@ async function checkAI({ output }) {
         (b) => b.id === saved.notes.find((n) => n.id === noteId).blocks[0],
       ).source,
       /Before selected words after/,
+    );
+
+    await js(() =>
+      document.body.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "z",
+          metaKey: true,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    await wait(900);
+    win.reload();
+    await until(
+      () =>
+        document.querySelector(".learning-slider output")?.textContent ===
+        "2.50",
+    );
+    assert.deepEqual(
+      await js(() =>
+        [...document.querySelectorAll("[data-probability]")].map(
+          (el) => el.textContent,
+        ),
+      ),
+      changedProbabilities,
+      "Reload restores the native block and learner progress",
+    );
+    saved = await doc();
+    assert.ok(
+      saved.notes
+        .find((n) => n.id === noteId)
+        .blocks.some(
+          (id) => saved.blocks.find((b) => b.id === id)?.type === "interactive",
+        ),
     );
 
     // Inline /ai retains text on both sides and omits the command from context.
@@ -239,20 +434,47 @@ async function checkAI({ output }) {
     await js(() => window.aiFixture.mode("diagram"));
     await prompt("Draw two connected blocks");
     await enter();
-    await until(() => !document.querySelector('[aria-label="文稿 AI"]'));
+    await until(() =>
+      document
+        .querySelector(".canvas-ai-error")
+        ?.textContent.includes("未生成可操作的交互块"),
+    );
     await wait(900);
     saved = await doc();
     const diagramNote = await js(() =>
       new URLSearchParams(location.hash.split("?")[1]).get("note"),
     );
-    assert.ok(
+    assert.equal(
       saved.notes
         .find((n) => n.id === diagramNote)
         .blocks.some(
           (id) => saved.blocks.find((b) => b.id === id)?.type === "canvas",
         ),
+      false,
+      "Static diagram must not replace an interactive block",
     );
-    await shot("diagram");
+    assert.equal(
+      await js(() => !!document.querySelector(".note-ai-preview")),
+      false,
+    );
+    await shot("rejected-diagram");
+    await click("关闭 AI");
+
+    await prepare("/ai");
+    await aiEnter();
+    await js(() => window.aiFixture.mode("unsupported"));
+    await prompt("An unsupported simulation");
+    await enter();
+    await until(() =>
+      document
+        .querySelector(".canvas-ai-error")
+        ?.textContent.includes("暂不支持这种交互"),
+    );
+    assert.equal(
+      await js(() => !!document.querySelector(".note-ai-preview")),
+      false,
+    );
+    await click("关闭 AI");
 
     await prepare("https://example.com/a");
     assert.equal(
@@ -275,18 +497,37 @@ async function checkAI({ output }) {
     );
     await click("AI");
     await until(() => !!document.querySelector('[aria-label="文稿 AI"]'));
+    win.setSize(680, 560);
+    await click("Switch to dark theme");
+    await wait(450);
+    const narrow = await js(() => {
+      const r = document
+        .querySelector('[aria-label="文稿 AI"]')
+        .getBoundingClientRect();
+      return {
+        left: r.left,
+        right: r.right,
+        top: r.top,
+        bottom: r.bottom,
+        width: innerWidth,
+        height: innerHeight,
+      };
+    });
+    assert.ok(narrow.left >= 15 && narrow.right <= narrow.width - 15);
+    assert.ok(narrow.top >= 15 && narrow.bottom <= narrow.height - 15);
+    await shot("anchored-dark-narrow");
+    win.setSize(1120, 820);
+    await wait(450);
     await prompt("Use the selected context");
     const count = await js(() => window.aiFixture.requests());
     await js(() =>
-      document
-        .querySelector('[aria-label="生成需求"]')
-        .dispatchEvent(
-          new KeyboardEvent("keydown", {
-            key: "Enter",
-            isComposing: true,
-            bubbles: true,
-          }),
-        ),
+      document.querySelector('[aria-label="生成需求"]').dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          isComposing: true,
+          bubbles: true,
+        }),
+      ),
     );
     assert.equal(
       await js(() => window.aiFixture.requests()),
@@ -316,7 +557,7 @@ async function checkAI({ output }) {
       "Leaving notes must not insert late content",
     );
     console.log(
-      "Note AI: PASS (selection/cursor context, preview, native experiments, atomic undo, stop/late response, stale source, embedded diagram, URL)",
+      "Note AI: PASS (anchored composer/dark/narrow, skeleton, persistent chat/revision/history, selection/cursor context, native interactions, live results/persist/reload, atomic undo/redo, stop/late response, stale source/result, diagram rejection, unsupported interaction, URL)",
     );
     app.exit(0);
   } catch (e) {

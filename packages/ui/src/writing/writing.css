@@ -1763,11 +1763,10 @@ body.notes-tree-dragging * {
   margin-bottom: 16px;
 }
 @media (max-width: 700px) {
-  .note-ai-layer .canvas-ai-composer,
   .note-ai-layer .canvas-ai-composer.is-docked {
     left: 16px;
-    top: auto;
-    bottom: 20px;
+    top: 76px;
+    bottom: auto;
     width: calc(100% - 32px);
     transform: none;
   }
@@ -1963,4 +1962,29 @@ body.notes-tree-dragging * {
   height: 1px;
   background: var(--border);
   margin: 5px;
+}
+
+.note-ai-skeleton {
+  display: grid;
+  gap: 12px;
+  padding: 16px 0;
+  min-height: 100px;
+  animation: canvas-ai-pulse 1.4s ease-in-out infinite;
+}
+.note-ai-skeleton span {
+  height: 10px;
+  width: 90%;
+  border-radius: 6px;
+  background: var(--interaction-hover);
+}
+.note-ai-skeleton span:first-child {
+  width: 38%;
+}
+.note-ai-skeleton span:last-child {
+  width: 68%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-ai-skeleton {
+    animation: none;
+  }
 }

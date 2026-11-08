@@ -53,11 +53,11 @@ import { ResizableNotesLayout } from "../writing/ResizableNotesLayout";
 import { writingRows, type WritingRow } from "../writing/writingRows";
 import { NoteAIPreview } from "../writing/NoteAIPreview";
 import { GenerateCanvas } from "../canvas/GenerateCanvas";
-import { CanvasScenePreview } from "../canvas/CanvasScenePreview";
 import { CanvasContent } from "../canvas/CanvasContent";
 import {
   noteAIContext,
   generatedNoteBlocks,
+  reviseNoteGeneration,
   type NoteAIRange,
 } from "../writing/noteAI";
 import type { CanvasDocument, NoteGenerationContext } from "@nomi/core";
@@ -105,11 +105,15 @@ export function Notes({ profile }: { profile: string }) {
     rowId: string;
     order: string[];
     context: NoteGenerationContext;
+    cursor: { editor: Editor; position: number };
+    result?: CanvasBlock[];
     anchor: NonNullable<typeof insertion.current>;
   }>();
+  const [aiBusy, setAIBusy] = useState(false);
   const [aiPreview, setAIPreview] = useState<CanvasDocument>();
   useEffect(() => {
     setNoteAI(undefined);
+    setAIBusy(false);
     setAIPreview(undefined);
   }, [selected, profile]);
   const [dropMark, setDropMark] = useState<{ id: string; top: number }>();
@@ -439,12 +443,14 @@ export function Notes({ profile }: { profile: string }) {
     const point = pointForRow(row, range.to);
     const source = current.blocks.find((b) => b.id === point.id);
     setAIPreview(undefined);
+    setAIBusy(false);
     setNoteAI({
       id: newCanvasId("generation"),
       noteId: owner.id,
       rowId: row.block.id,
       order: [...owner.blocks],
       context: noteAIContext(current, owner, row, editor, range),
+      cursor: { editor, position: range.to },
       anchor: {
         noteId: owner.id,
         point,
@@ -1171,31 +1177,27 @@ export function Notes({ profile }: { profile: string }) {
                           {block.type === "shape" ? block.text : ""}
                         </p>
                       )}
-                      {aiPreview && noteAI?.rowId === id && (
-                        <NoteAIPreview
-                          editor={editors.current.get(id)}
-                          position={noteAI.anchor.point.pos ?? 0}
-                        >
-                          {aiPreview.blocks.some((b) => b.type === "shape") ||
-                          aiPreview.board.connectors?.length ? (
-                            <CanvasScenePreview
-                              scene={aiPreview}
-                              content={(contentId) => (
-                                <CanvasContent
-                                  document={aiPreview}
-                                  contentId={contentId}
-                                  profile="note-ai-preview"
-                                  repository={data.repository}
-                                  editing={false}
-                                  onEdit={() => {}}
-                                  onAttach={() => {}}
-                                  onInteractive={() => {}}
-                                  endGroup={() => {}}
-                                />
-                              )}
-                            />
-                          ) : (
-                            aiPreview.blocks.map((block) => (
+                      {aiBusy &&
+                        noteAI &&
+                        (noteAI.result?.[0]?.id ?? noteAI.rowId) === id && (
+                          <NoteAIPreview
+                            editor={editors.current.get(id)}
+                            position={
+                              noteAI.result ? 0 : noteAI.cursor.position
+                            }
+                          >
+                            {!aiPreview && (
+                              <div
+                                className="note-ai-skeleton"
+                                role="status"
+                                aria-label="正在生成"
+                              >
+                                <span />
+                                <span />
+                                <span />
+                              </div>
+                            )}
+                            {aiPreview?.blocks.map((block) => (
                               <div
                                 className="note-ai-preview-block"
                                 key={block.id}
@@ -1212,10 +1214,9 @@ export function Notes({ profile }: { profile: string }) {
                                   endGroup={() => {}}
                                 />
                               </div>
-                            ))
-                          )}
-                        </NoteAIPreview>
-                      )}
+                            ))}
+                          </NoteAIPreview>
+                        )}
                     </section>
                   );
                 })}
@@ -1248,34 +1249,55 @@ export function Notes({ profile }: { profile: string }) {
           <GenerateCanvas
             key={noteAI.id}
             noteContext={noteAI.context}
+            anchor={noteAI.cursor}
+            onBusyChange={setAIBusy}
             onClose={() => {
               setNoteAI(undefined);
+              setAIBusy(false);
               setAIPreview(undefined);
             }}
             onStart={() => setAIPreview(undefined)}
             onPreview={setAIPreview}
             onInsert={(scene) => {
               try {
-                const current = data.current.current?.notes.find(
-                  (n) => n.id === noteAI.noteId,
-                );
-                if (
-                  JSON.stringify(current?.blocks) !==
-                  JSON.stringify(noteAI.order)
-                )
-                  return false;
-                const [first, ...rest] = generatedNoteBlocks(scene);
+                const document = data.current.current;
+                if (!document) return false;
+                const blocks = generatedNoteBlocks(scene);
+                const [first, ...rest] = blocks;
                 if (!first) return false;
-                insertContent(
-                  noteAI.noteId,
-                  first,
-                  undefined,
-                  [],
-                  noteAI.anchor,
-                  [],
-                  rest,
+                if (noteAI.result) {
+                  const commands = reviseNoteGeneration(
+                    document,
+                    noteAI.noteId,
+                    noteAI.result,
+                    blocks,
+                  );
+                  data.endGroup();
+                  data.edit(commands);
+                  data.endGroup();
+                } else {
+                  const current = document.notes.find(
+                    (n) => n.id === noteAI.noteId,
+                  );
+                  if (
+                    JSON.stringify(current?.blocks) !==
+                    JSON.stringify(noteAI.order)
+                  )
+                    return false;
+                  insertContent(
+                    noteAI.noteId,
+                    first,
+                    undefined,
+                    [],
+                    noteAI.anchor,
+                    [],
+                    rest,
+                  );
+                  data.endGroup();
+                }
+                setNoteAI(
+                  (session) => session && { ...session, result: blocks },
                 );
-                setNoteAI(undefined);
                 return true;
               } catch {
                 return false;

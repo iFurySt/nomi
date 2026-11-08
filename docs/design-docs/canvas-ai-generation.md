@@ -20,21 +20,25 @@ Responses 的真实文本 delta 到达后，`canvasGenerationPrefix` 只提取�
 
 `generation: "note"` 必须携带 `noteContext`：标题最多 256 字符、选区最多 4,000 字符、选区/光标前后各 1,500 字符（按 JavaScript 字符串长度计）。范围可跨当前文稿相邻块；当前富文本用可见文本，相邻 Markdown 用源码，非文本块只提供类型标记。不会读取附件、嵌套画布内容、子页或其他文稿。上下文为调用入口时的快照，不记录到聊天历史；host 单独验证结构和预算，作为不可信参考数据附在用户请求中，固定协议与无工具约束不变。
 
-流式命令在光标所在段落附近以 ProseMirror decoration 展示，既不修改编辑文档也不保存半成品。完成后在原光标或选区末尾插入，必要时拆开原 Markdown 块。纯文本/实验成为原生正文块；含形状/连线的结果整体成为可再次编辑的内嵌画布。整次插入为一笔文稿事务，可一次撤销。生成结束关闭输入框，再次调用会重新捕获上下文。
+流式命令在光标所在段落附近以 ProseMirror decoration 展示，既不修改编辑文档也不保存半成品。完成后在原光标或选区末尾插入，必要时拆开原 Markdown 块。文稿模式使用独立的 `noteGenerationPrompt`，以原生交互块为目标；只接收 interactive 与可选的简短 Markdown 说明，最多 10 块。完整结果至少包含一个有状态绑定的 Slider / SegmentedControl，形状、连线和纯静态输出均拒绝，不再自动封装成内嵌画布。流式前缀允许先到达说明，最终结果仍独立验证交互要求。整次插入为一笔文稿事务，可一次撤销。
 
-生成期间若目标文字或文稿块顺序改变，则拒绝插入并提示重新选择；切换文稿、停止、关闭或离开页面会取消请求并丢弃迟到结果。当前不替换选区、不修改现有内容，不支持跨独立编辑器的浏览器 DOM 选区。
+输入框初次锚定光标 / 选区末尾下方（10px 间隔），滚动和窗口变化时跟随，空间不足时避让视口。发送后动画停靠右上角；首个完整命令到达前，原段落展示轻量呼吸骨架，随后逐块预览。完成后保留聊天输入，支持继续调整。会话只保留在内存，下一轮携带最近一次成功的用户指令、完整助手结果与最初捕获的有界上下文；助手消息使用 `source: "chatgpt"`，遵循既有单条 32,000 字与总输入预算。失败 / 取消结果不进入历史。
+
+后续指令要求模型返回完整新版块组，并原子替换本会话上次生成的块。写入前校验这些块仍连续且定义未变；允许周围正文独立编辑，但不覆盖手动修改、删除、重排或撤销后的结果。每轮修改单独进入撤销历史；交互定义更新使用新块 ID，学习进度从新定义的初始状态开始。关闭或切换文稿结束临时会话，再次调用重新捕获上下文。
+
+生成期间若目标文字或文稿块顺序改变，则拒绝插入并提示重新选择；切换文稿、停止、关闭或离开页面会取消请求并丢弃迟到结果。首次生成不替换选区；后续调整只替换本会话生成的块组。不支持跨独立编辑器的浏览器 DOM 选区。
 
 ## 交互块能力边界
 
-GenUI 是已有 portable learning IR，只有 Panel / Row / Text / Button / SegmentedControl / Slider / Math / Plot，运算目前为 math.softmax / array.at / array.replaceAt。提示词携带合法示例与能力集合。超出能力范围应生成诚实的说明图，不能把静态图声称为真实仿真。新增通用数学、物理或动画能力需要扩展 IR、预算与跨语言 conformance。
+GenUI 是已有 portable learning IR，只有 Panel / Row / Text / Button / SegmentedControl / Slider / Math / Plot，运算目前为 math.softmax / array.at / array.replaceAt。提示词携带合法示例与能力集合。文稿模式超出能力范围时返回 `{"error":"unsupported_interaction"}` 并显示简短提示，原文不变；不以静态画布替代交互，也不把预录结果冒充动态计算。用户明确要求的步骤浏览器可用 enum / match 表达；可计算的数值实验使用状态绑定与已注册运算。Canvas 模式仍允许诚实的说明图回退。新增通用数学、物理或动画能力需要扩展 IR、预算与跨语言 conformance。
 
 ## 验证与入口
 
 - `pnpm exec vitest run packages/core/src/canvas/generation.test.ts packages/host/src/chatgpt.test.ts`
 - `node scripts/check-canvas-generation.mjs`：隔离测试账号与模拟响应，真实增量事件模拟、逐块 / 连线、原子插入 / 撤销、非法输出、取消 / 关闭后的迟到结果、IME、浅深色 / 窄屏；不是在线调用验证。
-- `node scripts/check-note-generation.mjs`：模拟文稿请求，覆盖光标/选区上下文、段落间临时预览、原生实验、嵌入图示、一次撤销、停止与过期位置、选区入口、IME 和离开页面的迟到响应。
+- `node scripts/check-note-generation.mjs`：模拟文稿请求，覆盖光标/选区定位、深色窄屏、生成骨架、保留会话、连续调整原位替换及历史、失败/取消保留结果、过期结果保护、段落间临时预览、原生交互块的滑块与数值联动、重开恢复进度、拒绝图示回退 / 不支持交互、一次撤销及重做、停止与过期位置、选区入口、IME 和离开页面的迟到响应。
 - `pnpm exec vitest run packages/ui/src/writing/noteAI.test.ts packages/host/src/chatgpt.test.ts`：上下文边界、其他文稿隔离、host 协议及关闭工具。
-- 2026-11-07 已重启 Nomi(Dev)，实际窗口验证 `/ai` 与未登录连接入口；开发版未连接账号，文稿模式尚无在线推理验收。
-- 旧版交互中，用户完成实际授权后曾验证模型列表与三步流程图的在线生成 / 预览；临时图未写入用户画布。新版流式界面尚未进行真实账号端到端调用；在线交互块尚未单独验收。
+- 2026-11-07 已重启 Nomi(Dev)，通过 Computer Use 在线生成原生温度交互块，再发送第二条指令修改标题；确认仅更新原结果、保留聊天输入，调整滑块后概率值实时变化。测试仅使用新建的开发验收文稿。
+- 旧版交互中，用户完成实际授权后曾验证模型列表与三步流程图的在线生成 / 预览；临时图未写入用户画布。文稿模式的在线连续调整验收见上一项。
 
 实现：core `canvas/generation.ts`，host `canvas-generation-prompt.ts`，UI `canvas/GenerateCanvas.tsx`。官方接入参考：https://developers.openai.com/siwc/token-sharing-open-source/sign-in

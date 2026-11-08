@@ -39,7 +39,7 @@ int main() { @autoreleasepool {
   [driver showExtractionReceivedProgress:.6]; [driver showExtractionReceivedProgress:NAN];
   assert([driver.snapshot[@"progress"] doubleValue] == .6);
   [driver showReadyToInstallAndRelaunch:^(SPUUserUpdateChoice choice) { assert(choice == SPUUserUpdateChoiceInstall); installs++; }];
-  assert([driver.phase isEqual:@"ready"] && installs == 1); // Never install without click.
+  assert([driver.phase isEqual:@"ready"] && installs == 1); // Host must flush documents before continuing.
   assert([driver install] && installs == 2 && ![driver install]);
   __block int resumed = 0;
   assert([driver updater:(SPUUpdater *)[NSObject new] shouldPostponeRelaunchForUpdate:(SUAppcastItem *)item untilInvokingBlock:^{ resumed++; }]);
@@ -50,6 +50,7 @@ int main() { @autoreleasepool {
   driver.terminationStarted = [NSDate dateWithTimeIntervalSinceNow:-9];
   assert([driver.snapshot[@"phase"] isEqual:@"ready"]);
   assert([driver install] && retries == 1);
+  assert([driver.failure isEqual:@""]);
   [driver dismissUpdateInstallation]; assert(![driver.snapshot[@"pendingInstall"] boolValue]);
   NSError *failure = [NSError errorWithDomain:@"fixture" code:1 userInfo:@{NSLocalizedDescriptionKey:@"Download failed"}];
   [driver showUpdaterError:failure acknowledgement:^{ acknowledgements++; }]; [driver dismissUpdateInstallation];

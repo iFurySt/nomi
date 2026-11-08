@@ -51,6 +51,11 @@ window.nomiDesktop.requestChatGPT = async (method, params: any) => {
     const output = mode;
     requests++;
     lastRequest = params;
+    if (output === "unsupported")
+      return {
+        ok: true,
+        value: { text: '{"error":"unsupported_interaction"}' },
+      };
     const block = (id: string, x: number) => ({
       type: "add_block",
       block: { id, type: "shape", shape: "rectangle", text: id, tone: "blue" },
@@ -88,7 +93,10 @@ window.nomiDesktop.requestChatGPT = async (method, params: any) => {
               block: {
                 id: "explanation",
                 type: "markdown",
-                source: "## Generated explanation\n\nA useful example.",
+                source:
+                  params.messages.length > 1
+                    ? "## Revised explanation\n\nAn adjusted example."
+                    : "## Generated explanation\n\nA useful example.",
               },
               placement: {
                 id: "p-explanation",

@@ -97,4 +97,4 @@ Canvas 上方的「文稿」复用同一 CanvasDocument / Note / Block 与平台
 
 ### Canvas AI 生成
 
-Canvas AI 入口复用 ChatGPT 订阅 provider，固定 host 提示生成受限新增 DSL，完整命令逐条校验后在画布临时层流式显示，最终整包校验后原子插入并支持撤销；Canvas 模式不读取现有内容。文稿 AI 在显式调用时携带标题、选区及前后各 1500 字符，生成原生正文块或内嵌画布；不读取其他文稿、附件或执行生成代码。能力边界与验证见 [画布 AI 生成](design-docs/canvas-ai-generation.md)。
+Canvas AI 入口复用 ChatGPT 订阅 provider，固定 host 提示生成受限新增 DSL，完整命令逐条校验后在画布临时层流式显示，最终整包校验后原子插入并支持撤销；Canvas 模式不读取现有内容。文稿 AI 在显式调用时携带标题、选区及前后各 1500 字符，使用独立提示词生成原生交互块与简短说明，拒绝静态图替代交互；输入框就地展开后停靠右上角，携带最近成功结果继续调整，仅原子替换本会话生成且未被手动修改的块组。不读取其他文稿、附件或执行生成代码。能力边界与验证见 [画布 AI 生成](design-docs/canvas-ai-generation.md)。

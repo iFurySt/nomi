@@ -1057,6 +1057,13 @@ it("bounds note context separately and sends it as reference data without tools"
       if (String(url).endsWith("/models")) return models();
       const body = JSON.parse(String(init?.body));
       expect(body.instructions).toContain("inserted into a note");
+      expect(body.instructions).toContain(
+        "Never generate shapes, connectors or an embedded canvas",
+      );
+      expect(body.instructions).toContain('"error":"unsupported_interaction"');
+      expect(body.instructions).not.toContain(
+        "provide an honest explanatory diagram",
+      );
       expect(body.tools).toBeUndefined();
       expect(JSON.stringify(body.input)).toContain("chosen text");
       expect(JSON.stringify(body.input)).toContain(

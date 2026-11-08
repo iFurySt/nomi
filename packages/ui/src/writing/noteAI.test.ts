@@ -1,8 +1,12 @@
 import { expect, it } from "vitest";
 import { Schema } from "@tiptap/pm/model";
 import type { Editor } from "@tiptap/core";
-import { emptyCanvasScene } from "@nomi/core";
-import { noteAIContext, generatedNoteBlocks } from "./noteAI";
+import { emptyCanvasScene, temperatureProgram } from "@nomi/core";
+import {
+  noteAIContext,
+  generatedNoteBlocks,
+  reviseNoteGeneration,
+} from "./noteAI";
 
 it("captures bounded neighboring blocks and selected text, never other notes/assets", () => {
   const schema = new Schema({
@@ -39,12 +43,18 @@ it("captures bounded neighboring blocks and selected text, never other notes/ass
   expect(result.after.startsWith(" after")).toBe(true);
   expect(JSON.stringify(result)).not.toContain("OTHER NOTE");
 });
-it("keeps diagram identities together but creates fresh IDs for prose", () => {
+it("inserts live blocks directly with fresh IDs, without a canvas wrapper", () => {
   const scene = emptyCanvasScene("scene");
-  scene.blocks = [{ id: "prose", type: "markdown", source: "Generated" }];
-  const first = generatedNoteBlocks(scene)[0];
-  expect(first.type).toBe("markdown");
-  expect(first.id).not.toBe("prose");
+  scene.blocks = [
+    { id: "prose", type: "markdown", source: "Generated" },
+    { id: "lab", type: "interactive", program: temperatureProgram },
+  ];
+  const blocks = generatedNoteBlocks(scene);
+  expect(blocks.map((b) => b.type)).toEqual(["markdown", "interactive"]);
+  expect(blocks[0].id).not.toBe("prose");
+  expect(blocks[1].id).not.toBe("lab");
+  expect(blocks[1]).toMatchObject({ program: temperatureProgram });
+  expect(generatedNoteBlocks(scene)[1].id).not.toBe(blocks[1].id);
   scene.blocks.push({
     id: "shape",
     type: "shape",
@@ -52,7 +62,55 @@ it("keeps diagram identities together but creates fresh IDs for prose", () => {
     text: "Diagram",
     tone: "neutral",
   });
-  const diagram = generatedNoteBlocks(scene)[0];
-  expect(diagram.type).toBe("canvas");
-  if (diagram.type === "canvas") expect(diagram.scene).toEqual(scene);
+  expect(() => generatedNoteBlocks(scene)).toThrow(
+    "文稿 AI 仅支持正文和交互块",
+  );
+});
+
+it("revises the generated group atomically while preserving surrounding prose", () => {
+  const document = emptyCanvasScene("revision");
+  const before = {
+    id: "before",
+    type: "markdown" as const,
+    source: "User text",
+  };
+  const generated = {
+    id: "ai",
+    type: "interactive" as const,
+    program: temperatureProgram,
+  };
+  const after = {
+    id: "after",
+    type: "markdown" as const,
+    source: "Still writing",
+  };
+  const next = { ...generated, id: "next" };
+  document.blocks = [before, generated, after];
+  document.notes = [
+    { id: "n", title: "Test", blocks: [before.id, generated.id, after.id] },
+  ];
+  expect(reviseNoteGeneration(document, "n", [generated], [next])).toEqual([
+    { type: "add_block", block: next },
+    { type: "set_note_blocks", id: "n", blocks: ["before", "next", "after"] },
+  ]);
+  document.blocks[1] = {
+    ...generated,
+    program: { ...temperatureProgram, id: "user-edited" },
+  };
+  expect(() =>
+    reviseNoteGeneration(document, "n", [generated], [next]),
+  ).toThrow("插入位置");
+  document.blocks[1] = generated;
+  document.notes[0].blocks = ["before", "after"];
+  expect(() =>
+    reviseNoteGeneration(document, "n", [generated], [next]),
+  ).toThrow("插入位置");
+  document.notes[0].blocks = ["before", "ai", "after"];
+  expect(() =>
+    reviseNoteGeneration(document, "n", [before, generated], [next]),
+  ).not.toThrow();
+  document.notes[0].blocks = ["before", "after", "ai"];
+  expect(() =>
+    reviseNoteGeneration(document, "n", [before, generated], [next]),
+  ).toThrow("插入位置");
 });

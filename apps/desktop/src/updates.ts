@@ -38,6 +38,8 @@ export function setupUpdates(
   let preparing = false;
   let paused = false;
   let saveError = "";
+  // One download click authorizes this session's restart, never a later retry.
+  let restartAfterDownload = false;
   const hour = 60 * 60 * 1000;
   const startedAt = Date.now();
   let lastCheck: number | undefined;
@@ -79,6 +81,7 @@ export function setupUpdates(
     if (bridge.state().phase !== "ready" && !bridge.state().pendingInstall)
       throw Error("更新尚未准备好。");
     preparing = true;
+    restartAfterDownload = false;
     saveError = "";
     try {
       const saved = await Promise.all(BrowserWindow.getAllWindows().map(flush));
@@ -96,7 +99,17 @@ export function setupUpdates(
   };
   // Sparkle's final relaunch gate catches edits made after the initial click.
   const timer = setInterval(() => {
-    if (bridge?.state().pendingInstall && !preparing && !paused) void install();
+    const state = bridge?.state();
+    if (!state) return;
+    if (["idle", "error", "up-to-date"].includes(state.phase ?? ""))
+      restartAfterDownload = false;
+    if (
+      !preparing &&
+      !paused &&
+      (state.pendingInstall ||
+        (restartAfterDownload && state.phase === "ready"))
+    )
+      void install();
   }, 250);
   timer.unref();
   app.once("will-quit", () => {
@@ -110,7 +123,9 @@ export function setupUpdates(
     version: app.getVersion(),
     available: !!bridge,
     ...bridge?.state(),
-    ...(preparing ? { phase: "installing" as const } : {}),
+    ...(preparing || (restartAfterDownload && bridge?.state().phase === "ready")
+      ? { phase: "installing" as const }
+      : {}),
     ...(paused ? { phase: "ready" as const, error: saveError } : {}),
     reason: bridge
       ? undefined
@@ -146,10 +161,16 @@ export function setupUpdates(
       if (method === "check") check();
       else if (method === "automatic" && typeof value === "boolean" && bridge)
         bridge.automatic(value);
-      else if (method === "download" && bridge) bridge.download();
-      else if (method === "install" && bridge) await install();
-      else if (method === "cancel" && bridge) bridge.cancel();
-      else throw Error("Unknown update operation.");
+      else if (method === "download" && bridge) {
+        bridge.download();
+        restartAfterDownload = true;
+        paused = false;
+        saveError = "";
+      } else if (method === "install" && bridge) await install();
+      else if (method === "cancel" && bridge) {
+        bridge.cancel();
+        restartAfterDownload = false;
+      } else throw Error("Unknown update operation.");
       return status();
     },
   );

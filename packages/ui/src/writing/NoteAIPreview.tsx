@@ -48,5 +48,11 @@ export function NoteAIPreview({
       if (!editor.isDestroyed) editor.unregisterPlugin(key);
     };
   }, [editor, position]);
+  if (!editor)
+    return (
+      <div className="note-ai-preview" aria-label="正在生成的内容">
+        {children}
+      </div>
+    );
   return host ? createPortal(children, host) : null;
 }

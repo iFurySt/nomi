@@ -138,3 +138,40 @@ export function canvasGenerationCommands(
     })),
   ];
 }
+
+export const NOTE_INTERACTION_UNSUPPORTED =
+  "暂不支持这种交互，请换一种方式描述。";
+export const NOTE_INTERACTION_REQUIRED = "未生成可操作的交互块，请重试。";
+
+/** Same safe transport, with a separate note result contract. Never fall back to diagrams. */
+export function parseNoteGeneration(
+  text: string,
+  partial = false,
+): CanvasDocument {
+  if (
+    text.length <= 32000 &&
+    /^\s*\{\s*"error"\s*:\s*"unsupported_interaction"\s*\}\s*$/.test(text)
+  )
+    throw Error(NOTE_INTERACTION_UNSUPPORTED);
+  const scene = parseCanvasGeneration(text);
+  if (
+    scene.board.connectors?.length ||
+    scene.blocks.length > 10 ||
+    scene.blocks.some((b) => b.type !== "markdown" && b.type !== "interactive")
+  )
+    throw Error(NOTE_INTERACTION_REQUIRED);
+  const interactive = scene.blocks.filter((b) => b.type === "interactive");
+  if (
+    (!partial && !interactive.length) ||
+    interactive.some(
+      (b) =>
+        !b.program.nodes.some(
+          (n) =>
+            (n.component === "Slider" || n.component === "SegmentedControl") &&
+            n.bind?.value,
+        ),
+    )
+  )
+    throw Error(NOTE_INTERACTION_REQUIRED);
+  return scene;
+}

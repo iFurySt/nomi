@@ -43,7 +43,8 @@ window.nomiDesktop = {
         progress: 0.42,
         cancellable: true,
       };
-    if (method === "install") state = { ...state, phase: "installing" };
+    if (method === "install")
+      state = { ...state, phase: "installing", error: undefined };
     if (method === "cancel")
       state = { ...state, phase: "idle", cancellable: false, canCheck: true };
     if (method === "check")

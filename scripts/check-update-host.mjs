@@ -39,7 +39,11 @@ const bridge = {
   },
   check: () => calls.push("check"),
   checkBackground: () => calls.push("background"),
-  download: () => calls.push("download"),
+  download: () => {
+    if (state.phase !== "available") throw Error("Not available");
+    calls.push("download");
+    state.phase = "downloading";
+  },
   cancel: () => calls.push("cancel"),
   install: () => {
     calls.push("install");
@@ -150,6 +154,62 @@ await handler(event, "install");
 assert.equal(calls.filter((x) => x === "resume").length, 1);
 state = { phase: "idle", pendingInstall: false };
 await assert.rejects(() => handler(event, "install"), /尚未准备/);
+// A click authorizes download -> extraction -> saved restart without renderer actions.
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+const installsBefore = calls.filter((x) => x === "install").length;
+state = { phase: "ready", pendingInstall: false };
+poll();
+await settle();
+assert.equal(calls.filter((x) => x === "install").length, installsBefore);
+state.phase = "available";
+await handler(event, "download");
+await assert.rejects(() => handler(event, "download"), /Not available/);
+state.phase = "extracting";
+poll();
+await settle();
+assert.equal(calls.filter((x) => x === "install").length, installsBefore);
+state.phase = "ready";
+saving = () => new Promise((resolve) => pending.push(resolve));
+assert.equal(updater.status().phase, "installing");
+poll();
+poll();
+assert.equal(pending.length, 2);
+pending.splice(0).forEach((resolve) => resolve(true));
+await settle();
+assert.equal(calls.filter((x) => x === "install").length, installsBefore + 1);
+// A native termination timeout must not enter an automatic retry loop.
+state.phase = "ready";
+state.error = "Quit failed";
+poll();
+await settle();
+assert.equal(calls.filter((x) => x === "install").length, installsBefore + 1);
+// Save failure pauses auto-install, even if later saves succeed.
+state = { phase: "available", pendingInstall: false };
+await handler(event, "download");
+saving = async () => false;
+state.phase = "ready";
+poll();
+await settle();
+assert.match(updater.status().error, /尚未保存/);
+saving = async () => true;
+poll();
+await settle();
+assert.equal(calls.filter((x) => x === "install").length, installsBefore + 1);
+await handler(event, "install");
+assert.equal(calls.filter((x) => x === "install").length, installsBefore + 2);
+for (const terminal of ["cancel", "error", "idle"]) {
+  state = { phase: "available", pendingInstall: false };
+  await handler(event, "download");
+  if (terminal === "cancel") await handler(event, "cancel");
+  else {
+    state.phase = terminal;
+    poll();
+  }
+  state.phase = "ready";
+  poll();
+  await settle();
+  assert.equal(calls.filter((x) => x === "install").length, installsBefore + 2);
+}
 // The host owns one schedule; wake/focus never replay missed hourly checks.
 state = {
   phase: "idle",
