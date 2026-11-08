@@ -133,7 +133,9 @@ it("round trips embedded native scenes, nested sources and originals through ext
       (b) => b.id === "canvas.inline",
     ),
   ).toMatchObject({ scene: { assets: [asset] } });
-});
+// This integration test performs several durable package saves, imports and
+// directory scans; shared Intel runners can exceed the unit-test 5s budget.
+}, 15_000);
 it("round trips all existing document semantics and standalone notes with physical children", async () => {
   const f = await fixture();
   expect(await f.load()).toEqual(f.doc);

@@ -29,7 +29,7 @@ await writeFile(
   join(output, "index.html"),
   '<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="renderer.css"><body><div id="root"></div><script src="renderer.js"></script></body></html>',
 );
-async function checkAI({ output }) {
+async function checkAI({ output, width }) {
   const { app, BrowserWindow } = require("electron");
   const { writeFileSync } = require("node:fs");
   const { join } = require("node:path");
@@ -38,7 +38,7 @@ async function checkAI({ output }) {
   app.setPath("userData", join(output, "profile"));
   await app.whenReady();
   const win = new BrowserWindow({
-    width: 1120,
+    width,
     height: 820,
     show: false,
     webPreferences: {
@@ -141,6 +141,8 @@ async function checkAI({ output }) {
         left: caret.left,
         popupTop: popup.top,
         popupLeft: popup.left,
+        popupWidth: popup.width,
+        viewportWidth: window.innerWidth,
       };
     });
     assert.ok(
@@ -148,8 +150,8 @@ async function checkAI({ output }) {
       "Composer opens below the selection " + JSON.stringify(anchor),
     );
     assert.ok(
-      Math.abs(anchor.popupLeft - anchor.left) < 2,
-      "Composer follows cursor horizontally",
+      Math.abs(anchor.popupLeft - Math.max(16, Math.min(anchor.left, anchor.viewportWidth - anchor.popupWidth - 16))) < 2,
+      "Composer follows cursor within viewport " + JSON.stringify(anchor),
     );
     await shot("composer");
     await prompt("Create an interactive temperature experiment");
@@ -568,7 +570,7 @@ async function checkAI({ output }) {
 }
 await writeFile(
   join(output, "main.cjs"),
-  `(${checkAI})(${JSON.stringify({ output })});setTimeout(()=>require('electron').app.exit(1),60000);`,
+  `(${checkAI})(${JSON.stringify({ output, width: Number(process.env.NOMI_AI_TEST_WIDTH || 1120) })});setTimeout(()=>require('electron').app.exit(1),60000);`,
 );
 
 const env = { ...process.env };
