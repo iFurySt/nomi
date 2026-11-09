@@ -141,3 +141,11 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、点击下载后自
 公开下载的 arm64 / x64 DMG 均通过长度、SHA-256、Sparkle Ed25519 签名及公证票据验证；两个 appcast 的签名、0.3.1 版本和下载地址通过。挂载 arm64 DMG 后，App 的严格深度签名、公证票据、Gatekeeper 和内嵌版本检查通过，验证卷已卸载。校验制品位于 ignored `.artifacts/desktop-031-verification/`。
 
 本版本包含公式源码复制与编辑修复、表格列宽和行列操作、顶部面包屑及轻量保存提示、加载骨架、AI 未连接入口与自动更新调度。此次发布侧会话未启动或替换正式版，公开制品校验不等同用户机器上的跨版本安装完成。
+
+## 0.3.2 发布验收
+
+[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.3.2) 已由 [双架构流水线](https://github.com/iFurySt/nomi/actions/runs/42493331537) 发布，tag 固定于 `a84110d`。Apple Silicon / Intel 均通过类型、382 项单测、生产构建、AI / 更新专项与既有发布门禁，以及签名、公证、stapling 和原生更新 driver 检查。首次预检修正了窄屏 AI 浮层定位断言与共享 Intel runner 文件系统往返测试的时间预算，仅重新固定尚未公开的 tag。
+
+公开下载的 arm64 / x64 DMG 均通过长度、SHA-256、Sparkle Ed25519 签名和公证票据验证；两个 appcast 的签名、0.3.2 版本和地址通过。挂载 arm64 App 后，严格深度签名、公证票据、Gatekeeper 与内嵌版本检查通过，验证卷已卸载。校验制品位于 ignored `.artifacts/desktop-032-verification/`。
+
+本版本包括文稿原生交互块 AI、就地输入与连续调整、一键下载后保存并自动重启更新。新更新交互在安装本版本后生效，从旧版升级仍使用旧版流程。仅重启 Nomi(Dev) 并确认版本和保存内容恢复；公开制品验证不等同用户机器上的跨版本安装。后续浏览器式菜单收敛不属于此 tag。
