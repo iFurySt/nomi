@@ -4866,12 +4866,13 @@ kbd {
   }
   .settings-shell .settings-nav-group {
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
     margin: 0;
-    overflow-x: auto;
   }
   .settings-shell .settings-nav-link {
     flex: 0 0 auto;
+    margin-top: 0;
   }
 }
 @media (max-width: 599px) {
