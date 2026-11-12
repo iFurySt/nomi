@@ -806,3 +806,70 @@
   th:first-child[data-numeric] {
   width: 30px;
 }
+
+/* Shared note/canvas authoring chrome. It does not shift the experiment. */
+.interactive-authorable {
+  position: relative;
+}
+.interactive-author-tools {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  z-index: 8;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 4px 16px #0000000a;
+  opacity: 0;
+  pointer-events: none;
+}
+.interactive-authorable:hover > .interactive-author-tools,
+.interactive-authorable:focus-within > .interactive-author-tools {
+  opacity: 1;
+  pointer-events: auto;
+}
+.interactive-author-tools .icon-button {
+  width: 28px;
+  height: 28px;
+}
+.interactive-dsl-dialog {
+  width: min(800px, calc(100vw - 32px));
+  max-width: 800px;
+}
+.interactive-dsl-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.interactive-dsl-editor textarea {
+  width: 100%;
+  height: min(60vh, 580px);
+  resize: vertical;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--surface);
+  font:
+    13px/1.6 ui-monospace,
+    monospace;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+}
+.interactive-dsl-editor p {
+  margin: 0;
+  max-height: 90px;
+  overflow: auto;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.interactive-dsl-editor footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

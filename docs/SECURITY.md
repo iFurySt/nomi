@@ -9,7 +9,7 @@ Nomi 处理个人学习、笔记、信息、知识、健康和财富等资料，
 - Nomi 使用独立 profile、本地数据目录、OAuth host ID 与注册，不复制 AIFi 登录态或数据。
 - ChatGPT 注册 / 会话加密存于本地，文件密钥与密文同目录；目录 0700、文件 0600。同用户文件读取能力仍可解密，不能宣称具有系统 Keychain 等效隔离。
 - 保留 PKCE / state / nonce、回调和 JWT 验证、刷新 / 撤销与显式工具审批。Codex 固定版本，运行在专属 cwd 中。
-- 当前本地 MCP 为金融研究及虚拟 Arena 服务；不得把它描述成对笔记、健康、家庭或 server 数据的授权。真实交易不在能力范围内。
+- 当前本机 MCP 仅服务桌面文稿 / 内容块，默认关闭，经本机私有 token 连接；明确只读模式、版本 / 快照冲突与幂等写入。不开远程网络，不接金融、健康、家庭 server 或 provider 凭据。文件导入 / 导出必须指定路径，不能执行代码。完整边界见 [本机 MCP](design-docs/local-mcp.md)。
 - Vite 拒绝 secret / ChatGPT / SQLite 及仓库内 `.apple` / `.harness` / `.nomi` 路径；凭据、数据库、临时 profiles 和 smoke artifacts 均不提交。
 - 桌面连接与 server 用户会话 / SeedX 机器凭据独立；后续接入家庭资料前先设计明确的共享授权。
 

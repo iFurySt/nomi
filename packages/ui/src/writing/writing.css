@@ -1988,3 +1988,31 @@ body.notes-tree-dragging * {
     animation: none;
   }
 }
+
+/* Gutter marquee selects document units without changing their layout. */
+.notes-scroll:focus {
+  outline: none;
+}
+.notes-scroll[data-marquee-dragging] {
+  cursor: default;
+  user-select: none;
+}
+.writing-marquee {
+  position: fixed;
+  z-index: 120;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--accent, #487bff) 55%, transparent);
+  background: color-mix(in srgb, var(--accent, #487bff) 10%, transparent);
+}
+.writing-article [data-block-selected] {
+  background-color: color-mix(in srgb, #487bff 12%, transparent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #487bff 25%, transparent);
+  border-radius: 4px;
+}
+.notes-scroll[data-block-selection="true"] .writing-block-actions,
+.notes-scroll[data-marquee-dragging] .writing-block-menu {
+  visibility: hidden;
+}
+.writing-article .tiptap [data-block-selected] {
+  box-shadow: none;
+}

@@ -1,3 +1,4 @@
+import { automationContext, openAutomationNote } from "./automation-context";
 import {
   createContext,
   createElement,
@@ -10,6 +11,7 @@ import {
 } from "react";
 import {
   applyCanvasCommands,
+  parseCanvasDocument,
   createCanvasDocument,
   type CanvasDocument,
   type CanvasCommand,
@@ -279,6 +281,104 @@ function useCanvasDocumentState(profile: string) {
     install({ ...next, revision: doc.revision + 1 });
     renderHistory((n) => n + 1);
   };
+  // Host requests join the same live session and Undo stack as local editing.
+  const automationSnapshot = useRef<
+    { id: string; document: CanvasDocument } | undefined
+  >(undefined);
+  const automationHandler = useRef<
+    (method: string, params: any) => Promise<unknown>
+  >(async () => {});
+  const composing = useRef(false);
+  automationHandler.current = async (method, params) => {
+    if (method === "snapshot") {
+      if (composing.current)
+        throw Error("EDITOR_BUSY: Finish the current input composition first.");
+      if (!(await persistRef.current()))
+        throw Error("SAVE_PENDING: Resolve the current save error first.");
+      const doc = current.current;
+      if (!doc) throw Error("SESSION_UNAVAILABLE: Document is still loading.");
+      const id = crypto.randomUUID();
+      automationSnapshot.current = { id, document: doc };
+      return {
+        document: doc,
+        snapshotId: id,
+        context: automationContext(
+          doc,
+          params.includeSelection,
+          params.surroundingCharacters,
+        ),
+      };
+    }
+    if (method === "commit") {
+      const before = current.current;
+      if (
+        composing.current ||
+        !before ||
+        before.revision !== params.expectedRevision ||
+        automationSnapshot.current?.id !== params.snapshotId ||
+        automationSnapshot.current?.document !== before
+      )
+        throw Error(
+          "REVISION_CONFLICT: Editor changed since the MCP snapshot.",
+        );
+      const after = parseCanvasDocument(params.document);
+      if (after.id !== before.id || after.revision !== before.revision + 1)
+        throw Error("INVALID_COMMIT: Document identity or revision mismatch.");
+      history.current.undo.push(before);
+      if (history.current.undo.length > 40) history.current.undo.shift();
+      history.current.redo = [];
+      history.current.group = undefined;
+      for (const item of params.assets)
+        originals.current.set(item.asset.id, {
+          asset: item.asset,
+          blob: new Blob([new Uint8Array(item.bytes)], {
+            type: item.asset.mime,
+          }),
+        });
+      install(after);
+      renderHistory((n) => n + 1);
+      if (!(await persistRef.current()))
+        throw Error(
+          "SAVE_PENDING: Change is in the editor but not durably saved. Retry the SAME request after resolving the save error.",
+        );
+      return { revision: after.revision };
+    }
+    if (method === "open")
+      return openAutomationNote(params.noteId, params.blockId);
+    throw Error("Unknown automation session method.");
+  };
+  useEffect(() => {
+    const bridge = window.nomiDesktop;
+    if (!bridge?.onAutomationRequest || !bridge.replyAutomation) return;
+    const start = () => {
+      composing.current = true;
+    };
+    const end = () => {
+      composing.current = false;
+    };
+    window.addEventListener("compositionstart", start, true);
+    window.addEventListener("compositionend", end, true);
+    const unsubscribe = bridge.onAutomationRequest(async (request) => {
+      try {
+        const value = await automationHandler.current(
+          request.method,
+          request.params,
+        );
+        bridge.replyAutomation!({ id: request.id, ok: true, value });
+      } catch (error) {
+        bridge.replyAutomation!({
+          id: request.id,
+          ok: false,
+          error: error instanceof Error ? error.message : "Session failed",
+        });
+      }
+    });
+    return () => {
+      unsubscribe();
+      window.removeEventListener("compositionstart", start, true);
+      window.removeEventListener("compositionend", end, true);
+    };
+  }, []);
   const viewRepository = useMemo(
     () => ({
       ...repository,

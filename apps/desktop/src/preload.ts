@@ -3,6 +3,25 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld(
   "nomiDesktop",
   Object.freeze({
+    onAutomationRequest: (
+      callback: (request: {
+        id: string;
+        method: string;
+        params: unknown;
+      }) => void,
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        request: { id: string; method: string; params: unknown },
+      ) => callback(request);
+      ipcRenderer.on("nomi:automation-request", listener);
+      return () =>
+        ipcRenderer.removeListener("nomi:automation-request", listener);
+    },
+    replyAutomation: (result: unknown) =>
+      ipcRenderer.send("nomi:automation-result", result),
+    requestAutomationSettings: (method: string, value?: boolean) =>
+      ipcRenderer.invoke("nomi:automation-settings", method, value),
     requestUpdates: (method: string, value?: boolean) =>
       ipcRenderer.invoke("nomi:updates", method, value),
     getRuntimeInfo: () => ipcRenderer.invoke("nomi:runtime-info"),

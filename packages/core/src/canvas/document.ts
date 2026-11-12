@@ -563,6 +563,7 @@ export type CanvasCommand =
   | { type: "set_note_blocks"; id: string; blocks: string[] }
   | { type: "set_shape"; block: Extract<CanvasBlock, { type: "shape" }> }
   | { type: "set_canvas"; block: EmbeddedCanvasBlock }
+  | { type: "set_interactive"; id: string; program: InteractiveProgram }
   | { type: "connect"; connector: CanvasConnector }
   | { type: "update_connector"; connector: CanvasConnector }
   | { type: "remove_connector"; id: string }
@@ -633,6 +634,13 @@ export function applyCanvasCommands(
         (p) => p.id === ("id" in command ? command.id : ""),
       ) ?? bad("摆放已不存在。");
     switch (command.type) {
+      case "set_interactive": {
+        const block = next.blocks.find((b) => b.id === command.id);
+        if (block?.type !== "interactive") bad("交互块已不存在。");
+        if (block?.type === "interactive")
+          block.program = parseInteractiveProgram(command.program);
+        break;
+      }
       case "set_canvas": {
         const index = next.blocks.findIndex(
           (b) => b.id === command.block.id && b.type === "canvas",

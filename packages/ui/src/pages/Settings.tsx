@@ -1,3 +1,4 @@
+import { MCPSettings } from "./MCPSettings";
 import { UpdateSettings } from "./UpdateSettings";
 import { GeneralSettings } from "./GeneralSettings";
 import { AppearanceMode } from "../components/AppearanceMode";
@@ -16,6 +17,7 @@ export function Settings() {
         </>
       )}
       {section === "chatgpt" && <ChatGPTSettings />}
+      {section === "mcp" && <MCPSettings />}
       {section === "appearance" && (
         <section className="setting-group">
           <h2>Visual style</h2>

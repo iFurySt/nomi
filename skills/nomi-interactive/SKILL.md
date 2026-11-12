@@ -52,8 +52,8 @@ If a preview environment is available, inspect desktop and narrow layouts and ac
 
 ## Deliver and use
 
-Return the `.nomi-ui.json` file and a short usage sentence. In Nomi: at the intended position insert **交互块 → 导入交互定义（.json）**, then choose the file. If only text can be returned, provide the complete JSON in one code block for saving with that extension.
+Return the `.nomi-ui.json` file and a short usage sentence. In Nomi: at the intended position insert **交互块 → 导入交互定义（.json）**, then choose the file. If only text can be returned, provide the complete JSON in one code block; users can copy the JSON and paste it at a text cursor in a Nomi note to create an interactive block, or save it with that extension.
 
-Current limitation: pasting raw HTML or JSON into the note body does **not** create a runnable interactive block. Do not claim direct clipboard import, HTML execution, or a mobile renderer is already implemented. The JSON preserves portable semantics; each supported platform controls its own presentation.
+Valid InteractiveProgram JSON pasted into the note body creates a new block with independent learning progress. The hover toolbar copies the definition or opens a validated DSL editor. Copy includes defaults and behavior, not the current learner input/progress. Raw HTML and arbitrary JSON are not executable imports. Do not claim HTML execution or a mobile renderer is already implemented. The JSON preserves portable semantics; each supported platform controls its own presentation.
 
 For a conversational agent without skill auto-discovery, the user can attach this folder/archive and ask it to read `SKILL.md`, then follow the same workflow. For a CLI agent, point it to this file or install the folder using that harness's supported skill mechanism. Do not require this repository or modify global agent instructions.

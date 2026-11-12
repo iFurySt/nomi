@@ -72,6 +72,10 @@ export function CanvasContent({
           profile={profile}
           documentId={document.id}
           blockId={b.id}
+          onApply={(program) => {
+            endGroup();
+            onEdit([{ type: "set_interactive", id: b.id, program }]);
+          }}
         />
       );
     if (b.type === "shape")

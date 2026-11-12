@@ -35,3 +35,7 @@
 - 需要 PR 依赖门禁时，再恢复 Dependency Review / OSV workflow。
 - 如果条件允许，在部署链路里增加对 provenance 的校验。
 - 把 attestation 校验继续下沉到部署平台或准入层。
+
+## 本机 MCP 依赖
+
+本机适配器使用精确固定的 `@modelcontextprotocol/sdk@1.32.2` 与 `zod@4.6.7`，锁文件同轮更新。SDK 仅进入独立 Node stdio bundle，桌面 host 共用严格工具 schema；不新增远程服务或运行时下载。

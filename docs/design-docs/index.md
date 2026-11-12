@@ -46,3 +46,5 @@
 - `mobile-uiux-less-is-more/`：上一轮基于 Snap / Log / Review 的 less-is-more 页面设计图，当前作为视觉参考保留；现行 mobile beta 使用资料 / 对话 / 家庭结构。
 
 - [画布选择、形状属性与布局](canvas-selection-and-layout.md)：形状 / 多选浮动栏、布局吸附、语义复制与参考交互验收矩阵。
+
+- [本机文稿 MCP](local-mcp.md)：文稿 / 内容块 CRUD、Agent 基础工具、持久恢复及桌面会话桥接。

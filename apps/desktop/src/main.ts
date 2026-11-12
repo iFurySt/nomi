@@ -1,4 +1,6 @@
+import { registerAutomation } from "./automation";
 import { setupUpdates } from "./updates";
+import { configureWindowInput, viewMenu } from "./window-policy";
 import { DocumentStore } from "../../../packages/host/src/document-store";
 import { registerDocumentStorage } from "./document-ipc";
 import { defaultDataDir } from "../../../packages/host/src/data-path";
@@ -235,8 +237,10 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      devTools: developmentApp,
     },
   });
+  configureWindowInput(window.webContents);
   if (developmentApp)
     window.on("page-title-updated", (event) => {
       event.preventDefault();
@@ -407,7 +411,7 @@ if (primaryInstance)
             ],
           },
           { role: "editMenu" },
-          { role: "viewMenu" },
+          viewMenu(developmentApp),
           { role: "windowMenu" },
         ]),
       );
@@ -535,6 +539,7 @@ if (primaryInstance)
       );
       await createWindow();
       await drainPackages();
+      await registerAutomation(documents, devUrl || pathToFileURL(join(__dirname, "../../web/dist/index.html")).href);
       if (smokeTimeout) clearTimeout(smokeTimeout);
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0)

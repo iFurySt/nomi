@@ -149,3 +149,7 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、点击下载后自
 公开下载的 arm64 / x64 DMG 均通过长度、SHA-256、Sparkle Ed25519 签名和公证票据验证；两个 appcast 的签名、0.3.2 版本和地址通过。挂载 arm64 App 后，严格深度签名、公证票据、Gatekeeper 与内嵌版本检查通过，验证卷已卸载。校验制品位于 ignored `.artifacts/desktop-032-verification/`。
 
 本版本包括文稿原生交互块 AI、就地输入与连续调整、一键下载后保存并自动重启更新。新更新交互在安装本版本后生效，从旧版升级仍使用旧版流程。仅重启 Nomi(Dev) 并确认版本和保存内容恢复；公开制品验证不等同用户机器上的跨版本安装。后续浏览器式菜单收敛不属于此 tag。
+
+## 本机 MCP 随包入口
+
+桌面构建额外生成 `apps/desktop/dist/mcp.mjs` 与 `mcp-LICENSES.txt`，打包时随 main / preload 携带。适配器使用用户的 Node 24+ 运行，只有用户显式启用本机 MCP 才会连接桌面；不新增后台常驻守护进程。Settings → MCP 可复制连接配置，正式 / 开发 profile 分离。发布涉及此入口时运行 `pnpm smoke:mcp`；详见 [本机 MCP](design-docs/local-mcp.md)。

@@ -22,19 +22,27 @@ const programs = {
   wave: waveProgram,
   temperature: temperatureProgram,
 };
+function EditableLab({ name }: { name: keyof typeof programs }) {
+  const [program, setProgram] = React.useState(() =>
+    parseInteractiveProgram(programs[name]),
+  );
+  return (
+    <InteractiveBlock
+      program={program}
+      profile="fixture"
+      documentId="v2"
+      blockId={name}
+      onApply={setProgram}
+    />
+  );
+}
 const root = createRoot(document.getElementById("root")!);
 Object.assign(window, {
   labFixture: {
     show: (name: keyof typeof programs) => {
       root.render(
         <main style={{ padding: 24, maxWidth: 900, margin: "auto" }}>
-          <InteractiveBlock
-            key={name}
-            program={parseInteractiveProgram(programs[name])}
-            profile="fixture"
-            documentId="v2"
-            blockId={name}
-          />
+          <EditableLab key={name} name={name} />
         </main>,
       );
     },

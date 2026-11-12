@@ -1,6 +1,6 @@
 {
   "name": "nomi",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -26,9 +26,12 @@
     "smoke:document-directory": "node scripts/check-document-directory.mjs",
     "smoke:notes": "node scripts/check-notes.mjs",
     "smoke:notes-ime": "node scripts/check-notes-ime.mjs",
-    "package:desktop": "pnpm build && node scripts/package-desktop.mjs"
+    "package:desktop": "pnpm build && node scripts/package-desktop.mjs",
+    "build:mcp": "node scripts/build-mcp.mjs",
+    "smoke:mcp": "node scripts/check-mcp.mjs"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
@@ -41,6 +44,7 @@
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.4",
-    "vitest": "5.0.4"
+    "vitest": "5.0.4",
+    "zod": "4.6.7"
   }
 }

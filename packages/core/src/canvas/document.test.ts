@@ -9,6 +9,40 @@ import {
   type CanvasResizeDirection,
 } from "./document";
 describe("canvas document semantics", () => {
+  it("edits interactive definitions atomically without changing block identity or prior snapshots", () => {
+    const before = createCanvasDocument();
+    const frozen = structuredClone(before);
+    const block = before.blocks.find((b) => b.type === "interactive")!;
+    if (block.type !== "interactive") throw Error("fixture");
+    const program = structuredClone(block.program);
+    program.id = "edited-experiment";
+    const next = applyCanvasCommands(before, before.revision, [
+      { type: "set_interactive", id: block.id, program },
+    ]);
+    expect(next.blocks.find((b) => b.id === block.id)).toEqual({
+      ...block,
+      program,
+    });
+    expect(next.notes).toEqual(before.notes);
+    expect(next.board).toEqual(before.board);
+    expect(before).toEqual(frozen);
+    expect(parseCanvasDocument(next)).toEqual(next);
+    expect(() =>
+      applyCanvasCommands(before, before.revision, [
+        {
+          type: "set_interactive",
+          id: block.id,
+          program: { ...program, schema: "unsafe" } as any,
+        },
+      ]),
+    ).toThrow();
+    expect(() =>
+      applyCanvasCommands(before, before.revision, [
+        { type: "set_interactive", id: "missing", program },
+      ]),
+    ).toThrow();
+    expect(before).toEqual(frozen);
+  });
   it("shares untouched content during text edits without mutating undo snapshots", () => {
     const before = createCanvasDocument();
     const frozen = structuredClone(before);

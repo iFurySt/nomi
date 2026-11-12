@@ -16,6 +16,7 @@ Nomi / 知己是个人一站式工作台，覆盖学习、笔记、信息 hub、
 - `packages/platform/`：浏览器存储及 allowlisted host 能力适配。
 - `packages/host/`：Node-only 的文稿包、目录事务、凭据与 ChatGPT OAuth 适配；不进入 renderer bundle。
 - `apps/cli/`：仅保留未来服务边界说明，不构建或运行。
+- `apps/mcp/`：本机 stdio MCP 适配器，复用桌面文稿会话与领域操作；28 个文稿 / 内容块工具，显式开启，见 [本机 MCP](design-docs/local-mcp.md)。
 - `apps/ios/`：原生 SwiftUI iPhone App，现有家庭资料 beta。
 - `apps/server/`：Go API、Postgres、FS storage、household workspace 与异步 worker。
 - `infra/amoylab/`：现有 server 生产部署。
@@ -24,7 +25,7 @@ Nomi / 知己是个人一站式工作台，覆盖学习、笔记、信息 hub、
 
 `apps/desktop` / `apps/web` 组合共享 UI；UI 依赖 core 和 platform，core 不依赖 React / Electron。renderer 无 Node 或任意 filesystem 权限；Electron top-frame IPC 只允许声明过的方法。
 
-Node host 管理 `.nomi` 包、原件、目录切换、保存事务和 ChatGPT 注册 / 会话。桌面不启动 Go 数据服务，不携带 SQLite 研究库、MCP 或 Codex CLI。主导航只有 Canvas 和文稿，Settings 保留目录、外观、ChatGPT 连接和 Sparkle 更新。交互学习通过文稿 / 画布内容块提供。正式发布见 `docs/DESKTOP_RELEASE.md`，运行与数据路径见 `docs/DESKTOP.md`。
+Node host 管理 `.nomi` 包、原件、目录切换、保存事务和 ChatGPT 注册 / 会话。桌面不启动 Go 数据服务，不携带 SQLite 研究库或 Codex CLI；可显式开启本机文稿 MCP，适配器随桌面构建携带。主导航只有 Canvas 和文稿，Settings 保留目录、外观、ChatGPT 连接和 Sparkle 更新。交互学习通过文稿 / 画布内容块提供。正式发布见 `docs/DESKTOP_RELEASE.md`，运行与数据路径见 `docs/DESKTOP.md`。
 
 ## 下一阶段目标架构（提案）
 
@@ -100,3 +101,7 @@ Canvas 上方的「文稿」复用同一 CanvasDocument / Note / Block 与平台
 ### Canvas AI 生成
 
 Canvas AI 入口复用 ChatGPT 订阅 provider，固定 host 提示生成受限新增 DSL，完整命令逐条校验后在画布临时层流式显示，最终整包校验后原子插入并支持撤销；Canvas 模式不读取现有内容。文稿 AI 在显式调用时携带标题、选区及前后各 1500 字符，使用独立提示词生成原生交互块与简短说明，拒绝静态图替代交互；输入框就地展开后停靠右上角，携带最近成功结果继续调整，仅原子替换本会话生成且未被手动修改的块组。不读取其他文稿、附件或执行生成代码。能力边界与验证见 [画布 AI 生成](design-docs/canvas-ai-generation.md)。
+
+### 本机文稿 MCP
+
+MCP / 未来 CLI 共用版本化领域操作，当前 stdio 适配器经私有 loopback 桥接现有编辑会话，修改进入同一个 Undo 与 `.nomi` 保存事务。全库版本、快照身份与幂等键防止覆盖用户后续输入；回收站与 Agent 修改记录按资料库持久保存。读取 / 导入 / 导出 / 反向链接等 28 个工具及边界见 [本机 MCP](design-docs/local-mcp.md)。不接入家庭 server，不执行任意生成代码。

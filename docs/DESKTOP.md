@@ -53,6 +53,10 @@ make ci
 
 开发版是独立空环境，不自动迁移正式文稿、目录设置、浏览器存储或登录态；测试使用合成内容。开发版凭据不采用正式版 `NOMI_DATA_DIR` 覆盖。单实例锁使用不同 userData，两版可同时运行；开发版只接受自己的登录唤醒链接。旧 `dist/Nomi.app` / `.local` 启动器保留但不再由脚本启动，不据此清理用户数据。后续验收只操作开发版，不抢用户正在使用的正式窗口。
 
+## 原生菜单与界面缩放
+
+桌面 View 菜单只保留全屏；开发版额外提供开发者工具，正式版禁用 DevTools。两版均不暴露浏览器刷新、强制刷新或整页缩放；拦截 Cmd/Ctrl+R、F5 与 Cmd/Ctrl +/-/0，每次加载恢复界面为 100%。这不改变画布 / PDF 自身的缩放、触控板画布手势、编辑撤销或前进后退。回归：`node scripts/check-window-input.mjs`，使用隔离 Electron 验证真实键盘事件与菜单。
+
 ## 数据与身份
 
 - 正式 Electron 展示名 `Nomi`；本地开发版展示名 `Nomi(Dev)`、macOS bundle id `com.ifuryst.nomi.dev`，包命名空间 `@nomi/*`，preload `window.nomiDesktop`，IPC / localStorage 使用 Nomi namespace。
@@ -108,3 +112,7 @@ Settings → General 位于 Appearance 上方，也是设置默认页。文稿�
 ### 启动位置与画布导航
 
 首次启动进入文稿；后续恢复上次有效页面（包括文稿选择、设置分区和内嵌画布）。显式文稿打开链接优先，失效页面回退文稿。位置只保存在当前运行环境的本地偏好中，开发版与正式版不共用。文稿内嵌画布进入导航历史，Cmd/Ctrl+[ 返回所属文稿，Cmd/Ctrl+] 再次进入；Close / Esc 同样退出。
+
+## 本机 MCP
+
+Settings → MCP 可显式启用本机文稿工具、限制只读、复制客户端连接配置。默认关闭，正式 / 开发分别授权；Node 24+ 运行随包携带的 stdio adapter，App 保持打开。提供文稿 / 内容块 CRUD、搜索与选区、精确编辑、批量事务、附件、引用、导入导出及持久恢复，共 28 个工具。详情与验证见 [本机文稿 MCP](design-docs/local-mcp.md)。`pnpm build` 构建并携带适配器，`pnpm smoke:mcp` 使用隔离 Electron 与真实 MCP 客户端。

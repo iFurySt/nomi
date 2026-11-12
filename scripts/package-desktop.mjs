@@ -87,7 +87,7 @@ writeFileSync(
 );
 const desktop = join(entry, "apps/desktop/dist");
 mkdirSync(desktop, { recursive: true });
-for (const file of ["main.cjs", "preload.cjs"])
+for (const file of ["main.cjs", "preload.cjs", "mcp.mjs", "mcp-LICENSES.txt"])
   cpSync(join(root, "apps/desktop/dist", file), join(desktop, file));
 cpSync(join(root, "apps/desktop/dist/brand"), join(desktop, "brand"), {
   recursive: true,

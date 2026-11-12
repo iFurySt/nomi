@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { copyFileSync, mkdirSync } from "node:fs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
+await import("./build-mcp.mjs");
 await build({
   entryPoints: {
     main: resolve(root, "apps/desktop/src/main.ts"),
@@ -25,4 +26,14 @@ copyFileSync(
     `packages/ui/src/assets/brand/nomi-companion-v1/${process.platform === "darwin" ? "app-icon-macos-1024.png" : "app-icon-dark-512.png"}`,
   ),
   resolve(brandDir, "app-icon.png"),
+);
+
+copyFileSync(
+  resolve(root, "apps/mcp/dist/main.mjs"),
+  resolve(root, "apps/desktop/dist/mcp.mjs"),
+);
+
+copyFileSync(
+  resolve(root, "apps/mcp/dist/LICENSES.txt"),
+  resolve(root, "apps/desktop/dist/mcp-LICENSES.txt"),
 );

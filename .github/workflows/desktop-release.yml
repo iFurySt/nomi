@@ -65,6 +65,11 @@ jobs:
           node scripts/ci-desktop-step.mjs node scripts/check-chatgpt-login.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-update-ui.mjs
           node scripts/ci-desktop-step.mjs node scripts/check-update-host.mjs
+          node scripts/ci-desktop-step.mjs node scripts/check-window-input.mjs
+          node scripts/ci-desktop-step.mjs node scripts/check-interactive-v2.mjs
+          node scripts/ci-desktop-step.mjs node scripts/check-interactive-authoring.mjs
+          node scripts/ci-desktop-step.mjs node scripts/check-block-selection.mjs
+          node scripts/ci-desktop-step.mjs node scripts/check-mcp.mjs
       - name: Import signing credentials
         env:
           CERTIFICATE: ${{ secrets.DESKTOP_CERTIFICATE_P12 }}

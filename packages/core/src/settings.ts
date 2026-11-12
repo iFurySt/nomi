@@ -1,4 +1,9 @@
-export const settingsSections = ["general", "appearance", "chatgpt"] as const;
+export const settingsSections = [
+  "general",
+  "appearance",
+  "chatgpt",
+  "mcp",
+] as const;
 export type SettingsSection = (typeof settingsSections)[number];
 export function parseSettingsSection(hash: string): SettingsSection {
   const section = hash

@@ -1,3 +1,5 @@
+import { useBlockSelection } from "../writing/useBlockSelection";
+import { BLOCK_CLIPBOARD, decodeSelected } from "../writing/blockSelection";
 import { WorkspaceTitle } from "../components/WorkspaceTitle";
 import { NotesLoading } from "../writing/NotesLoading";
 import { useEffect, useRef, useState, type DragEvent } from "react";
@@ -180,7 +182,7 @@ export function Notes({ profile }: { profile: string }) {
         target !== document.documentElement &&
         target.id !== "main-content" &&
         !target.closest(
-          ".writing-article,.writing-block-menu,.writing-add-menu,.notes-library,.notes-context-menu",
+          ".notes-scroll,.writing-article,.writing-block-menu,.writing-add-menu,.notes-library,.notes-context-menu",
         )
       )
         return;
@@ -724,6 +726,17 @@ export function Notes({ profile }: { profile: string }) {
       setError((e as Error).message);
     }
   }
+  useBlockSelection({
+    pane: scrollPane,
+    editors,
+    document: doc,
+    note,
+    edit: (commands) => {
+      data.endGroup();
+      data.edit(commands);
+    },
+    onError: setError,
+  });
   if (data.loadError)
     return (
       <div role="alert" className="writing-error">
@@ -841,6 +854,83 @@ export function Notes({ profile }: { profile: string }) {
         )}
         <div
           className="notes-writing-area"
+          onPasteCapture={(event) => {
+            const target = event.target as HTMLElement;
+            if (
+              !note ||
+              !target.isContentEditable ||
+              target.closest("pre,.canvas-interactive,[role=dialog]")
+            )
+              return;
+            const copiedBlocks = event.clipboardData.getData(BLOCK_CLIPBOARD);
+            if (copiedBlocks) {
+              const id = target.closest<HTMLElement>("[data-writing-block]")
+                ?.dataset.writingBlock;
+              const row = rows.find((r) => r.block.id === id);
+              const editor = id ? editors.current.get(id) : undefined;
+              if (!row || !editor) return;
+              event.preventDefault();
+              event.stopPropagation();
+              attempt(() => {
+                const blocks = decodeSelected(
+                  copiedBlocks,
+                  data.current.current!,
+                );
+                if (!blocks.length) return;
+                insertContent(
+                  note.id,
+                  blocks[0],
+                  undefined,
+                  [],
+                  {
+                    noteId: note.id,
+                    point: pointForRow(row, editor.state.selection.to),
+                    snapshot: textSnapshot(editor),
+                  },
+                  [],
+                  blocks.slice(1),
+                );
+              });
+              return;
+            }
+            const text = event.clipboardData.getData("text/plain");
+            if (
+              text.length > 2_000_000 ||
+              !text.trimStart().startsWith("{") ||
+              !text.includes('"nomi-interactive-ir/')
+            )
+              return;
+            let program;
+            try {
+              program = parseInteractiveProgram(JSON.parse(text));
+            } catch {
+              return;
+            }
+            const id = target.closest<HTMLElement>("[data-writing-block]")
+              ?.dataset.writingBlock;
+            const row = rows.find((r) => r.block.id === id);
+            const editor = id ? editors.current.get(id) : undefined;
+            if (!row || !editor) return;
+            event.preventDefault();
+            event.stopPropagation();
+            attempt(() =>
+              insertContent(
+                note.id,
+                {
+                  id: newCanvasId("interactive"),
+                  type: "interactive",
+                  program,
+                },
+                undefined,
+                [],
+                {
+                  noteId: note.id,
+                  point: pointForRow(row, editor.state.selection.to),
+                  snapshot: textSnapshot(editor),
+                },
+              ),
+            );
+          }}
           onInputCapture={(event) => {
             const target = event.target as HTMLElement;
             if (
@@ -878,6 +968,7 @@ export function Notes({ profile }: { profile: string }) {
           <div
             ref={scrollPane}
             className="notes-scroll"
+            tabIndex={-1}
             data-editable-tail={editableTail || undefined}
             onMouseDown={(event) => {
               if (
@@ -1145,6 +1236,12 @@ export function Notes({ profile }: { profile: string }) {
                           profile={profile}
                           documentId={doc.id}
                           blockId={id}
+                          onApply={(program) => {
+                            data.endGroup();
+                            data.edit([
+                              { type: "set_interactive", id, program },
+                            ]);
+                          }}
                         />
                       ) : block.type === "image" || block.type === "file" ? (
                         <AssetContent

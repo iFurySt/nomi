@@ -384,8 +384,68 @@ async function check({ output }) {
     win.setSize(900, 950);
     await wait(120);
     await shot("compact-dark");
+    // DSL draft validation and cancel/apply must not mutate the running block early.
+    await js(() => document.querySelector('[aria-label="编辑 DSL"]').click());
+    await until(() => !!document.querySelector('[aria-label="交互块 DSL"]'));
+    const original = await js(
+      () => document.querySelector('[aria-label="交互块 DSL"]').value,
+    );
+    const editDSL = async (source) =>
+      js((text) => {
+        const input = document.querySelector('[aria-label="交互块 DSL"]');
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        ).set.call(input, text);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }, source);
+    const dialogButton = async (label) =>
+      js(
+        (label) =>
+          [...document.querySelectorAll('[role="dialog"] button')]
+            .find((b) => b.textContent === label)
+            .click(),
+        label,
+      );
+    await editDSL("{invalid");
+    await dialogButton("应用");
+    await until(
+      () => !!document.querySelector('[role="dialog"] [role="alert"]'),
+    );
+    assert.equal(
+      await js(
+        () =>
+          document.querySelectorAll(".canvas-interactive .interactive-surface")
+            .length > 0,
+      ),
+      true,
+    );
+    await dialogButton("取消");
+    await js(() => document.querySelector('[aria-label="编辑 DSL"]').click());
+    await until(() => !!document.querySelector('[aria-label="交互块 DSL"]'));
+    assert.equal(
+      await js(() => document.querySelector('[aria-label="交互块 DSL"]').value),
+      original,
+    );
+    const updated = JSON.parse(original);
+    updated.id = "edited-dsl";
+    await editDSL(JSON.stringify(updated, null, 2));
+    await dialogButton("应用");
+    await until(() => !document.querySelector('[role="dialog"]'));
+    await js(() => document.querySelector('[aria-label="编辑 DSL"]').click());
+    await until(() => !!document.querySelector('[aria-label="交互块 DSL"]'));
+    assert.equal(
+      await js(
+        () =>
+          JSON.parse(document.querySelector('[aria-label="交互块 DSL"]').value)
+            .id,
+      ),
+      "edited-dsl",
+    );
+    await shot("dsl-edit");
+    await dialogButton("取消");
     console.log(
-      "Interactive v2 PASS: recompute, step, reset, persistence, error recovery, wave, 390px, dark",
+      "Interactive v2 PASS: recompute, step, reset, persistence, error recovery, wave, 390px, dark, DSL validate/cancel/apply",
     );
     app.exit(0);
   } catch (e) {

@@ -7,6 +7,23 @@ export interface RuntimeInfo {
 declare global {
   interface Window {
     nomiDesktop?: {
+      onAutomationRequest?(
+        callback: (request: {
+          id: string;
+          method: string;
+          params: any;
+        }) => void,
+      ): () => void;
+      replyAutomation?(result: {
+        id: string;
+        ok: boolean;
+        value?: unknown;
+        error?: string;
+      }): void;
+      requestAutomationSettings?(
+        method: "status" | "enabled" | "readOnly" | "copyConfig",
+        value?: boolean,
+      ): Promise<{ enabled: boolean; readOnly: boolean }>;
       requestUpdates?(
         method: import("@nomi/core").UpdateAction,
         value?: boolean,

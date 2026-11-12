@@ -14,6 +14,7 @@ import {
 } from "@nomi/platform";
 import { InteractiveRenderer } from "../interactive/InteractiveRenderer";
 import "../interactive/learning.css";
+import { InteractiveTools } from "../interactive/InteractiveTools";
 const storage: StoragePort = {
   getItem: (key) => localStorage.getItem(key),
   setItem: (key, value) => localStorage.setItem(key, value),
@@ -25,11 +26,13 @@ export const InteractiveBlock = memo(
     profile,
     documentId,
     blockId,
+    onApply,
   }: {
     program: InteractiveProgram;
     profile: string;
     documentId: string;
     blockId: string;
+    onApply?: (program: InteractiveProgram) => void;
   }) {
     // Stable document + block scope means two placements share one learner state.
     const scope = JSON.stringify([profile, documentId, blockId]);
@@ -100,7 +103,8 @@ export const InteractiveBlock = memo(
       };
     }, [scope]);
     return (
-      <div className="canvas-interactive">
+      <div className="canvas-interactive interactive-authorable">
+        <InteractiveTools program={program} onApply={onApply} />
         {error && (
           <div className="learning-alert" role="alert">
             {error}
@@ -137,6 +141,7 @@ export const InteractiveBlock = memo(
     );
   },
   (a, b) =>
+    a.onApply === b.onApply &&
     a.profile === b.profile &&
     a.documentId === b.documentId &&
     a.blockId === b.blockId &&
