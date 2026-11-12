@@ -36,8 +36,8 @@ async function check({ output }) {
   app.setPath("userData", path.join(output, "profile"));
   await app.whenReady();
   const win = new BrowserWindow({
-    width: 1300,
-    height: 1000,
+    width: 1000,
+    height: 760,
     show: false,
     webPreferences: { backgroundThrottling: false },
   });
@@ -215,6 +215,21 @@ async function check({ output }) {
       0,
     );
     // Mixed selection from the third paragraph into the interactive block.
+    // Hosted macOS screens can clamp the requested window height. Bring both
+    // ends into view instead of clamping the drag above the target block.
+    await js(() => {
+      document
+        .querySelector(
+          '[data-writing-block="test.marquee.text"] .tiptap > p:last-child',
+        )
+        .scrollIntoView({ block: "center", behavior: "instant" });
+    });
+    await until(() => {
+      const embed = document
+        .querySelector('[data-writing-block="interactive.temperature"]')
+        .getBoundingClientRect();
+      return embed.top + 30 < innerHeight - 100;
+    });
     pts = await js(() => {
       const p = document
           .querySelector(
@@ -225,7 +240,7 @@ async function check({ output }) {
           .querySelector('[data-writing-block="interactive.temperature"]')
           .getBoundingClientRect();
       return {
-        from: { x: Math.round(p.left - 70), y: Math.round(p.top + 2) },
+        from: { x: Math.round(p.left - 24), y: Math.round(p.top + 2) },
         to: {
           x: Math.round(p.left + 150),
           y: Math.round(Math.min(innerHeight - 100, embed.top + 80)),
