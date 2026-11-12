@@ -122,7 +122,12 @@ export const InteractiveBlock = memo(
             apply(setStudyValue(program, current.current.state, id, value))
           }
           onAction={(id) => {
-            apply(runStudyAction(program, current.current.state, id));
+            try {
+              apply(runStudyAction(program, current.current.state, id));
+            } catch {
+              setError("无法完成此操作，请检查输入。");
+              return;
+            }
             current.current.blocked = false;
             commit();
           }}

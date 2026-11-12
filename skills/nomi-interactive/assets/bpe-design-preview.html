@@ -1,0 +1,132 @@
+<div class="viz-dotted-background" style="padding:16px 8px">
+<section id="nomi-bpe-compact" aria-label="Nomi BPE 交互块原型">
+  <header class="lab-heading"><h2>BPE 分词</h2><span class="step-count" aria-live="polite"></span></header>
+  <label class="input-label" for="bpe-corpus">句子</label>
+  <textarea id="bpe-corpus" rows="2" maxlength="700" spellcheck="false">we learn to learn and we love learning</textarea>
+  <div class="action-line">
+    <span class="token-count"></span>
+    <div class="actions">
+      <button class="icon-button cursor-interaction" data-action="back" aria-label="上一步" data-tooltip="上一步"><i data-lucide="undo-2" aria-hidden="true"></i></button>
+      <button class="icon-button cursor-interaction" data-action="reset" aria-label="从头开始" data-tooltip="从头开始"><i data-lucide="rotate-ccw" aria-hidden="true"></i></button>
+      <button class="merge-button cursor-interaction" data-action="next"></button>
+    </div>
+  </div>
+  <div class="tables-grid">
+    <section class="data-section" aria-label="当前拆分">
+      <div class="section-heading"><h3>当前拆分</h3><span class="quiet" data-tooltip="▁ 表示词尾，不是空格词元">▁ 词尾</span></div>
+      <table class="split-table"><thead><tr><th>词</th><th class="number">次数</th><th>词元</th></tr></thead><tbody data-table="words"></tbody></table>
+      <button class="more cursor-interaction" data-expand="words" hidden></button>
+    </section>
+    <section class="data-section" aria-label="候选合并">
+      <div class="section-heading"><h3>候选合并</h3><span class="quiet">按频次</span></div>
+      <table><thead><tr><th>相邻词元</th><th class="number">频次</th><th class="end">下一步</th></tr></thead><tbody data-table="pairs"></tbody></table>
+      <button class="more cursor-interaction" data-expand="pairs" hidden></button>
+    </section>
+    <section class="data-section" aria-label="合并规则">
+      <div class="section-heading"><h3>合并规则 <span class="quiet rules-count"></span></h3><span class="quiet">执行顺序</span></div>
+      <table><thead><tr><th class="round-col">轮</th><th>规则</th><th class="number">频次</th></tr></thead><tbody data-table="rules"></tbody></table>
+      <button class="more cursor-interaction" data-expand="rules" hidden></button>
+    </section>
+    <section class="data-section" aria-label="词表">
+      <div class="section-heading"><h3>词表 <span class="quiet vocab-count"></span></h3><span class="quiet" data-tooltip="保留初始字符与每轮新增词元">全部已学</span></div>
+      <table><thead><tr><th class="round-col">ID</th><th>词元</th><th class="number" data-tooltip="当前拆分中出现的次数">当前频次</th></tr></thead><tbody data-table="vocab"></tbody></table>
+      <button class="more cursor-interaction" data-expand="vocab" hidden></button>
+    </section>
+  </div>
+  <div class="announcement" aria-live="polite"></div>
+</section>
+</div>
+<style>
+#nomi-bpe-compact{--paper:light-dark(#fff,#202123);--ink:light-dark(#252629,#ededee);--subtle:light-dark(#777a80,#a6a8ae);--line:light-dark(#e9eaed,#383a40);--soft:light-dark(#f5f6f7,#292b30);--focus-fill:light-dark(#edf2ff,#27344c);--focus-ink:light-dark(#365baf,#b6cdff);--row-pad:8px;color-scheme:light dark;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:18px;padding:20px;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-sizing:border-box;max-width:900px;margin:auto}
+#nomi-bpe-compact *{box-sizing:border-box}
+#nomi-bpe-compact h2,#nomi-bpe-compact h3{margin:0;font-weight:500;color:var(--ink)}
+#nomi-bpe-compact h2{font-size:18px;letter-spacing:-.4px}
+#nomi-bpe-compact h3{font-size:14px}
+#nomi-bpe-compact .lab-heading{display:flex;align-items:center;gap:12px;margin-bottom:15px;padding-right:76px}
+#nomi-bpe-compact .step-count,#nomi-bpe-compact .quiet,#nomi-bpe-compact .token-count{color:var(--subtle);font-size:12px;font-variant-numeric:tabular-nums}
+#nomi-bpe-compact .input-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+#nomi-bpe-compact textarea{display:block;width:100%;resize:vertical;min-height:58px;max-height:180px;background:var(--soft);border:1px solid transparent;border-radius:10px;padding:10px 12px;font:inherit;color:var(--ink)}
+#nomi-bpe-compact textarea:focus{border-color:var(--subtle)}
+#nomi-bpe-compact .action-line{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:10px 0 18px}
+#nomi-bpe-compact .actions{display:flex;align-items:center;gap:5px;margin-left:auto}
+#nomi-bpe-compact button{font:inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;color:var(--ink);background:transparent;border-radius:8px}
+#nomi-bpe-compact button:disabled{opacity:.35}
+#nomi-bpe-compact button:not(:disabled):hover{background:var(--soft)}
+#nomi-bpe-compact .icon-button{width:32px;height:32px;padding:8px}
+#nomi-bpe-compact .merge-button{padding:7px 12px;background:var(--ink);color:var(--paper);font-size:13px;min-height:34px;margin-left:4px}
+#nomi-bpe-compact .merge-button:not(:disabled):hover{background:light-dark(#45474c,#c9cbd0)}
+#nomi-bpe-compact .tables-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);column-gap:24px;row-gap:22px;align-items:start}
+#nomi-bpe-compact .data-section{min-width:0}
+#nomi-bpe-compact .section-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+#nomi-bpe-compact table{width:100%;border-collapse:collapse;table-layout:auto;font-size:12px}
+#nomi-bpe-compact th{font-weight:400;color:var(--subtle);text-align:left;padding:5px 7px;border-bottom:1px solid var(--line);white-space:nowrap}
+#nomi-bpe-compact td{padding:var(--row-pad) 7px;border-bottom:1px solid var(--line);vertical-align:middle;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+#nomi-bpe-compact .number{text-align:right;width:52px}
+#nomi-bpe-compact .end{text-align:right;width:50px}
+#nomi-bpe-compact .round-col{width:30px;color:var(--subtle)}
+#nomi-bpe-compact .tokens{display:flex;align-items:center;flex-wrap:wrap;gap:3px;min-width:0}
+#nomi-bpe-compact .token{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;display:inline-block;border-radius:4px;padding:1px 4px;background:var(--soft);overflow-wrap:anywhere;max-width:100%}
+#nomi-bpe-compact .candidate-pair{display:inline-flex;align-items:center;gap:2px;border-radius:4px;background:var(--focus-fill);padding:1px 2px}
+#nomi-bpe-compact .candidate-pair .token{background:transparent;color:var(--focus-ink)}
+#nomi-bpe-compact .candidate-row{background:var(--focus-fill)}
+#nomi-bpe-compact .candidate-row .token{background:transparent}
+#nomi-bpe-compact .next-label{color:var(--focus-ink);font-size:11px}
+#nomi-bpe-compact .rule{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+#nomi-bpe-compact .latest .token.new{color:var(--focus-ink);background:var(--focus-fill)}
+#nomi-bpe-compact .empty{color:var(--subtle);height:62px;text-align:center}
+#nomi-bpe-compact .more{color:var(--subtle);font-size:12px;width:100%;padding:6px;margin-top:2px}
+#nomi-bpe-compact [hidden]{display:none!important}
+#nomi-bpe-compact .announcement{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+@media(max-width:570px){#nomi-bpe-compact{padding:14px}#nomi-bpe-compact .tables-grid{grid-template-columns:minmax(0,1fr);gap:20px}#nomi-bpe-compact textarea{font-size:16px}#nomi-bpe-compact .lab-heading{padding-right:55px}}
+@media(pointer:coarse){#nomi-bpe-compact button{min-height:44px}#nomi-bpe-compact .icon-button{width:44px}}
+@media(prefers-reduced-motion:no-preference){#nomi-bpe-compact .latest .new{animation:nomi-bpe-merge .25s ease-out}@keyframes nomi-bpe-merge{from{transform:scale(.86)}to{transform:scale(1)}}}
+</style>
+<script>
+(()=>{
+const root=document.getElementById('nomi-bpe-compact');
+const input=root.querySelector('textarea');
+const end='</w>';
+const defaults='we learn to learn and we love learning';
+let step=0,expanded={},lastResult=null;
+const design={density:'紧凑',highlight:true};
+const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const display=s=>s.replaceAll(end,'▁');
+const token=(s,extra='')=>'<span class="token '+extra+'">'+escape(display(s))+'</span>';
+function train(corpus,count){
+ const words=corpus.trim().split(/\s+/u).filter(Boolean);
+ let sequences=words.map(w=>[...Array.from(w),end]);
+ const initial=sequences.reduce((sum,s)=>sum+s.length,0);
+ const learned=[...new Set(sequences.flat())].sort();
+ const rules=[];
+ function pairs(){const counts=new Map();for(const seq of sequences)for(let i=0;i<seq.length-1;i++){const k=JSON.stringify([seq[i],seq[i+1]]);counts.set(k,(counts.get(k)||0)+1)}return [...counts].sort((a,b)=>b[1]-a[1]||(a[0]<b[0]?-1:a[0]>b[0]?1:0)).map(([k,n])=>[...JSON.parse(k),n])}
+ for(let n=0;n<count;n++){const best=pairs()[0];if(!best)break;const[a,b,f]=best;const merged=a+b;sequences=sequences.map(seq=>{const result=[];for(let i=0;i<seq.length;i++){if(seq[i]===a&&seq[i+1]===b){result.push(merged);i++}else result.push(seq[i])}return result});if(!learned.includes(merged))learned.push(merged);rules.push([a,b,merged,f]);}
+ const freq=new Map();sequences.flat().forEach(t=>freq.set(t,(freq.get(t)||0)+1));
+ const unique=new Map();words.forEach((w,i)=>{if(unique.has(w))unique.get(w).count++;else unique.set(w,{word:w,count:1,tokens:sequences[i]})});
+ return {words:[...unique.values()],pairs:pairs(),rules,vocab:learned.map((t,id)=>({id,token:t,count:freq.get(t)||0})),initial,total:sequences.reduce((sum,s)=>sum+s.length,0)};
+}
+function persist(){const api=window.openai;if(api&&api.setWidgetState)api.setWidgetState({modelContent:{prototype:'BPE 紧凑版',sentence:input.value,step},privateContent:{expanded}}).catch(()=>{});}
+function more(name,rows,make){const limit=6;const open=expanded[name];let visible=rows;if(!open&&rows.length>limit)visible=(name==='rules'||(name==='vocab'&&step>0))?rows.slice(-limit):rows.slice(0,limit);root.querySelector('[data-table="'+name+'"]').innerHTML=visible.length?visible.map(make).join(''):'<tr><td colspan="3" class="empty">'+(name==='rules'?'尚未合并':name==='pairs'?(input.value.trim()?'已全部合并':'—'):'—')+'</td></tr>';const button=root.querySelector('[data-expand="'+name+'"]');button.hidden=rows.length<=limit;button.textContent=open?'收起':'展开全部 '+rows.length+' 项';button.setAttribute('aria-expanded',String(!!open));}
+function render(){
+ const r=train(input.value,step);step=r.rules.length;lastResult=r;const next=r.pairs[0];
+ root.style.setProperty('--row-pad',design.density==='紧凑'?'7px':'11px');
+ root.querySelector('.step-count').textContent='第 '+step+' 轮';
+ root.querySelector('.token-count').textContent='词元 '+r.initial+(step?' → '+r.total:'');
+ root.querySelector('.rules-count').textContent=r.rules.length||'';
+ root.querySelector('.vocab-count').textContent=r.vocab.length||'';
+ root.querySelector('[data-action="back"]').disabled=step===0;
+ root.querySelector('[data-action="reset"]').disabled=step===0;
+ const btn=root.querySelector('[data-action="next"]');btn.disabled=!next;btn.textContent=next?'合并 '+display(next[0])+' + '+display(next[1]):(r.total?'已完成':'合并下一步');
+ more('words',r.words,row=>{let html='';for(let i=0;i<row.tokens.length;i++){if(design.highlight&&next&&row.tokens[i]===next[0]&&row.tokens[i+1]===next[1]){html+='<span class="candidate-pair">'+token(row.tokens[i])+token(row.tokens[++i])+'</span>'}else html+=token(row.tokens[i]);}return '<tr><td>'+escape(row.word)+'</td><td class="number">'+row.count+'</td><td><div class="tokens">'+html+'</div></td></tr>'});
+ more('pairs',r.pairs,(p,i)=>'<tr class="'+(i===0?'candidate-row':'')+'"><td><div class="rule">'+token(p[0])+'<span class="quiet">+</span>'+token(p[1])+'</div></td><td class="number">'+p[2]+'</td><td class="end next-label">'+(i===0?'←':'')+'</td></tr>');
+ more('rules',r.rules.map((rule,i)=>({rule,n:i+1})),({rule:p,n})=>'<tr class="'+(n===step?'latest':'')+'"><td class="round-col">'+n+'</td><td><div class="rule">'+token(p[0])+'<span class="quiet">+</span>'+token(p[1])+'<span class="quiet">→</span>'+token(p[2],'new')+'</div></td><td class="number">'+p[3]+'</td></tr>');
+ more('vocab',r.vocab,v=>'<tr class="'+(r.rules.length&&v.token===r.rules.at(-1)[2]?'latest':'')+'"><td class="round-col">'+v.id+'</td><td>'+token(v.token,'new')+'</td><td class="number">'+v.count+'</td></tr>');
+}
+input.addEventListener('input',e=>{if(e.isComposing)return;step=0;expanded={};render();persist()});
+input.addEventListener('compositionend',()=>{step=0;expanded={};render();persist()});
+root.addEventListener('click',e=>{const button=e.target.closest('button');if(!button||button.disabled)return;if(button.dataset.expand){const k=button.dataset.expand;expanded[k]=!expanded[k];render();persist();return;}const action=button.dataset.action;if(action==='next'){const p=lastResult.pairs[0];step++;render();root.querySelector('.announcement').textContent='第 '+step+' 轮：'+display(p[0])+' 加 '+display(p[1])+' 合并为 '+display(p[0]+p[1])+'，频次 '+p[2];}else if(action==='back'){step=Math.max(0,step-1);render();}else if(action==='reset'){step=0;render();}persist();});
+function restore(s){if(s?.modelContent?.prototype!=='BPE 紧凑版')return;const m=s.modelContent;input.value=typeof m.sentence==='string'?m.sentence.slice(0,700):defaults;step=Number.isInteger(m.step)?Math.max(0,Math.min(m.step,800)):0;expanded=s.privateContent?.expanded||{};}
+restore(window.openai?.widgetState);render();
+window.addEventListener('openai:set_globals',e=>{if(e.detail?.globals?.widgetState){restore(e.detail.globals.widgetState);render();}});
+if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:render});tweak.addSelect(design,'density',{label:'表格密度',options:['紧凑','舒展']});tweak.addToggle(design,'highlight',{label:'高亮待合并词元'});}
+})();
+</script>

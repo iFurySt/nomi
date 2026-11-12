@@ -1,0 +1,198 @@
+{
+  "schema": "nomi-interactive-ir/draft-2",
+  "id": "wave-lab",
+  "version": 1,
+  "profile": "portable.learning/draft-2",
+  "requires": {
+    "components": {
+      "Panel": 1,
+      "Text": 1,
+      "Slider": 1,
+      "Plot": 1,
+      "Math": 1,
+      "Button": 1
+    },
+    "functions": {
+      "math.multiply": 1,
+      "math.sin": 1,
+      "math.add": 1
+    },
+    "expressions": [
+      "literal",
+      "state",
+      "variable",
+      "derived",
+      "call",
+      "sampleFamily"
+    ],
+    "hostEffects": []
+  },
+  "budget": {
+    "maxSamplePointsPerSeries": 128,
+    "maxSeries": 4,
+    "maxStepsPerEvaluation": 10000
+  },
+  "state": {
+    "amplitude": {
+      "type": "number",
+      "scope": "user",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.1
+    },
+    "frequency": {
+      "type": "number",
+      "scope": "user",
+      "default": 1,
+      "min": 0.5,
+      "max": 3,
+      "step": 0.1
+    }
+  },
+  "derived": {
+    "curve": {
+      "kind": "sampleFamily",
+      "seriesVariable": "series",
+      "seriesValues": [0],
+      "sampleVariable": "x",
+      "domain": [0, 6.283185],
+      "count": 100,
+      "value": {
+        "kind": "call",
+        "function": "math.multiply",
+        "version": 1,
+        "args": [
+          {
+            "kind": "state",
+            "id": "amplitude"
+          },
+          {
+            "kind": "call",
+            "function": "math.sin",
+            "version": 1,
+            "args": [
+              {
+                "kind": "call",
+                "function": "math.multiply",
+                "version": 1,
+                "args": [
+                  {
+                    "kind": "variable",
+                    "id": "x"
+                  },
+                  {
+                    "kind": "state",
+                    "id": "frequency"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "actions": {
+    "reset": {
+      "kind": "reset",
+      "scope": "user",
+      "targets": ["amplitude", "frequency"]
+    }
+  },
+  "root": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": [
+          "title",
+          "amplitude",
+          "frequency",
+          "plot",
+          "formula",
+          "reset"
+        ]
+      }
+    },
+    {
+      "id": "title",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "role": "heading",
+        "text": "波的形状"
+      }
+    },
+    {
+      "id": "amplitude",
+      "component": "Slider",
+      "version": 1,
+      "props": {
+        "label": "振幅 A",
+        "min": 0,
+        "max": 2,
+        "step": 0.1
+      },
+      "bind": {
+        "value": "amplitude"
+      }
+    },
+    {
+      "id": "frequency",
+      "component": "Slider",
+      "version": 1,
+      "props": {
+        "label": "频率 ω",
+        "min": 0.5,
+        "max": 3,
+        "step": 0.1
+      },
+      "bind": {
+        "value": "frequency"
+      }
+    },
+    {
+      "id": "plot",
+      "component": "Plot",
+      "version": 1,
+      "props": {
+        "series": {
+          "kind": "derived",
+          "id": "curve"
+        },
+        "markers": [],
+        "seriesLabels": ["波形"],
+        "xAxis": {
+          "label": "x",
+          "domain": [0, 6.283185]
+        },
+        "yAxis": {
+          "label": "y",
+          "domain": [-2.1, 2.1]
+        }
+      }
+    },
+    {
+      "id": "formula",
+      "component": "Math",
+      "version": 1,
+      "props": {
+        "source": "y=A\\sin(\\omega x)"
+      }
+    },
+    {
+      "id": "reset",
+      "component": "Button",
+      "version": 1,
+      "props": {
+        "label": "重置"
+      },
+      "on": {
+        "activate": "reset"
+      }
+    }
+  ]
+}

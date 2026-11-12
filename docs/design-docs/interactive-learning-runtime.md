@@ -1,8 +1,26 @@
 # 交互学习运行时：第一轮实现
 
-状态：2026-10-19，Electron / React 可运行纵向切片。长期方向以 [GenUI 设计](generative-interactive-content.md) 为准。
+状态：2026-11-09，Electron / React 支持 draft-1 与 portable draft-2。下文早期 Learn 路由属于历史切片，当前入口为文稿 / Canvas。长期方向以 [GenUI 设计](generative-interactive-content.md) 为准。
 
-## 已实现的体验
+## draft-2 当前扩展
+
+新增 TextInput、Metric、Table、Scene 四种组件（共 12 种），string 状态声明 maxLength，`set` 动作计算并校验新值后原子更新。Scene 仅包含 rect / circle / line / text，颜色为语义 token，坐标和项目数有界；不包含原始 SVG / HTML / JS。
+
+函数均版本 1：math.add/subtract/multiply/divide/pow/min/max/sin/cos，number.format（0..8 小数位，舍入零不显示负号），string.concat，object.get，array.length，learning.bpe；继承 draft-1 的函数。非有限计算、越界和未知能力拒绝，失败的派生计算不会污染下一次循环检测。
+
+BPE 是教学用字符算法：最多 1024 个 UTF-16 长度单位、128 个空白分隔词、32 次合并；以 Unicode code point 起始，每词追加保留边界 `</w>`，输入不能包含此标记。重复词参与计频，邻接对计重叠频次，合并按从左到右非重叠替换。频次相同时按 JSON 编码 pair key 的 UTF-16 字典序选择。返回真实完成步数、初始 / 当前 token 数、分词、合并规则、当前 pair 频次及当前词表；`vocabulary` 仍表示当前分词频次，不是训练词表；新增 `learnedVocabulary` 返回 `[教学 ID, token, 当前频次]`，保留初始字符与所有已学习 token，当前频次可为零。初始字符按 UTF-16 字典序编号，新 token 按首次学习顺序追加；不对应任何生产 tokenizer ID。每轮消耗共享求值预算，没有后台请求。
+
+新增能力必须显式使用 draft-2 schema / profile；旧程序不自动迁移。控件结果、定义与个人进度继续分离。输入错误按节点显示短提示，保留输入框供修正；set 动作错误不提交状态。
+
+验证：`packages/core/src/interactive/v2.test.ts`、`node scripts/check-interactive-v2.mjs`；在线合成生成 fixture 位于 `packages/core/src/interactive/fixtures/`。Swift 参考目前只覆盖旧 draft-1；多端一致性契约不是已交付的移动 renderer。
+
+## 2026-11-11 紧凑 presentation
+
+在 draft-2 中，Table / Button / TextInput 新增组件 version 2，必须同时在 requires 与 node 声明。Table 提供 visibleRows、window、highlightRow 、hint/showCount/columnAlign/emptyText 与 tokens/emphasis/groups/joiners 单元格；Button 提供语义 icon、variant、disabled；TextInput 支持 hideLabel 保留无障碍名称；resetTargets 在内容变化时恢复关联状态的默认值。其余组件仍为 version 1，既有定义继续可用。
+
+折叠不截断求值数据；输入变化会清空 BPE 步数，保留用户语料。紧凑 BPE 同源于 core、Skill 及 host 生成示例，详见 [外部 Agent 创作规范](interactive-authoring-skill.md)。React renderer 采用黑白灰与少量蓝色、两列紧凑表格及窄屏堆叠；文稿宿主不重复添加标题和外层留白。Swift 参考尚不支持这些新组件版本。
+
+## 2026-10-19 历史切片
 
 桌面左侧 **Learn**（`#/learn`）运行温度探索器：Slider、两种曲线模式、三个 token 的概率与 marker、LaTeX 公式、数值表和 Reset。控件计算完全在本机完成，不发送模型或网络请求。浅色、深色和窄屏沿用已有桌面外壳。
 

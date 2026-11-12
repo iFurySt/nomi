@@ -1,0 +1,460 @@
+{
+  "schema": "nomi-interactive-ir/draft-2",
+  "id": "bpe-lab",
+  "version": 1,
+  "profile": "portable.learning/draft-2",
+  "requires": {
+    "components": {
+      "Panel": 1,
+      "Text": 1,
+      "TextInput": 1,
+      "Row": 1,
+      "Button": 1,
+      "Metric": 1,
+      "Table": 1
+    },
+    "functions": {
+      "learning.bpe": 1,
+      "object.get": 1,
+      "math.min": 1,
+      "math.max": 1,
+      "math.add": 1,
+      "math.subtract": 1
+    },
+    "expressions": ["literal", "state", "derived", "call"],
+    "hostEffects": []
+  },
+  "budget": {
+    "maxSamplePointsPerSeries": 128,
+    "maxSeries": 4,
+    "maxStepsPerEvaluation": 100000
+  },
+  "state": {
+    "corpus": {
+      "type": "string",
+      "scope": "user",
+      "default": "we learn to learn and we love learning",
+      "maxLength": 1024
+    },
+    "step": {
+      "type": "number",
+      "scope": "user",
+      "default": 0,
+      "min": 0,
+      "max": 32,
+      "step": 1
+    }
+  },
+  "derived": {
+    "training": {
+      "kind": "call",
+      "function": "learning.bpe",
+      "version": 1,
+      "args": [
+        {
+          "kind": "state",
+          "id": "corpus"
+        },
+        {
+          "kind": "state",
+          "id": "step"
+        }
+      ]
+    }
+  },
+  "actions": {
+    "next": {
+      "kind": "set",
+      "scope": "user",
+      "target": "step",
+      "value": {
+        "kind": "call",
+        "function": "math.min",
+        "version": 1,
+        "args": [
+          {
+            "kind": "literal",
+            "value": 32
+          },
+          {
+            "kind": "call",
+            "function": "math.add",
+            "version": 1,
+            "args": [
+              {
+                "kind": "call",
+                "function": "object.get",
+                "version": 1,
+                "args": [
+                  {
+                    "kind": "derived",
+                    "id": "training"
+                  },
+                  {
+                    "kind": "literal",
+                    "value": "step"
+                  }
+                ]
+              },
+              {
+                "kind": "literal",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "previous": {
+      "kind": "set",
+      "scope": "user",
+      "target": "step",
+      "value": {
+        "kind": "call",
+        "function": "math.max",
+        "version": 1,
+        "args": [
+          {
+            "kind": "literal",
+            "value": 0
+          },
+          {
+            "kind": "call",
+            "function": "math.subtract",
+            "version": 1,
+            "args": [
+              {
+                "kind": "state",
+                "id": "step"
+              },
+              {
+                "kind": "literal",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "reset": {
+      "kind": "reset",
+      "scope": "user",
+      "targets": ["corpus", "step"]
+    },
+    "restart": {
+      "kind": "reset",
+      "scope": "user",
+      "targets": ["step"]
+    }
+  },
+  "root": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": [
+          "heading",
+          "intro",
+          "corpus",
+          "controls",
+          "metrics",
+          "process",
+          "results"
+        ]
+      }
+    },
+    {
+      "id": "process",
+      "component": "Row",
+      "version": 1,
+      "props": {
+        "children": ["segmentation", "candidates"]
+      }
+    },
+    {
+      "id": "results",
+      "component": "Row",
+      "version": 1,
+      "props": {
+        "children": ["rules", "lexicon"]
+      }
+    },
+    {
+      "id": "segmentation",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["words"]
+      }
+    },
+    {
+      "id": "candidates",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["pairs"]
+      }
+    },
+    {
+      "id": "rules",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["merges"]
+      }
+    },
+    {
+      "id": "lexicon",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["vocabulary"]
+      }
+    },
+    {
+      "id": "heading",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "BPE · 从字符到词元",
+        "role": "heading"
+      }
+    },
+    {
+      "id": "intro",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "每次合并候选表首行；改写句子后，可点「从头开始」。"
+      }
+    },
+    {
+      "id": "corpus",
+      "component": "TextInput",
+      "version": 1,
+      "props": {
+        "label": "语料",
+        "multiline": true
+      },
+      "bind": {
+        "value": "corpus"
+      }
+    },
+    {
+      "id": "controls",
+      "component": "Row",
+      "version": 1,
+      "props": {
+        "children": ["prev", "next", "reset"]
+      }
+    },
+    {
+      "id": "prev",
+      "component": "Button",
+      "version": 1,
+      "props": {
+        "label": "上一步"
+      },
+      "on": {
+        "activate": "previous"
+      }
+    },
+    {
+      "id": "next",
+      "component": "Button",
+      "version": 1,
+      "props": {
+        "label": "下一步"
+      },
+      "on": {
+        "activate": "next"
+      }
+    },
+    {
+      "id": "reset",
+      "component": "Button",
+      "version": 1,
+      "props": {
+        "label": "从头开始"
+      },
+      "on": {
+        "activate": "restart"
+      }
+    },
+    {
+      "id": "metrics",
+      "component": "Row",
+      "version": 1,
+      "props": {
+        "children": ["before", "after", "round"]
+      }
+    },
+    {
+      "id": "before",
+      "component": "Metric",
+      "version": 1,
+      "props": {
+        "label": "初始词元",
+        "value": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "initialTokens"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "after",
+      "component": "Metric",
+      "version": 1,
+      "props": {
+        "label": "当前词元",
+        "value": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "tokenCount"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "round",
+      "component": "Metric",
+      "version": 1,
+      "props": {
+        "label": "已合并",
+        "value": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "step"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "words",
+      "component": "Table",
+      "version": 1,
+      "props": {
+        "caption": "当前分词",
+        "columns": ["单词", "词元"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "words"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "pairs",
+      "component": "Table",
+      "version": 1,
+      "props": {
+        "caption": "候选词对 · 首行优先",
+        "columns": ["左", "右", "频次"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "pairs"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "merges",
+      "component": "Table",
+      "version": 1,
+      "props": {
+        "caption": "合并规则",
+        "columns": ["步骤", "左", "右", "结果", "频次"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "merges"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "vocabulary",
+      "component": "Table",
+      "version": 1,
+      "props": {
+        "caption": "已学习词表",
+        "columns": ["ID", "词元", "当前频次"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "learnedVocabulary"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

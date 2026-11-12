@@ -32,6 +32,8 @@ Node host 管理 `.nomi` 包、原件、目录切换、保存事务和 ChatGPT �
 
 交互 IR、React 温度探索器、本机独立进度与 Swift 计算参考已实现，见 [运行时说明](design-docs/interactive-learning-runtime.md)。新增 Document / Note / Block / Placement / Connector 本地内核和画布编辑器，支持基础 shape、对齐吸附与摆放端点绑定，桌面结构与附件原件在可配置目录内以 `.nomi` 文件包保存（Markdown / GenUI 源、原件及 children 子包），完整工作区投影用于恢复；浏览器使用 IndexedDB；桌面文稿层级与实际文件夹双向联动，camera / study state 单独保存，见 [画布实现](design-docs/canvas-workspace-runtime.md)。这仍是单机实现，笔迹、跨端同步与对外 DSL 包规范仍待开发，不能混同金融 SQLite 或家庭 workspace。推荐的存储、鉴权、同步房间和手写实验见 [整体设计](design-docs/notes-infinite-canvas.md)；文档语法与往返约束见 [DSL 草案](design-docs/notes-canvas-dsl.md)。GenUI、OpenUI 复用评估、跨语言测试与温度探索器的实施顺序以 [交互内容修订](design-docs/generative-interactive-content.md) 为准。
 
+2026-11-09 的 [交互块 v2 提案](design-docs/interactive-content-v2.md) 明确同一 DSL 共享状态、计算和交互语义，各平台分别适配布局、控件与动效。portable draft-2 已实现文本输入、数据表格、纯计算、语义图形与流式节点预览；Web 扩展及安全回退仍在设计中；HTML / JS、anime.js / Three.js 隔离执行尚未实现，不改变当前禁止执行生成代码的边界。
+
 ## 家庭资料服务边界
 
 以下描述当前已运行的 iOS / server beta，不代表个人工作台所有领域的最终数据模型。旧 `/records`、`/ask`、`/ai/extract-image` 与旧 Swift macOS 客户端不兼容；新的 Electron 工作台是独立实现。

@@ -1,3 +1,4 @@
+import { learningFunctionArity } from "./functions";
 import { InteractiveError, interactiveComponents } from "./types";
 import type { InteractiveNode, InteractiveProgram } from "./types";
 import {
@@ -53,6 +54,10 @@ const text = (v: unknown, max = 4096) => {
 };
 const fields: Record<string, string[]> = {
   Panel: ["children"],
+  TextInput: ["label", "multiline"],
+  Table: ["columns", "rows", "caption"],
+  Metric: ["label", "value", "unit"],
+  Scene: ["width", "height", "label", "items"],
   Row: ["children"],
   Text: ["text", "role"],
   Button: ["label"],
@@ -60,6 +65,19 @@ const fields: Record<string, string[]> = {
   Slider: ["label", "min", "max", "step", "marks"],
   Math: ["source"],
   Plot: ["series", "markers", "xAxis", "yAxis", "seriesLabels"],
+};
+const enhancedFields: Record<string, string[]> = {
+  Table: [
+    "visibleRows",
+    "window",
+    "highlightRow",
+    "hint",
+    "showCount",
+    "columnAlign",
+    "emptyText",
+  ],
+  Button: ["icon", "variant", "disabled"],
+  TextInput: ["resetTargets", "hideLabel"],
 };
 export interface PlotSeries {
   series: number;
@@ -79,14 +97,160 @@ export interface PlotAxis {
 export function validateResolvedProps(
   component: string,
   p: Record<string, any>,
+  version = 1,
 ) {
+  if (component === "TextInput") {
+    text(p.label, 128);
+    if (p.hideLabel !== undefined && typeof p.hideLabel !== "boolean")
+      fail("Invalid input label visibility.");
+    if (p.multiline !== undefined && typeof p.multiline !== "boolean")
+      fail("Invalid input mode.");
+  }
+  if (component === "Metric") {
+    text(p.label, 128);
+    if (typeof p.value === "number") number(p.value);
+    else text(p.value, 256);
+    if (p.unit !== undefined) text(p.unit, 64);
+  }
+  if (component === "Table") {
+    const columns = list(p.columns, 12);
+    if (!columns.length) fail("Missing columns.");
+    columns.forEach((v) => text(v, 128));
+    if (p.caption !== undefined) text(p.caption, 256);
+    if (p.hint !== undefined) text(p.hint, 128);
+    if (p.emptyText !== undefined) text(p.emptyText, 128);
+    if (p.showCount !== undefined && typeof p.showCount !== "boolean")
+      fail("Invalid table count visibility.");
+    if (p.columnAlign !== undefined) {
+      if (
+        list(p.columnAlign, 12).length !== columns.length ||
+        p.columnAlign.some(
+          (a: unknown) => !["left", "right"].includes(String(a)),
+        )
+      )
+        fail("Invalid table alignment.");
+    }
+    if (p.visibleRows !== undefined) integer(p.visibleRows, 1, 20);
+    if (p.highlightRow !== undefined) integer(p.highlightRow, -1, 1023);
+    if (p.window !== undefined && !["start", "end"].includes(p.window))
+      fail("Invalid table window.");
+    for (const row of list(p.rows, 1024)) {
+      if (list(row, 12).length !== columns.length)
+        fail("Table column mismatch.");
+      row.forEach((v: unknown) => {
+        if (version === 2 && v && typeof v === "object" && !Array.isArray(v)) {
+          const cell = object(v);
+          keys(cell, ["tokens", "emphasis", "groups", "joiners"]);
+          const tokens = list(cell.tokens, 1025);
+          tokens.forEach((t) => text(t, 2048));
+          for (const index of list(cell.emphasis ?? [], 1025))
+            integer(index, 0, tokens.length - 1);
+          if (cell.joiners !== undefined) {
+            if (
+              list(cell.joiners, 1024).length !== Math.max(0, tokens.length - 1)
+            )
+              fail("Invalid token joiners.");
+            cell.joiners.forEach((j: unknown) => {
+              if (!["+", "→"].includes(String(j)))
+                fail("Invalid token joiner.");
+            });
+          }
+          const grouped = new Set<number>();
+          for (const group of list(cell.groups ?? [], 512)) {
+            const indices = list(group, 1025);
+            if (indices.length < 2)
+              fail("Token group requires adjacent tokens.");
+            indices.forEach((index, i) => {
+              integer(index, 0, tokens.length - 1);
+              if (
+                grouped.has(index as number) ||
+                (i && index !== (indices[i - 1] as number) + 1)
+              )
+                fail("Invalid token group.");
+              grouped.add(index as number);
+            });
+          }
+        } else if (typeof v === "number") number(v);
+        else text(v, 2048);
+      });
+    }
+  }
+  if (component === "Scene") {
+    integer(p.width, 100, 1200);
+    integer(p.height, 80, 800);
+    text(p.label, 256);
+    const color = (v: unknown) => {
+      if (
+        v !== undefined &&
+        ![
+          "ink",
+          "muted",
+          "accent",
+          "blue",
+          "green",
+          "orange",
+          "surface",
+          "none",
+        ].includes(v as string)
+      )
+        fail("Invalid semantic color.");
+    };
+    for (const item of list(p.items, 128)) {
+      const q = object(item);
+      keys(q, [
+        "type",
+        "x",
+        "y",
+        "width",
+        "height",
+        "radius",
+        "x2",
+        "y2",
+        "text",
+        "fill",
+        "stroke",
+      ]);
+      if (!["rect", "circle", "line", "text"].includes(q.type))
+        fail("Unsupported graphic.");
+      for (const k of ["x", "y"])
+        if (Math.abs(number(q[k])) > 4000) fail("Graphic outside bounds.");
+      for (const k of ["width", "height", "radius", "x2", "y2"])
+        if (q[k] !== undefined && Math.abs(number(q[k])) > 4000)
+          fail("Graphic outside bounds.");
+      if (
+        q.type === "rect" &&
+        (!(number(q.width) > 0) || !(number(q.height) > 0))
+      )
+        fail("Invalid rectangle.");
+      if (q.type === "circle" && !(number(q.radius) > 0))
+        fail("Invalid circle.");
+      if (q.type === "line") {
+        number(q.x2);
+        number(q.y2);
+      }
+      if (q.type === "text") text(q.text, 256);
+      color(q.fill);
+      color(q.stroke);
+    }
+  }
   if (component === "Text") {
     text(p.text);
     if (p.role !== undefined && p.role !== "heading")
       fail("Unsupported text role.");
   }
   if (component === "Math") text(p.source, 8192);
-  if (component === "Button") text(p.label, 128);
+  if (component === "Button") {
+    text(p.label, 128);
+    if (p.icon !== undefined && !["previous", "restart"].includes(p.icon))
+      fail("Unsupported button icon.");
+    if (
+      p.variant !== undefined &&
+      !["primary", "secondary"].includes(p.variant)
+    )
+      fail("Unsupported button variant.");
+    if (p.disabled !== undefined && typeof p.disabled !== "boolean")
+      fail("Invalid disabled state.");
+  }
   if (component === "Slider") {
     text(p.label, 128);
     if (!(number(p.min) < number(p.max)) || !(number(p.step) > 0))
@@ -210,9 +374,13 @@ export function parseInteractiveProgram(
     "root",
     "nodes",
   ]);
+  const v2 =
+    p.schema === "nomi-interactive-ir/draft-2" &&
+    p.profile === "portable.learning/draft-2";
   if (
-    p.schema !== "nomi-interactive-ir/draft-1" ||
-    p.profile !== "portable.learning/draft-1"
+    !v2 &&
+    (p.schema !== "nomi-interactive-ir/draft-1" ||
+      p.profile !== "portable.learning/draft-1")
   )
     fail("Unsupported interactive protocol.", "capability");
   id(p.id);
@@ -234,10 +402,18 @@ export function parseInteractiveProgram(
     "sampleFamily",
   ];
   for (const [k, v] of Object.entries(object(req.components)))
-    if (!interactiveComponents.includes(k as any) || v !== 1)
+    if (
+      !interactiveComponents.includes(k as any) ||
+      (v !== 1 && !(v2 && v === 2 && Object.hasOwn(enhancedFields, k))) ||
+      (!v2 && ["TextInput", "Table", "Metric", "Scene"].includes(k))
+    )
       fail(`Unsupported component: ${k}`, "capability");
   for (const [k, v] of Object.entries(object(req.functions)))
-    if (!interactiveFunctions.includes(k as any) || v !== 1)
+    if (
+      !interactiveFunctions.includes(k as any) ||
+      v !== 1 ||
+      (!v2 && Object.hasOwn(learningFunctionArity, k))
+    )
       fail(`Unsupported function: ${k}`, "capability");
   for (const k of list(req.expressions, 16))
     if (!kinds.includes(k)) fail("Unsupported expression.", "capability");
@@ -261,9 +437,14 @@ export function parseInteractiveProgram(
       "values",
       "itemType",
       "length",
+      ...(v2 ? ["maxLength"] : []),
     ]);
-    if (d.scope !== "user" || !["number", "enum", "vector"].includes(d.type))
+    if (
+      d.scope !== "user" ||
+      !["number", "enum", "vector", ...(v2 ? ["string"] : [])].includes(d.type)
+    )
       fail("Unsupported state type or scope.");
+    if (d.type === "string") integer(d.maxLength, 1, 4096);
     if (d.type === "number") {
       if (d.min !== undefined) number(d.min);
       if (d.max !== undefined) number(d.max);
@@ -331,7 +512,11 @@ export function parseInteractiveProgram(
           fail("Undeclared function.", "capability");
         {
           const args = list(e.args, 3);
-          if (args.length !== (e.function === "array.replaceAt" ? 3 : 2))
+          if (
+            args.length !==
+            (learningFunctionArity[e.function] ??
+              (e.function === "array.replaceAt" ? 3 : 2))
+          )
             fail("Invalid function arity.");
           args.forEach((x) => walk(x));
         }
@@ -403,6 +588,13 @@ export function parseInteractiveProgram(
   for (const [key, a] of Object.entries(actions)) {
     id(key);
     const d = object(a);
+    if (v2 && d.kind === "set") {
+      keys(d, ["kind", "scope", "target", "value"]);
+      if (d.scope !== "user" || !Object.hasOwn(states, d.target))
+        fail("Invalid action target.");
+      expression(d.value, new Set());
+      continue;
+    }
     keys(d, ["kind", "scope", "targets"]);
     if (d.kind !== "reset" || d.scope !== "user")
       fail("Unsupported action.", "capability");
@@ -425,16 +617,37 @@ export function parseInteractiveProgram(
     keys(node, ["id", "component", "version", "props", "bind", "on"]);
     id(node.id);
     if (byId.has(node.id)) fail("Duplicate view identity.");
-    if (req.components[node.component] !== 1 || node.version !== 1)
+    if (
+      !req.components[node.component] ||
+      req.components[node.component] !== node.version
+    )
       fail("Undeclared component.", "capability");
-    keys(object(node.props), fields[node.component] ?? []);
+    keys(object(node.props), [
+      ...(fields[node.component] ?? []),
+      ...(node.version === 2 ? (enhancedFields[node.component] ?? []) : []),
+    ]);
+    if (node.props.resetTargets !== undefined) {
+      for (const target of list(node.props.resetTargets, 32)) {
+        if (
+          typeof target !== "string" ||
+          !Object.hasOwn(states, target) ||
+          target === node.bind?.value
+        )
+          fail("Invalid reset target.");
+      }
+    }
     data(node.props);
     if (node.bind) {
       keys(object(node.bind), ["value"]);
       const def =
         Object.hasOwn(states, node.bind.value) && states[node.bind.value];
-      if (!def || !["Slider", "SegmentedControl"].includes(node.component))
+      if (
+        !def ||
+        !["Slider", "SegmentedControl", "TextInput"].includes(node.component)
+      )
         fail("Invalid input binding.");
+      if (node.component === "TextInput" && def.type !== "string")
+        fail("Text input needs a string binding.");
       if (
         node.component === "Slider" &&
         (def.type !== "number" ||
@@ -453,7 +666,9 @@ export function parseInteractiveProgram(
           ))
       )
         fail("Options must cover bound enum.");
-    } else if (["Slider", "SegmentedControl"].includes(node.component))
+    } else if (
+      ["Slider", "SegmentedControl", "TextInput"].includes(node.component)
+    )
       fail("Inputs need a state binding.");
     if (node.on) {
       keys(object(node.on), ["activate"]);
@@ -487,6 +702,6 @@ export function parseInteractiveProgram(
   const program = structuredClone(p) as InteractiveProgram;
   const runtime = evaluateProgram(program, hydrateStudyState(program));
   for (const node of program.nodes)
-    validateResolvedProps(node.component, runtime.props(node.id));
+    validateResolvedProps(node.component, runtime.props(node.id), node.version);
   return program;
 }

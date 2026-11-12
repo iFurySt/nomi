@@ -19,7 +19,7 @@ export type Expression =
       value: Expression;
     };
 export interface StateDefinition {
-  type: "number" | "enum" | "vector";
+  type: "number" | "enum" | "vector" | "string";
   default: Value;
   scope: "user";
   min?: number;
@@ -28,6 +28,7 @@ export interface StateDefinition {
   values?: string[];
   itemType?: "number";
   length?: number;
+  maxLength?: number;
 }
 export const interactiveComponents = [
   "Panel",
@@ -38,21 +39,25 @@ export const interactiveComponents = [
   "Slider",
   "Math",
   "Plot",
+  "TextInput",
+  "Table",
+  "Metric",
+  "Scene",
 ] as const;
 export type InteractiveComponent = (typeof interactiveComponents)[number];
 export interface InteractiveNode {
   id: string;
   component: InteractiveComponent;
-  version: 1;
+  version: 1 | 2;
   props: Record<string, unknown>;
   bind?: { value: string };
   on?: { activate: string };
 }
 export interface InteractiveProgram {
-  schema: "nomi-interactive-ir/draft-1";
+  schema: "nomi-interactive-ir/draft-1" | "nomi-interactive-ir/draft-2";
   id: string;
   version: number;
-  profile: "portable.learning/draft-1";
+  profile: "portable.learning/draft-1" | "portable.learning/draft-2";
   requires: {
     components: Record<string, number>;
     functions: Record<string, number>;
@@ -66,7 +71,11 @@ export interface InteractiveProgram {
   };
   state: Record<string, StateDefinition>;
   derived: Record<string, Expression>;
-  actions: Record<string, { kind: "reset"; scope: "user"; targets: string[] }>;
+  actions: Record<
+    string,
+    | { kind: "reset"; scope: "user"; targets: string[] }
+    | { kind: "set"; scope: "user"; target: string; value: Expression }
+  >;
   root: string;
   nodes: InteractiveNode[];
 }

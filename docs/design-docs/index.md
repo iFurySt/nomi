@@ -26,6 +26,9 @@
 - [连线编辑与浮动工具栏](connector-editing.md)：边界锚点吸附、端点 / 线段、标记与样式、文字、剪贴板、层级和锁定的实现契约。
 - [交互学习运行时实现](interactive-learning-runtime.md)：Learn 实验、严格 IR、定义与个人进度分离、React renderer 与独立 Swift 数值 / 事件 conformance。
 - [生成式交互内容与跨平台 DSL](generative-interactive-content.md)：当前修订入口，覆盖 interactive learning、AI GenUI、平台中立 IR、状态 / 计算 / 动作和原生 renderer。
+- [交互块 v2：统一语义与多端呈现](interactive-content-v2.md)：portable v2 第一版已实现；可选 Web 实现、原生适配与安全边界的长期设计。
+- [交互块 v2 验收](interactive-v2-validation.md)：实际在线生成、数值验证、流式与窄屏检查。
+- [外部 Agent 交互块创作 Skill](interactive-authoring-skill.md)：可分发创作规范、程序示例、离线校验与实际导入边界。
 - [Temperature Explorer 契约样例](interactive-learning-example/README.md)：静态 IR、参考概率与预期事件，未实现运行时。
 - [OpenUI 源码评估](../references/openui-genui-review.md)：两仓库的分工、可复用边界和源码证据。
 

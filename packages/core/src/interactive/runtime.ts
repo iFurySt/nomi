@@ -1,3 +1,4 @@
+import { callLearningFunction, learningFunctionArity } from "./functions";
 import type {
   Expression,
   InteractiveProgram,
@@ -28,6 +29,7 @@ export const interactiveFunctions = [
   "math.softmax",
   "array.at",
   "array.replaceAt",
+  ...Object.keys(learningFunctionArity),
 ] as const;
 const obj = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -35,6 +37,8 @@ export function validStateValue(
   def: InteractiveProgram["state"][string],
   value: unknown,
 ): value is Value {
+  if (def.type === "string")
+    return typeof value === "string" && value.length <= (def.maxLength ?? 1024);
   if (def.type === "number")
     return (
       typeof value === "number" &&
@@ -90,6 +94,10 @@ export function runStudyAction(
 ): StudyState {
   const def = Object.hasOwn(program.actions, action) && program.actions[action];
   if (!def) throw new InteractiveError("reference", "Unknown action.");
+  if (def.kind === "set") {
+    const value = evaluateProgram(program, state).expression(def.value);
+    return setStudyValue(program, state, def.target, value);
+  }
   const next = { ...state };
   for (const key of def.targets)
     next[key] = structuredClone(program.state[key].default);
@@ -113,10 +121,13 @@ export function evaluateProgram(
     if (active.has(id))
       throw new InteractiveError("cycle", "Cyclic computation.");
     active.add(id);
-    const value = expr(program.derived[id], Object.create(null));
-    active.delete(id);
-    memo.set(id, value);
-    return value;
+    try {
+      const value = expr(program.derived[id], Object.create(null));
+      memo.set(id, value);
+      return value;
+    } finally {
+      active.delete(id);
+    }
   };
   const expr = (e: Expression, vars: Record<string, Value>): Value => {
     step();
@@ -160,6 +171,8 @@ export function evaluateProgram(
             throw new InteractiveError("domain", "Invalid softmax arguments.");
           return softmax(args[0] as number[], args[1]);
         }
+        if (Object.hasOwn(learningFunctionArity, e.function))
+          return callLearningFunction(e.function, args, step);
         const [list, index, value] = args;
         if (
           !Array.isArray(list) ||
@@ -224,6 +237,7 @@ export function evaluateProgram(
   };
   return {
     derived,
+    expression: (value: Expression) => expr(value, Object.create(null)),
     props: (nodeId: string): Record<string, unknown> => {
       const node = program.nodes.find((n) => n.id === nodeId);
       if (!node) throw new InteractiveError("reference", "Unknown view node.");

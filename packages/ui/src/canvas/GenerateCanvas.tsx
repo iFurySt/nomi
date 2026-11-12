@@ -8,7 +8,7 @@ import {
 import type { Editor } from "@tiptap/core";
 import { ArrowUp, Square, X, Sparkles } from "lucide-react";
 import {
-  canvasGenerationPrefix,
+  interactiveGenerationPrefix,
   parseCanvasGeneration,
   parseNoteGeneration,
   NOTE_INTERACTION_REQUIRED,
@@ -162,7 +162,7 @@ export function GenerateCanvas({
           if (request.current !== id || streamError) return;
           try {
             text += delta;
-            const prefix = canvasGenerationPrefix(text);
+            const prefix = interactiveGenerationPrefix(text);
             if (prefix && prefix !== previous) {
               previous = prefix;
               const scene = noteContext

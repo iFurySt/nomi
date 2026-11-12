@@ -1,0 +1,366 @@
+{
+  "schema": "nomi-interactive-ir/draft-2",
+  "id": "bpe-experiment",
+  "version": 1,
+  "profile": "portable.learning/draft-2",
+  "requires": {
+    "components": {
+      "Panel": 1,
+      "Text": 1,
+      "TextInput": 1,
+      "Slider": 1,
+      "Row": 1,
+      "Button": 1,
+      "Metric": 1,
+      "Table": 1
+    },
+    "functions": {
+      "learning.bpe": 1,
+      "object.get": 1,
+      "math.min": 1,
+      "math.max": 1,
+      "math.add": 1,
+      "math.subtract": 1
+    },
+    "expressions": ["literal", "state", "derived", "call"],
+    "hostEffects": []
+  },
+  "budget": {
+    "maxSamplePointsPerSeries": 128,
+    "maxSeries": 4,
+    "maxStepsPerEvaluation": 100000
+  },
+  "state": {
+    "corpus": {
+      "type": "string",
+      "scope": "user",
+      "default": "ab ab ac",
+      "maxLength": 1024
+    },
+    "step": {
+      "type": "number",
+      "scope": "user",
+      "default": 0,
+      "min": 0,
+      "max": 32,
+      "step": 1
+    }
+  },
+  "derived": {
+    "training": {
+      "kind": "call",
+      "function": "learning.bpe",
+      "version": 1,
+      "args": [
+        {
+          "kind": "state",
+          "id": "corpus"
+        },
+        {
+          "kind": "state",
+          "id": "step"
+        }
+      ]
+    }
+  },
+  "actions": {
+    "next": {
+      "kind": "set",
+      "scope": "user",
+      "target": "step",
+      "value": {
+        "kind": "call",
+        "function": "math.min",
+        "version": 1,
+        "args": [
+          {
+            "kind": "literal",
+            "value": 32
+          },
+          {
+            "kind": "call",
+            "function": "math.add",
+            "version": 1,
+            "args": [
+              {
+                "kind": "call",
+                "function": "object.get",
+                "version": 1,
+                "args": [
+                  {
+                    "kind": "derived",
+                    "id": "training"
+                  },
+                  {
+                    "kind": "literal",
+                    "value": "step"
+                  }
+                ]
+              },
+              {
+                "kind": "literal",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "previous": {
+      "kind": "set",
+      "scope": "user",
+      "target": "step",
+      "value": {
+        "kind": "call",
+        "function": "math.max",
+        "version": 1,
+        "args": [
+          {
+            "kind": "literal",
+            "value": 0
+          },
+          {
+            "kind": "call",
+            "function": "math.subtract",
+            "version": 1,
+            "args": [
+              {
+                "kind": "call",
+                "function": "object.get",
+                "version": 1,
+                "args": [
+                  {
+                    "kind": "derived",
+                    "id": "training"
+                  },
+                  {
+                    "kind": "literal",
+                    "value": "step"
+                  }
+                ]
+              },
+              {
+                "kind": "literal",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "reset": {
+      "kind": "reset",
+      "scope": "user",
+      "targets": ["corpus", "step"]
+    }
+  },
+  "root": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": [
+          "heading",
+          "intro",
+          "corpus-input",
+          "step-slider",
+          "controls",
+          "completed",
+          "words",
+          "merges",
+          "vocabulary",
+          "note"
+        ]
+      }
+    },
+    {
+      "id": "heading",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "BPE · 逐步合并实验",
+        "role": "heading"
+      }
+    },
+    {
+      "id": "intro",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "每一步合并出现次数最多的相邻词元对；重复单词会增加计数。修改语料后，按所选步数重新计算。"
+      }
+    },
+    {
+      "id": "corpus-input",
+      "component": "TextInput",
+      "version": 1,
+      "props": {
+        "label": "语料 · 用空格分隔单词",
+        "multiline": true
+      },
+      "bind": {
+        "value": "corpus"
+      }
+    },
+    {
+      "id": "step-slider",
+      "component": "Slider",
+      "version": 1,
+      "props": {
+        "label": "请求合并步数",
+        "min": 0,
+        "max": 32,
+        "step": 1
+      },
+      "bind": {
+        "value": "step"
+      }
+    },
+    {
+      "id": "controls",
+      "component": "Row",
+      "version": 1,
+      "props": {
+        "children": ["previous-button", "next-button", "reset-button"]
+      }
+    },
+    {
+      "id": "previous-button",
+      "component": "Button",
+      "version": 1,
+      "props": {
+        "label": "上一步"
+      },
+      "on": {
+        "activate": "previous"
+      }
+    },
+    {
+      "id": "next-button",
+      "component": "Button",
+      "version": 1,
+      "props": {
+        "label": "合并一步"
+      },
+      "on": {
+        "activate": "next"
+      }
+    },
+    {
+      "id": "reset-button",
+      "component": "Button",
+      "version": 1,
+      "props": {
+        "label": "重置语料与步数"
+      },
+      "on": {
+        "activate": "reset"
+      }
+    },
+    {
+      "id": "completed",
+      "component": "Metric",
+      "version": 1,
+      "props": {
+        "label": "实际完成的合并次数",
+        "value": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "step"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "words",
+      "component": "Table",
+      "version": 1,
+      "props": {
+        "caption": "当前分词",
+        "columns": ["单词", "词元"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "words"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "merges",
+      "component": "Table",
+      "version": 1,
+      "props": {
+        "caption": "合并规则 · 按执行顺序",
+        "columns": ["步骤", "左词元", "右词元", "合并结果", "频次"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "merges"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "vocabulary",
+      "component": "Table",
+      "version": 1,
+      "props": {
+        "caption": "当前词表",
+        "columns": ["词元", "频次"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "vocabulary"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "note",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "· 分隔词元，</w> 表示词尾。没有可合并的词元对时，实际步数停止增长。限 1024 字符、128 个单词、32 次合并；请勿在语料中输入保留标记 </w>。此实验用于教学，不等同于生产模型的分词器。"
+      }
+    }
+  ]
+}

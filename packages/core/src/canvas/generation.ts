@@ -163,15 +163,19 @@ export function parseNoteGeneration(
   const interactive = scene.blocks.filter((b) => b.type === "interactive");
   if (
     (!partial && !interactive.length) ||
-    interactive.some(
-      (b) =>
-        !b.program.nodes.some(
-          (n) =>
-            (n.component === "Slider" || n.component === "SegmentedControl") &&
-            n.bind?.value,
-        ),
-    )
+    (!partial &&
+      interactive.some(
+        (b) =>
+          !b.program.nodes.some(
+            (n) =>
+              ["Slider", "SegmentedControl", "TextInput"].includes(
+                n.component,
+              ) && n.bind?.value,
+          ),
+      ))
   )
     throw Error(NOTE_INTERACTION_REQUIRED);
   return scene;
 }
+
+export { interactiveGenerationPrefix } from "./generation-preview";

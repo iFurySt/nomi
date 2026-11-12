@@ -1,6 +1,9 @@
 import { useId, useMemo } from "react";
 import type { ReactNode } from "react";
 import katex from "katex";
+import { Undo2, RotateCcw } from "lucide-react";
+import { Tooltip } from "../components/Tooltip";
+import { InteractiveTable } from "./InteractiveTable";
 import "katex/dist/katex.min.css";
 import {
   evaluateProgram,
@@ -12,6 +15,10 @@ import {
   type PlotMarker,
   type PlotAxis,
 } from "@nomi/core";
+const fixed = (value: number, digits = 2) => {
+  const rounded = value.toFixed(digits);
+  return Number(rounded) === 0 ? (0).toFixed(digits) : rounded;
+};
 const colors = [
   "#169e83",
   "#548ed5",
@@ -78,7 +85,7 @@ function Plot({
     ((n - yAxis.domain[0]) / (yAxis.domain[1] - yAxis.domain[0])) *
       (height - top - bottom);
   const fmt = (n: number) =>
-    yAxis.format === "percent" ? `${Math.round(n * 100)}%` : n.toFixed(2);
+    yAxis.format === "percent" ? `${Math.round(n * 100)}%` : fixed(n);
   const rows = markers.map((m) => ({
     label: seriesLabels[m.series] ?? `Series ${m.series + 1}`,
     x: m.x,
@@ -183,9 +190,7 @@ function Plot({
             <i style={{ background: colors[markers[i].series] }} />
             {r.label}
             <strong data-probability={markers[i].series}>
-              {yAxis.format === "percent"
-                ? `${(r.y * 100).toFixed(2)}%`
-                : r.y.toFixed(2)}
+              {yAxis.format === "percent" ? `${fixed(r.y * 100)}%` : fixed(r.y)}
             </strong>
           </span>
         ))}
@@ -229,34 +234,143 @@ export function InteractiveRenderer({
 }) {
   const prefix = useId();
   const output = useMemo(() => {
-    try {
-      const runtime = evaluateProgram(program, state);
-      const props = new Map(
-        program.nodes.map((n) => {
+    const runtime = evaluateProgram(program, state);
+    const errors = new Map<string, string>();
+    const props = new Map(
+      program.nodes.map((n) => {
+        try {
           const value = runtime.props(n.id);
-          validateResolvedProps(n.component, value);
-          return [n.id, value];
-        }),
-      );
-      return { props, error: "" };
-    } catch (e) {
-      return {
-        props: new Map<string, Record<string, unknown>>(),
-        error: (e as Error).message,
-      };
-    }
-  }, [program, state]);
-  if (output.error)
-    return (
-      <div className="learning-alert" role="alert">
-        计算未完成：{output.error}
-      </div>
+          validateResolvedProps(n.component, value, n.version);
+          return [n.id, value] as const;
+        } catch {
+          errors.set(n.id, "请检查输入");
+          return [n.id, {}] as const;
+        }
+      }),
     );
+    return { props, errors };
+  }, [program, state]);
   const node = (id: string): ReactNode => {
     const n = program.nodes.find((v) => v.id === id)!;
     const p = output.props.get(id)! as any;
     const binding = n.bind?.value;
+    if (output.errors.has(id))
+      return (
+        <div key={id} className="learning-alert" role="status">
+          {output.errors.get(id)}
+        </div>
+      );
     switch (n.component) {
+      case "TextInput":
+        return (
+          <label key={id} data-node={id} className="learning-input">
+            <span hidden={p.hideLabel}>{p.label}</span>
+            {p.multiline ? (
+              <textarea
+                aria-label={p.label}
+                value={String(state[binding!] ?? "")}
+                maxLength={program.state[binding!].maxLength}
+                rows={2}
+                onChange={(e) => {
+                  onSet(binding!, e.target.value);
+                  for (const target of p.resetTargets ?? [])
+                    onSet(target, program.state[target].default);
+                }}
+                onBlur={onCommit}
+              />
+            ) : (
+              <input
+                aria-label={p.label}
+                value={String(state[binding!] ?? "")}
+                maxLength={program.state[binding!].maxLength}
+                onChange={(e) => {
+                  onSet(binding!, e.target.value);
+                  for (const target of p.resetTargets ?? [])
+                    onSet(target, program.state[target].default);
+                }}
+                onBlur={onCommit}
+              />
+            )}
+          </label>
+        );
+      case "Metric":
+        return (
+          <div key={id} className="learning-metric" data-node={id}>
+            <span>{p.label}</span>
+            <strong>
+              {p.value}
+              <small>{p.unit}</small>
+            </strong>
+          </div>
+        );
+      case "Table":
+        return <InteractiveTable key={id} id={id} {...p} />;
+      case "Scene": {
+        const color = (c: string | undefined, fallback: string) =>
+          ({
+            ink: "var(--text)",
+            muted: "var(--muted)",
+            surface: "var(--surface)",
+            accent: "#5078ef",
+            blue: "#548ed5",
+            green: "#169e83",
+            orange: "#d68a33",
+            none: "none",
+          })[c ?? ""] ?? fallback;
+        return (
+          <svg
+            key={id}
+            data-node={id}
+            className="learning-scene"
+            viewBox={`0 0 ${p.width} ${p.height}`}
+            role="img"
+            aria-label={p.label}
+          >
+            {p.items.map((q: any, i: number) => {
+              const style = {
+                fill: color(q.fill, q.type === "text" ? "var(--text)" : "none"),
+                stroke: color(
+                  q.stroke,
+                  q.type === "text" ? "none" : "var(--text)",
+                ),
+                strokeWidth: 2,
+              };
+              if (q.type === "rect")
+                return (
+                  <rect
+                    key={i}
+                    x={q.x}
+                    y={q.y}
+                    width={q.width}
+                    height={q.height}
+                    rx={6}
+                    {...style}
+                  />
+                );
+              if (q.type === "circle")
+                return (
+                  <circle key={i} cx={q.x} cy={q.y} r={q.radius} {...style} />
+                );
+              if (q.type === "line")
+                return (
+                  <line
+                    key={i}
+                    x1={q.x}
+                    y1={q.y}
+                    x2={q.x2}
+                    y2={q.y2}
+                    {...style}
+                  />
+                );
+              return (
+                <text key={i} x={q.x} y={q.y} fontSize={16} {...style}>
+                  {q.text}
+                </text>
+              );
+            })}
+          </svg>
+        );
+      }
       case "Panel":
         return (
           <section key={id} className="interactive-panel" data-node={id}>
@@ -279,17 +393,31 @@ export function InteractiveRenderer({
             {p.text}
           </p>
         );
-      case "Button":
-        return (
+      case "Button": {
+        const Icon = p.icon === "previous" ? Undo2 : RotateCcw;
+        const button = (
           <button
-            key={id}
             className="learning-reset"
             data-node={id}
+            data-variant={p.variant ?? "secondary"}
+            data-icon={p.icon ? "true" : undefined}
+            aria-label={p.label}
+            disabled={p.disabled}
             onClick={() => n.on && onAction(n.on.activate)}
           >
-            {p.label}
+            {p.icon ? <Icon size={16} aria-hidden="true" /> : p.label}
           </button>
         );
+        return p.icon ? (
+          <Tooltip key={id} label={p.label}>
+            {button}
+          </Tooltip>
+        ) : (
+          <span key={id} className="learning-action">
+            {button}
+          </span>
+        );
+      }
       case "SegmentedControl":
         return (
           <div
@@ -318,7 +446,11 @@ export function InteractiveRenderer({
             <div>
               <label htmlFor={`${prefix}-${id}`}>{p.label}</label>
               <output htmlFor={`${prefix}-${id}`}>
-                {Number(state[binding!]).toFixed(2)}
+                {program.schema === "nomi-interactive-ir/draft-1"
+                  ? Number(state[binding!]).toFixed(2)
+                  : Number(state[binding!]).toLocaleString(undefined, {
+                      maximumFractionDigits: 4,
+                    })}
               </output>
             </div>
             <input
@@ -358,5 +490,9 @@ export function InteractiveRenderer({
         );
     }
   };
-  return <div className="interactive-surface">{node(program.root)}</div>;
+  return (
+    <div className="interactive-surface" data-profile={program.profile}>
+      {node(program.root)}
+    </div>
+  );
 }

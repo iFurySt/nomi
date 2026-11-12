@@ -1,0 +1,391 @@
+{
+  "schema": "nomi-interactive-ir/draft-2",
+  "id": "wave-explorer",
+  "version": 1,
+  "profile": "portable.learning/draft-2",
+  "requires": {
+    "components": {
+      "Panel": 1,
+      "Text": 1,
+      "Slider": 1,
+      "Plot": 1,
+      "Scene": 1,
+      "Metric": 1,
+      "Math": 1,
+      "Button": 1
+    },
+    "functions": {
+      "math.multiply": 1,
+      "math.sin": 1,
+      "math.subtract": 1,
+      "number.format": 1
+    },
+    "expressions": [
+      "literal",
+      "state",
+      "derived",
+      "variable",
+      "call",
+      "sampleFamily"
+    ],
+    "hostEffects": []
+  },
+  "budget": {
+    "maxSamplePointsPerSeries": 512,
+    "maxSeries": 1,
+    "maxStepsPerEvaluation": 100000
+  },
+  "state": {
+    "amplitude": {
+      "type": "number",
+      "scope": "user",
+      "default": 1,
+      "min": 0,
+      "max": 2,
+      "step": 0.1
+    },
+    "frequency": {
+      "type": "number",
+      "scope": "user",
+      "default": 1,
+      "min": 0.5,
+      "max": 3,
+      "step": 0.1
+    }
+  },
+  "derived": {
+    "curve": {
+      "kind": "sampleFamily",
+      "seriesVariable": "s",
+      "seriesValues": [0],
+      "sampleVariable": "x",
+      "domain": [0, 2],
+      "count": 512,
+      "value": {
+        "kind": "call",
+        "function": "math.multiply",
+        "version": 1,
+        "args": [
+          {
+            "kind": "state",
+            "id": "amplitude"
+          },
+          {
+            "kind": "call",
+            "function": "math.sin",
+            "version": 1,
+            "args": [
+              {
+                "kind": "call",
+                "function": "math.multiply",
+                "version": 1,
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": 6.283185307179586
+                  },
+                  {
+                    "kind": "call",
+                    "function": "math.multiply",
+                    "version": 1,
+                    "args": [
+                      {
+                        "kind": "state",
+                        "id": "frequency"
+                      },
+                      {
+                        "kind": "variable",
+                        "id": "x"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "displacement": {
+      "kind": "call",
+      "function": "math.multiply",
+      "version": 1,
+      "args": [
+        {
+          "kind": "state",
+          "id": "amplitude"
+        },
+        {
+          "kind": "call",
+          "function": "math.sin",
+          "version": 1,
+          "args": [
+            {
+              "kind": "call",
+              "function": "math.multiply",
+              "version": 1,
+              "args": [
+                {
+                  "kind": "literal",
+                  "value": 6.283185307179586
+                },
+                {
+                  "kind": "state",
+                  "id": "frequency"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "ballY": {
+      "kind": "call",
+      "function": "math.subtract",
+      "version": 1,
+      "args": [
+        {
+          "kind": "literal",
+          "value": 110
+        },
+        {
+          "kind": "call",
+          "function": "math.multiply",
+          "version": 1,
+          "args": [
+            {
+              "kind": "literal",
+              "value": 40
+            },
+            {
+              "kind": "derived",
+              "id": "displacement"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "actions": {
+    "reset": {
+      "kind": "reset",
+      "scope": "user",
+      "targets": ["amplitude", "frequency"]
+    }
+  },
+  "root": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": [
+          "heading",
+          "hint",
+          "formula",
+          "amplitude",
+          "frequency",
+          "plot",
+          "ball",
+          "value",
+          "reset"
+        ]
+      }
+    },
+    {
+      "id": "heading",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "role": "heading",
+        "text": "正弦波：高低与疏密"
+      }
+    },
+    {
+      "id": "hint",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "振幅决定峰高；频率决定每单位 x 内的周期数。小球固定观察 x=1。"
+      }
+    },
+    {
+      "id": "formula",
+      "component": "Math",
+      "version": 1,
+      "props": {
+        "source": "y=A\\sin(2\\pi f x)"
+      }
+    },
+    {
+      "id": "amplitude",
+      "component": "Slider",
+      "version": 1,
+      "props": {
+        "label": "振幅 A",
+        "min": 0,
+        "max": 2,
+        "step": 0.1
+      },
+      "bind": {
+        "value": "amplitude"
+      }
+    },
+    {
+      "id": "frequency",
+      "component": "Slider",
+      "version": 1,
+      "props": {
+        "label": "频率 f（周期 / 单位 x）",
+        "min": 0.5,
+        "max": 3,
+        "step": 0.1
+      },
+      "bind": {
+        "value": "frequency"
+      }
+    },
+    {
+      "id": "plot",
+      "component": "Plot",
+      "version": 1,
+      "props": {
+        "series": {
+          "kind": "derived",
+          "id": "curve"
+        },
+        "markers": [
+          {
+            "series": 0,
+            "x": 1,
+            "y": {
+              "kind": "derived",
+              "id": "displacement"
+            }
+          }
+        ],
+        "seriesLabels": ["正弦曲线"],
+        "xAxis": {
+          "label": "x",
+          "domain": [0, 2]
+        },
+        "yAxis": {
+          "label": "位移 y",
+          "domain": [-2.2, 2.2]
+        }
+      }
+    },
+    {
+      "id": "ball",
+      "component": "Scene",
+      "version": 1,
+      "props": {
+        "width": 560,
+        "height": 220,
+        "label": "x=1 的瞬时位移：小球相对平衡位置上下移动",
+        "items": [
+          {
+            "type": "line",
+            "x": 180,
+            "y": 20,
+            "x2": 180,
+            "y2": 200,
+            "stroke": "muted"
+          },
+          {
+            "type": "line",
+            "x": 70,
+            "y": 110,
+            "x2": 450,
+            "y2": 110,
+            "stroke": "muted"
+          },
+          {
+            "type": "text",
+            "x": 460,
+            "y": 115,
+            "text": "y=0",
+            "fill": "muted"
+          },
+          {
+            "type": "text",
+            "x": 210,
+            "y": 30,
+            "text": "+2",
+            "fill": "muted"
+          },
+          {
+            "type": "text",
+            "x": 210,
+            "y": 195,
+            "text": "−2",
+            "fill": "muted"
+          },
+          {
+            "type": "line",
+            "x": 180,
+            "y": 110,
+            "x2": 180,
+            "y2": {
+              "kind": "derived",
+              "id": "ballY"
+            },
+            "stroke": "accent"
+          },
+          {
+            "type": "circle",
+            "x": 180,
+            "y": {
+              "kind": "derived",
+              "id": "ballY"
+            },
+            "radius": 11,
+            "fill": "accent"
+          },
+          {
+            "type": "text",
+            "x": 300,
+            "y": 65,
+            "text": "观察点 x=1",
+            "fill": "ink"
+          }
+        ]
+      }
+    },
+    {
+      "id": "value",
+      "component": "Metric",
+      "version": 1,
+      "props": {
+        "label": "x=1 时的瞬时位移",
+        "value": {
+          "kind": "call",
+          "function": "number.format",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "displacement"
+            },
+            {
+              "kind": "literal",
+              "value": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "reset",
+      "component": "Button",
+      "version": 1,
+      "props": {
+        "label": "重置"
+      },
+      "on": {
+        "activate": "reset"
+      }
+    }
+  ]
+}

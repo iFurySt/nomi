@@ -1,0 +1,4 @@
+interface:
+  display_name: "Nomi 交互块"
+  short_description: "生成可导入 Nomi 的紧凑交互实验，附真实计算与兼容性验证"
+  default_prompt: "使用 $nomi-interactive 生成一个紧凑、可操作的交互实验，并输出可导入 Nomi 的 .nomi-ui.json。"

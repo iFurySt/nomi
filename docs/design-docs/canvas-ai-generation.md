@@ -10,7 +10,7 @@ Canvas 工具栏的 AI 生成入口复用 Settings → ChatGPT 的 OAuth、动�
 
 入口是紧凑输入框，只展示输入、模型与发送。Enter 发送，Shift+Enter 换行，输入法组词期间不提交；发送后输入框动画收至右侧，显示短状态和停止按钮。窄屏停靠底部，系统减少动态效果时取消动画。
 
-Responses 的真实文本 delta 到达后，`canvasGenerationPrefix` 只提取已经闭合的完整命令对象，逐次调用同一个严格校验器。临时场景直接显示在画布上，复用内容 renderer、完整连线样式与路由；每个块、连线到达时淡入。自动取景为右侧输入框留出空间。临时层不参与选择、编辑与持久化；最终完整响应再次校验后，才作为一次事务插入。并非等全部生成完成后用定时器播放。
+Responses 的真实文本 delta 到达后，`interactiveGenerationPrefix` 提取已经闭合的完整命令对象，并可提前提取交互块中已闭合且通过校验的视图子树，逐次调用同一个严格校验器。临时场景直接显示在画布上，复用内容 renderer、完整连线样式与路由；每个块、连线到达时淡入。自动取景为右侧输入框留出空间。临时层不参与选择、编辑与持久化；最终完整响应再次校验后，才作为一次事务插入。并非等全部生成完成后用定时器播放。
 
 关闭、停止、切换账号或组件卸载时取消该 requestId；停止和失败清理临时内容，迟到结果不显示也不写入。非法输出显示简短重试提示。没有自动修复循环、连续对话或修改已有图示，每次发送都是独立描述。
 
@@ -20,7 +20,7 @@ Responses 的真实文本 delta 到达后，`canvasGenerationPrefix` 只提取�
 
 `generation: "note"` 必须携带 `noteContext`：标题最多 256 字符、选区最多 4,000 字符、选区/光标前后各 1,500 字符（按 JavaScript 字符串长度计）。范围可跨当前文稿相邻块；当前富文本用可见文本，相邻 Markdown 用源码，非文本块只提供类型标记。不会读取附件、嵌套画布内容、子页或其他文稿。上下文为调用入口时的快照，不记录到聊天历史；host 单独验证结构和预算，作为不可信参考数据附在用户请求中，固定协议与无工具约束不变。
 
-流式命令在光标所在段落附近以 ProseMirror decoration 展示，既不修改编辑文档也不保存半成品。完成后在原光标或选区末尾插入，必要时拆开原 Markdown 块。文稿模式使用独立的 `noteGenerationPrompt`，以原生交互块为目标；只接收 interactive 与可选的简短 Markdown 说明，最多 10 块。完整结果至少包含一个有状态绑定的 Slider / SegmentedControl，形状、连线和纯静态输出均拒绝，不再自动封装成内嵌画布。流式前缀允许先到达说明，最终结果仍独立验证交互要求。整次插入为一笔文稿事务，可一次撤销。
+流式命令在光标所在段落附近以 ProseMirror decoration 展示，既不修改编辑文档也不保存半成品。完成后在原光标或选区末尾插入，必要时拆开原 Markdown 块。文稿模式使用独立的 `noteGenerationPrompt`，以原生交互块为目标；只接收 interactive 与可选的简短 Markdown 说明，最多 10 块。完整结果至少包含一个有状态绑定的 Slider / SegmentedControl / TextInput，形状、连线和纯静态输出均拒绝，不再自动封装成内嵌画布。流式前缀允许先到达说明，最终结果仍独立验证交互要求。整次插入为一笔文稿事务，可一次撤销。
 
 输入框初次锚定光标 / 选区末尾下方（10px 间隔），滚动和窗口变化时跟随，空间不足时避让视口。发送后动画停靠右上角；首个完整命令到达前，原段落展示轻量呼吸骨架，随后逐块预览。完成后保留聊天输入，支持继续调整。会话只保留在内存，下一轮携带最近一次成功的用户指令、完整助手结果与最初捕获的有界上下文；助手消息使用 `source: "chatgpt"`，遵循既有单条 32,000 字与总输入预算。失败 / 取消结果不进入历史。
 
@@ -30,7 +30,13 @@ Responses 的真实文本 delta 到达后，`canvasGenerationPrefix` 只提取�
 
 ## 交互块能力边界
 
-GenUI 是已有 portable learning IR，只有 Panel / Row / Text / Button / SegmentedControl / Slider / Math / Plot，运算目前为 math.softmax / array.at / array.replaceAt。提示词携带合法示例与能力集合。文稿模式超出能力范围时返回 `{"error":"unsupported_interaction"}` 并显示简短提示，原文不变；不以静态画布替代交互，也不把预录结果冒充动态计算。用户明确要求的步骤浏览器可用 enum / match 表达；可计算的数值实验使用状态绑定与已注册运算。Canvas 模式仍允许诚实的说明图回退。新增通用数学、物理或动画能力需要扩展 IR、预算与跨语言 conformance。
+当前默认生成 `nomi-interactive-ir/draft-2` / `portable.learning/draft-2`，兼容旧温度程序。除原有八种组件外支持 TextInput、Metric、Table、Scene；状态增加有界字符串，动作增加表达式 `set`。纯计算函数包括基础数学、数据访问、格式化、字符级 BPE 教学训练。完整契约与预算见 [运行时](interactive-learning-runtime.md)。
+
+提示词提供 Temperature、BPE、正弦波三种不同范例，要求每个控件实际影响输出；超出能力返回 `{"error":"unsupported_interaction"}`，不以静态图或无关温度实验冒充。振荡曲线建议 512 点并限制可见周期，说明保持简短。真实生成仍需数值与行为验收，合法 IR 不保证教学内容正确。
+
+流式协议要求 placement 在 block 前，program 的元信息 / state / derived / actions / root 在 nodes 前，父节点在子节点前。只有闭合节点参与临时树；未到达的 child 引用暂时过滤，循环 / 重复节点 / 非法能力不展示。预览经过与最终结果相同的严格校验，不运行半段源码，不落盘；最终结果必须满足完整树和可交互要求。模型未遵循字段顺序时回退为完整命令预览。
+
+本轮没有开放生成 HTML / JavaScript、网络、文件或宿主动作。Web 扩展及原生移动呈现仍按 [v2 设计](interactive-content-v2.md) 后续实施。
 
 ## 验证与入口
 
@@ -42,3 +48,5 @@ GenUI 是已有 portable learning IR，只有 Panel / Row / Text / Button / Segm
 - 旧版交互中，用户完成实际授权后曾验证模型列表与三步流程图的在线生成 / 预览；临时图未写入用户画布。文稿模式的在线连续调整验收见上一项。
 
 实现：core `canvas/generation.ts`，host `canvas-generation-prompt.ts`，UI `canvas/GenerateCanvas.tsx`。官方接入参考：https://developers.openai.com/siwc/token-sharing-open-source/sign-in
+
+2026-11-09 实际在线 BPE / 波形生成和连续调整、390px 与深色验证见 [v2 验收记录](interactive-v2-validation.md)。

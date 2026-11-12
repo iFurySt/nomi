@@ -1,6 +1,6 @@
 # 生成式交互内容与跨平台 DSL
 
-状态：2026-10-18 架构提案修订；2026-10-19 已实现交互 IR / TypeScript runtime、React 温度探索器与 Swift 计算参考。实际范围见 [运行时说明](interactive-learning-runtime.md)，同日已补齐 [画布主工作区](canvas-workspace-runtime.md) 与本地笔记 / 附件 / 交互块；完整产品、原生 UI、手写、同步与 AI 生成待实现。用户明确要求交互学习与 AI GenUI，并要求将来可用 SwiftUI / UIKit、Android Compose 等原生实现。本提案更新 [笔记与画布设计](notes-infinite-canvas.md) 中“共享 TypeScript / WebView”的实现假设；完整笔记、无限画布、Markdown / LaTeX、手写和本地优先目标继续保留。
+状态：2026-10-18 架构提案修订；2026-10-19 已实现交互 IR / TypeScript runtime、React 温度探索器与 Swift 计算参考。实际范围见 [运行时说明](interactive-learning-runtime.md)，同日已补齐 [画布主工作区](canvas-workspace-runtime.md) 与本地笔记 / 附件 / 交互块；截至 2026-11-09，文稿 / 画布 AI 生成已接入受限交互 IR，见 [AI 生成实现](canvas-ai-generation.md)；原生交互 UI、手写与同步仍待实现。最新的多端呈现、能力扩展与 Web 扩展提案见 [交互块 v2](interactive-content-v2.md)；portable v2 第一版已实现，Web 扩展与原生移动 renderer 尚未实施。用户明确要求交互学习与 AI GenUI，并要求将来可用 SwiftUI / UIKit、Android Compose 等原生实现。本提案更新 [笔记与画布设计](notes-infinite-canvas.md) 中“共享 TypeScript / WebView”的实现假设；完整笔记、无限画布、Markdown / LaTeX、手写和本地优先目标继续保留。
 
 ## 产品命名
 
@@ -161,7 +161,9 @@ OpenUI 的按 statement name 增量替换可用于生成侧编辑，但不能直
 
 程序定义与普通 Note / Ink 一样纳入文档语义命令。个人 UserStudyState 有单独的 user-scoped 存储与同步，不被共享文档作者或家人自动读取。明确“保存为共享例题”才写回共享文档。
 
-## 调整后的实施顺序
+## 原始实施顺序（2026-10-18）
+
+此处保留早期路线；当前实现见上方状态，后续扩展顺序以 [交互块 v2](interactive-content-v2.md) 为准。
 
 1. **协议与 reference fixtures**：Note / Ink / InteractiveBlock、catalog、状态范围、函数 / 动作和能力版本；建立源码 → IR → 回读实验，验证 OpenUI 前端的可复用边界。
 2. **Temperature Explorer 最小纵向切片**：React 端滑块、两种模式、曲线与 Reset，离线求值；同一 IR 用最小 SwiftUI 原型渲染并复用数值 / 事件 fixture，Android 预留相同契约与测试入口。
@@ -178,7 +180,7 @@ OpenUI 的按 statement name 增量替换可用于生成侧编辑，但不能直
 - 同一测试在 TS 与最小 Swift 实现中得到容差内相同数据、相同事件与个人状态恢复；并不要求相同系统控件外观。
 - 修改文案不重置参数，修改默认值不覆盖已学习状态；缺组件 / 函数明确降级，原程序仍保留。
 - 非法公式、超预算采样、半截生成、旧版本 patch、缺 capability 不损坏现有文档或触发效果。
-- 源码 / IR / runtime 的单一语义状态、函数版本迁移和协作兼容需要实际实验；当前 TypeScript 运行时、React renderer 和 Swift 计算参考已实现；源码往返、协作、生产原生 validator / renderer 与 AI 生成仍待验证。
+- 源码 / IR / runtime 的单一语义状态、函数版本迁移和协作兼容需要实际实验；当前 TypeScript 运行时、React renderer 和 Swift 计算参考已实现；源码往返、协作、生产原生 validator / renderer 仍待验证；AI 生成已接入当前受限 IR，通用交互生成质量仍需扩展和验证。
 
 ## 2026-10-19 实施记录
 

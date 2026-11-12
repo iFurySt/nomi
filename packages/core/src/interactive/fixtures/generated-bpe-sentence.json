@@ -1,0 +1,411 @@
+{
+  "schema": "nomi-interactive-ir/draft-2",
+  "id": "bpe-program",
+  "version": 1,
+  "profile": "portable.learning/draft-2",
+  "requires": {
+    "components": {
+      "Panel": 1,
+      "Row": 1,
+      "Text": 1,
+      "TextInput": 1,
+      "Button": 1,
+      "Metric": 1,
+      "Table": 1
+    },
+    "functions": {
+      "learning.bpe": 1,
+      "object.get": 1,
+      "math.min": 1,
+      "math.add": 1
+    },
+    "expressions": ["literal", "state", "derived", "call"],
+    "hostEffects": []
+  },
+  "budget": {
+    "maxSamplePointsPerSeries": 128,
+    "maxSeries": 4,
+    "maxStepsPerEvaluation": 100000
+  },
+  "state": {
+    "corpus": {
+      "type": "string",
+      "scope": "user",
+      "default": "we learn to learn and we love learning",
+      "maxLength": 1024
+    },
+    "step": {
+      "type": "number",
+      "scope": "user",
+      "default": 0,
+      "min": 0,
+      "max": 32,
+      "step": 1
+    }
+  },
+  "derived": {
+    "training": {
+      "kind": "call",
+      "function": "learning.bpe",
+      "version": 1,
+      "args": [
+        {
+          "kind": "state",
+          "id": "corpus"
+        },
+        {
+          "kind": "state",
+          "id": "step"
+        }
+      ]
+    }
+  },
+  "actions": {
+    "next": {
+      "kind": "set",
+      "scope": "user",
+      "target": "step",
+      "value": {
+        "kind": "call",
+        "function": "math.min",
+        "version": 1,
+        "args": [
+          {
+            "kind": "literal",
+            "value": 32
+          },
+          {
+            "kind": "call",
+            "function": "math.add",
+            "version": 1,
+            "args": [
+              {
+                "kind": "call",
+                "function": "object.get",
+                "version": 1,
+                "args": [
+                  {
+                    "kind": "derived",
+                    "id": "training"
+                  },
+                  {
+                    "kind": "literal",
+                    "value": "step"
+                  }
+                ]
+              },
+              {
+                "kind": "literal",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "restart": {
+      "kind": "reset",
+      "scope": "user",
+      "targets": ["step"]
+    }
+  },
+  "root": "root",
+  "nodes": [
+    {
+      "id": "root",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": [
+          "heading",
+          "intro",
+          "corpusInput",
+          "controls",
+          "metrics",
+          "process",
+          "results"
+        ]
+      }
+    },
+    {
+      "id": "heading",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "从字符到词元",
+        "role": "heading"
+      }
+    },
+    {
+      "id": "intro",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "从字符拆分开始，每次合并候选表首行的相邻词元；以空格分词、重复词计频，修改句子会重新计算当前轮次，属于教学分词器。"
+      }
+    },
+    {
+      "id": "corpusInput",
+      "component": "TextInput",
+      "version": 1,
+      "props": {
+        "label": "输入句子",
+        "multiline": true
+      },
+      "bind": {
+        "value": "corpus"
+      }
+    },
+    {
+      "id": "controls",
+      "component": "Row",
+      "version": 1,
+      "props": {
+        "children": ["nextButton", "restartButton"]
+      }
+    },
+    {
+      "id": "nextButton",
+      "component": "Button",
+      "version": 1,
+      "props": {
+        "label": "合并一次"
+      },
+      "on": {
+        "activate": "next"
+      }
+    },
+    {
+      "id": "restartButton",
+      "component": "Button",
+      "version": 1,
+      "props": {
+        "label": "从字符重新开始"
+      },
+      "on": {
+        "activate": "restart"
+      }
+    },
+    {
+      "id": "metrics",
+      "component": "Row",
+      "version": 1,
+      "props": {
+        "children": ["round", "initial", "current"]
+      }
+    },
+    {
+      "id": "round",
+      "component": "Metric",
+      "version": 1,
+      "props": {
+        "label": "已完成合并",
+        "value": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "step"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "initial",
+      "component": "Metric",
+      "version": 1,
+      "props": {
+        "label": "初始词元数",
+        "value": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "initialTokens"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "current",
+      "component": "Metric",
+      "version": 1,
+      "props": {
+        "label": "当前词元数",
+        "value": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "tokenCount"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "process",
+      "component": "Row",
+      "version": 1,
+      "props": {
+        "children": ["segmentationPanel", "candidatesPanel"]
+      }
+    },
+    {
+      "id": "segmentationPanel",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["wordsTable"]
+      }
+    },
+    {
+      "id": "wordsTable",
+      "component": "Table",
+      "version": 1,
+      "props": {
+        "caption": "当前拆分结果",
+        "columns": ["单词", "词元序列"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "words"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "candidatesPanel",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["pairsTable"]
+      }
+    },
+    {
+      "id": "pairsTable",
+      "component": "Table",
+      "version": 1,
+      "props": {
+        "caption": "相邻词元对频次 · 首行是下一次合并",
+        "columns": ["左词元", "右词元", "频次"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "pairs"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "results",
+      "component": "Row",
+      "version": 1,
+      "props": {
+        "children": ["rulesPanel", "vocabularyPanel"]
+      }
+    },
+    {
+      "id": "rulesPanel",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["rulesTable"]
+      }
+    },
+    {
+      "id": "rulesTable",
+      "component": "Table",
+      "version": 1,
+      "props": {
+        "caption": "已生成的合并规则 · 按执行顺序",
+        "columns": ["轮次", "左词元", "右词元", "合并结果", "合并时频次"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "merges"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "vocabularyPanel",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["vocabularyTable"]
+      }
+    },
+    {
+      "id": "vocabularyTable",
+      "component": "Table",
+      "version": 1,
+      "props": {
+        "caption": "已学习词表 · 初始字符及历次新增词元",
+        "columns": ["教学 ID", "词元", "当前频次"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "training"
+            },
+            {
+              "kind": "literal",
+              "value": "learnedVocabulary"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

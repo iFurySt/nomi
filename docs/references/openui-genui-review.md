@@ -41,3 +41,14 @@
 不直接搬运云端账号路径、Next.js 应用、整套组件样式、默认副作用和任意脚本执行。参考项目的 MIT 标记不等于本轮已经做完依赖 / 制品审查；真正引入依赖时按仓库供应链流程处理。
 
 设计决定与实施顺序见 [生成式交互内容设计](../design-docs/generative-interactive-content.md)。
+
+
+## 2026-11-09 复核：生成质量与跨端实现
+
+再次只读检查两个本地 checkout，版本仍与上表一致；同时复核上游 README 与 HtmlView，不将本地版本称为上游最新实现。没有安装依赖或运行示例。
+
+HtmlView 的价值是把开放 Web 表达与组件协议分开：只允许脚本的隔离 iframe，流式结束后才执行，使用来源校验处理高度消息。Nomi 不直接沿用其 CDN 资源策略，也不把 iframe 的权限隔离当作独立进程 / CPU 资源保证。具体源码仍见上方固定版本链接。
+
+生成提示采用多种组合范例，源码见 [prompt-options](https://github.com/thesysdev/open-intelligent-ui/blob/03213439358bf3408ad61a46ec9e3230c5572e48/src/lib/prompt-options.ts)。Nomi 当前只有 8 个组件、3 个函数，Temperature 示例不足以支撑通用算法教学；应先扩展能力并建立行为验收，再评价模型生成效果。
+
+Open Intelligent UI 是独立项目，不能据此反推 ChatGPT 的内部协议。Nomi 的设计决定、同一 DSL 的原生 / Web 适配及待验证边界见 [交互块 v2](../design-docs/interactive-content-v2.md)。
