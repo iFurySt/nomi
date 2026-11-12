@@ -153,3 +153,14 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、点击下载后自
 ## 本机 MCP 随包入口
 
 桌面构建额外生成 `apps/desktop/dist/mcp.mjs` 与 `mcp-LICENSES.txt`，打包时随 main / preload 携带。适配器使用用户的 Node 24+ 运行，只有用户显式启用本机 MCP 才会连接桌面；不新增后台常驻守护进程。Settings → MCP 可复制连接配置，正式 / 开发 profile 分离。发布涉及此入口时运行 `pnpm smoke:mcp`；详见 [本机 MCP](design-docs/local-mcp.md)。
+
+
+## 0.3.3 发布验收
+
+[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.3.3) 已由 [双架构流水线](https://github.com/iFurySt/nomi/actions/runs/43252212542) 发布，tag 固定于 `8e71843`。Apple Silicon / Intel 均通过类型、418 项单测、生产构建、既有桌面门禁及新增交互块 v2、复制 / DSL 创作、框选、MCP 与桌面输入专项；签名、公证、stapling、原生 driver 与独立 App 更新初始化检查通过。
+
+预检修复了新增 MCP 后窄屏设置导航溢出，以及框选测试固定落点在窄屏进入文稿侧栏的问题；只更新尚未公开的 tag。另一次 Apple Silicon 排队因 GitHub runner 容量不足被取消，重试后恢复，没有覆盖已发布制品。
+
+从公开地址重新下载 arm64 / x64 DMG，两者的长度、SHA-256、Sparkle Ed25519 签名和公证票据均通过；两个 appcast 的签名、0.3.3 版本和地址通过。挂载 arm64 App 后，严格深度签名、公证票据、Gatekeeper 与内嵌版本检查通过，验证卷已卸载。校验制品位于 ignored `.artifacts/desktop-033-verification/`。
+
+本版本包含紧凑交互学习与标准创作 Skill、交互块复制和 DSL 编辑、正文留白框选与批量操作，以及默认关闭的本机 MCP。开发版已保存后重启并确认文稿恢复；未启动、替换正式版或操作用户文稿，公开制品验证不等同用户机器上的跨版本安装完成。
