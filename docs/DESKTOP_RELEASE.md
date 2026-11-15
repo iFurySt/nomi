@@ -41,6 +41,8 @@ Repository secrets：
 
 Repository variable `DESKTOP_SIGN_IDENTITY` 指定身份名称。构建只使用临时 Keychain，按固定 SHA-256 检查 Apple Developer ID 中间证书，仅缺失时从 Apple 下载并校验后导入，结束始终删除 Keychain 和临时凭据。IME 回归在 CI 展示测试窗口、关闭后台节流并启用 CDP 焦点模拟，确认编辑器真正获得焦点后才开始组合输入；不依赖固定延迟或后台 requestAnimationFrame。不得在 pull_request 中导入签名 secret。私钥轮换必须先按 Sparkle 官方轮换协议规划已有安装的信任链。
 
+若 Apple 公证返回非结构化错误，可手动运行 `desktop-notary-check.yml`，只读取公证历史以检查现有凭据 / 服务连通性，不打印历史内容；临时密钥权限为 0600，结束立即清理，错误脱敏。
+
 版本化 DMG 发布后不可覆盖；重跑已公开版本应改版本号。`desktop-updates` 是稳定的更新清单 Release，仅其 `appcast-arm64.xml` / `appcast-x64.xml` 可替换。它不设置为 latest，因此 server 的独立 Release 不影响桌面更新地址。更新 feed 最后上传，始终先确保对应 DMG 已公开。
 
 ## Sparkle 2

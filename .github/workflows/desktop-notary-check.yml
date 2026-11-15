@@ -1,0 +1,20 @@
+name: Desktop notarization check
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Check Apple notarization access
+        env:
+          DESKTOP_ASC_PRIVATE_KEY: ${{ secrets.DESKTOP_ASC_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.DESKTOP_ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.DESKTOP_ASC_ISSUER_ID }}
+        run: node scripts/check-desktop-notary.mjs
