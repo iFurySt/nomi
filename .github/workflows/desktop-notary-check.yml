@@ -17,4 +17,4 @@ jobs:
           DESKTOP_ASC_PRIVATE_KEY: ${{ secrets.DESKTOP_ASC_PRIVATE_KEY }}
           ASC_KEY_ID: ${{ secrets.DESKTOP_ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.DESKTOP_ASC_ISSUER_ID }}
-        run: node scripts/check-desktop-notary.mjs
+        run: node scripts/ci-desktop-step.mjs node scripts/check-desktop-notary.mjs
