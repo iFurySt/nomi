@@ -19,3 +19,16 @@ jobs:
 
       - name: Run base CI checks
         run: ./scripts/ci.sh
+
+  sync-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: apps/sync-server/go.mod
+          cache-dependency-path: apps/sync-server/go.sum
+      - name: Isolated PostgreSQL sync integration tests
+        run: ./scripts/test-sync-server.sh
