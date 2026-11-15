@@ -1,3 +1,5 @@
+> 历史档案（2026-11-15）：旧家庭服务 / iOS 工程已退役。以下旧命令仅供追溯，不能用于新文稿同步服务。新方案见 [云同步设计](design-docs/cloud-sync.md)。本次未改动远端旧数据。
+
 # amoylab 部署
 
 Nomi server 部署在 `amoylab:/opt/nomi`，GitHub Actions 在 `server-v*` tag 时构建 `ghcr.io/ifuryst/nomi-server` 并通过受限 SSH 执行部署。

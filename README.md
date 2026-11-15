@@ -9,7 +9,7 @@ Nomi 是个人一站式工作台：把学习、笔记、信息 hub、知识、�
 ## 当前状态
 
 - **Electron 桌面 0.1.0**：Canvas 与文稿，支持 Markdown / LaTeX、图片、文件、表格、交互内容与 `.nomi` 文件包。macOS DMG 和 Sparkle 更新见 [发布说明](docs/DESKTOP_RELEASE.md)。保留 ChatGPT 连接以供后续文稿 AI 扩展；已移除金融页面与桌面 Go 服务。
-- **iOS + Go server private beta**：已有家庭账号、一次性邀请、成员档案、资料上传、异步整理与带来源引用的连续对话。原件和长期上下文在独立 household filesystem workspace，权限与任务在 Postgres。
+- **个人云同步**：独立 Go 后端正在开发，保持现有本地优先体验；旧家庭资料 beta 已移除。
 - **画布与笔记**：默认 Canvas 承载笔记、公式、图片 / 文件和交互块，桌面结构与附件原件保存为本机 `.nomi` 文件包，浏览器预览使用 IndexedDB，摄像机与个人参数单独保存。
 - **交互学习**：声明式 IR 驱动控件、LaTeX、曲线与本地计算，可在 Canvas / 文稿中嵌入；不依赖模型请求。完整笔记产品能力、信息 hub、跨领域知识与完整财富管理仍待扩展。桌面和 server 的身份、数据及 AI 执行路径当前独立，尚无跨端同步。
 
@@ -39,39 +39,18 @@ make ci
 
 迁入来源、数据路径和验证边界见 [桌面开发说明](docs/DESKTOP.md)。
 
-## 家庭资料服务与 iOS
+## 可选个人云同步
 
-```sh
-cd apps/server
-go test ./...
-NOMI_DATABASE_URL='postgres://...' \
-NOMI_BOOTSTRAP_INVITE_CODE='local-private-code' \
-NOMI_SEEDX_API_KEY='local-seedx-key' \
-go run ./cmd/nomi-server --addr :8088
-
-seedx daemon connect \
-  --server-url http://127.0.0.1:8088 \
-  --api-key local-seedx-key
-```
-
-```sh
-xcodebuild -project apps/ios/Nomi.xcodeproj \
-  -scheme Nomi \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  build
-```
-
-首次注册使用 `NOMI_BOOTSTRAP_INVITE_CODE` 创建唯一家庭；之后由 owner 生成一次性家人邀请码。现有 beta 家庭成员默认可访问家庭全部资料；未来个人私有空间不能直接沿用这个权限假设。
+正在按 [云同步设计](docs/design-docs/cloud-sync.md) 和 [执行计划](docs/exec-plans/active/20261115-personal-cloud-sync.md) 开发。后端独立于桌面，位于 `apps/sync-server`；使用 PostgreSQL 保存文稿内容与版本，开发阶段用服务器持久磁盘存附件。不开启同步无需账号。旧家庭资料 server、iOS 和 Swift macOS 工程已退役，历史发布不会被新工程自动覆盖。
 
 ## 文档入口
 
 - [当前产品定位](docs/product-specs/personal-workbench.md)
 - [架构](docs/ARCHITECTURE.md) · [产品判断](docs/PRODUCT_SENSE.md)
-- [桌面开发](docs/DESKTOP.md) · [前端与 iOS](docs/FRONTEND.md)
-- [家庭资料 beta 范围](docs/product-specs/family-private-beta.md)
+- [桌面开发](docs/DESKTOP.md) · [前端](docs/FRONTEND.md)
 - [安全](docs/SECURITY.md) · [部署](docs/DEPLOYMENT.md)
 
-Server 通过 `server-v*` tag 发布到 GHCR 并部署 amoylab；桌面通过 `desktop-v*` tag 自动构建签名、公证的 DMG 与 Sparkle feed。
+旧 server 自动部署已停用；新同步服务部署流程见部署文档。桌面通过 `desktop-v*` tag 自动构建签名、公证的 DMG 与 Sparkle feed。
 
 ## 许可证
 

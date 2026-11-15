@@ -28,7 +28,7 @@ Nomi 处理个人学习、笔记、信息、知识、健康和财富等资料，
 - 定义与学习进度在 localStorage 按本机 profile 分开组织，不宣称为加密或服务端授权；未来文档、实例与家庭共享需单独设计 scope。
 - 错误定义保留当前可用内容，损坏进度阻止自动覆盖；Swift reference interpreter 仅处理受信测试样例，尚未接生产导入。
 
-以下为现有 iOS / server beta 约束。
+以下为已退役 iOS / server beta 的历史约束，不适用于新个人同步服务。新服务边界以 [云同步设计](design-docs/cloud-sync.md) 为准；不迁入旧家庭账号或资料。
 
 ## 身份与授权
 

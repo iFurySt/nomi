@@ -16,7 +16,6 @@ required_files=(
   ".github/ISSUE_TEMPLATE/feature_request.yml"
   ".github/ISSUE_TEMPLATE/config.yml"
   ".github/workflows/ci.yml"
-  ".github/workflows/server-release.yml"
   "scripts/check-action-pinning.sh"
 )
 

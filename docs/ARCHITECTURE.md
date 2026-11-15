@@ -1,6 +1,6 @@
 # 架构总览
 
-Nomi / 知己是个人一站式工作台，覆盖学习、笔记、信息 hub、知识、健康与财富管理，并可扩展到家庭成员。总体产品范围见 [个人工作台规格](product-specs/personal-workbench.md)。当前有两条独立运行路径：迁入的本地 Electron 工作台，以及已有的 iOS / server 家庭资料 beta；尚未实现统一账号、跨端同步或所有领域模块。
+Nomi / 知己是个人一站式工作台，覆盖学习、笔记、信息 hub、知识、健康与财富管理，并可扩展到家庭成员。总体产品范围见 [个人工作台规格](product-specs/personal-workbench.md)。当前产品以 Electron 文稿 / 画布工作台为起点，独立个人同步后端正在开发；旧家庭资料 beta 已退役。
 
 ## 桌面 0.1.0 边界
 
@@ -17,9 +17,7 @@ Nomi / 知己是个人一站式工作台，覆盖学习、笔记、信息 hub、
 - `packages/host/`：Node-only 的文稿包、目录事务、凭据与 ChatGPT OAuth 适配；不进入 renderer bundle。
 - `apps/cli/`：仅保留未来服务边界说明，不构建或运行。
 - `apps/mcp/`：本机 stdio MCP 适配器，复用桌面文稿会话与领域操作；28 个文稿 / 内容块工具，显式开启，见 [本机 MCP](design-docs/local-mcp.md)。
-- `apps/ios/`：原生 SwiftUI iPhone App，现有家庭资料 beta。
-- `apps/server/`：Go API、Postgres、FS storage、household workspace 与异步 worker。
-- `infra/amoylab/`：现有 server 生产部署。
+- `apps/sync-server/`：独立 Go 个人同步后端（正在实施）；不依赖旧家庭服务。
 
 ## 桌面运行拓扑
 
@@ -37,64 +35,11 @@ Node host 管理 `.nomi` 包、原件、目录切换、保存事务和 ChatGPT �
 
 2026-11-09 的 [交互块 v2 提案](design-docs/interactive-content-v2.md) 明确同一 DSL 共享状态、计算和交互语义，各平台分别适配布局、控件与动效。portable draft-2 已实现文本输入、数据表格、纯计算、语义图形与流式节点预览；Web 扩展及安全回退仍在设计中；HTML / JS、anime.js / Three.js 隔离执行尚未实现，不改变当前禁止执行生成代码的边界。
 
-## 家庭资料服务边界
+## 个人同步后端
 
-以下描述当前已运行的 iOS / server beta，不代表个人工作台所有领域的最终数据模型。旧 `/records`、`/ask`、`/ai/extract-image` 与旧 Swift macOS 客户端不兼容；新的 Electron 工作台是独立实现。
+旧家庭资料 Go server、iOS beta、Swift macOS 客户端和 amoylab 自动部署入口于 2026-11-15 按用户要求退出当前代码树。历史说明仅作追溯，不是当前运行拓扑；此次不删除远端服务或生产数据。
 
-## iOS / server 运行拓扑
-
-1. iOS 通过 HTTPS 登录并持有 Keychain 中的 opaque session token。
-2. 所有 `/v1/*` 请求先经过顶层会话认证，再按 session 中的 `household_id` 隔离查询。
-3. 上传文件写入 `StorageProvider`；当前实现为本地 FS，接口允许未来替换 S3 兼容 OSS。
-4. Postgres 保存 user、household、membership、session、invite、person、asset、job、knowledge projection、thread 和 message。
-5. 单 worker 从 Postgres 以 `FOR UPDATE SKIP LOCKED` claim job，保证重启可恢复。
-6. 每个 household 拥有独立 workspace。Go 确定性地归档原件、写入 `ai-vault` 摘要并提交 git；Codex 只读取目标资料和紧凑既有上下文，返回结构化分析。完成的分析同时 upsert 到 `knowledge_entries`，供移动端快速读取，filesystem 仍是真相源。
-7. amoylab 宿主机的 `seedx daemon connect` 主动连接 `/daemon/connect`，使用宿主机 Codex 登录态执行 household cwd 中的任务。
-8. 对话 job 读取 thread 历史和 workspace，生成带相对路径 citations 的 assistant message。
-
-## 真相源边界
-
-| 数据 | 真相源 | 说明 |
-| --- | --- | --- |
-| 原始资料、长期摘要、分析文档 | household filesystem workspace | 版本化、可审计、可由 Agent 读取 |
-| 原始上传对象 | StorageProvider | 当前 FS；与 workspace 归档副本分离 |
-| 身份、权限、队列、会话、App 资料列表投影 | Postgres | `knowledge_entries` 由 workspace 内容投影；每个查询必须带 household scope |
-| 对话展示 | Postgres messages | assistant message 保留 workspace citations |
-
-workspace 基本结构：
-
-```text
-workspaces/<household-id>/
-  AGENTS.md
-  docs/
-  raw-data/
-    _incoming/       # 临时、git ignored
-    family/
-    people/<person-id>/
-  ai-vault/
-    family/
-    people/<person-id>/
-  .git/
-```
-
-## API 边界
-
-- Public：`GET /health`、`GET /privacy`、`GET /support`、`POST /auth/register`、`POST /auth/login`。
-- Machine：`GET /daemon/connect`、带 HMAC 的 `GET /agent/assets/{id}`。
-- User protected：全部 `/v1/*`，包含 logout、invite、people、assets、jobs、knowledge、threads 和 messages。
-- 新增任何 `/v1` 路由时，即使忘记单独挂 middleware，也会先被顶层认证包拦截。
-
-## 当前约束
-
-- private beta 只允许创建一个 bootstrap household；owner 后续发一次性邀请。
-- Apple Beta App Review 使用运维 CLI 创建的独立演示 household，不加入也不能读取真实家庭。
-- 第一版单 worker 串行执行，避免 workspace 冲突。
-- SeedX 0.2.1 daemon 对单次命令有 60 秒内部上限；生产默认 Codex effort 为 `low`，Nomi 把确定性文件操作移出 Agent 临界区。扩大使用前应由 SeedX 暴露独立 command timeout。
-- 当前 Codex 登录态只允许服务受信任家庭，不作为公开 SaaS 凭据模型。
-
-## 个人与家庭的后续边界
-
-现有 beta 的 household 是共享权限边界，owner / member 默认可见全部家庭资料。个人工作台的私有内容不能默认进入这个共享空间；后续接入学习、笔记、财富与跨端同步前，需要明确独立个人归属、授权与共享语义。
+独立后端位于 `apps/sync-server`，按 [云同步设计](design-docs/cloud-sync.md) 实施，使用新数据库与设备会话。正文 / DSL / 画布和版本存 PostgreSQL，原件通过 ObjectStore（开发为持久 disk）存储。桌面不开同步无需登录；详见 [执行计划](exec-plans/active/20261115-personal-cloud-sync.md)。
 
 ### 文稿写作视图
 

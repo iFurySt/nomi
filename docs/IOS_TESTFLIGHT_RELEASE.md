@@ -1,3 +1,5 @@
+> 历史档案（2026-11-15）：旧家庭服务 / iOS 工程已退役。以下旧命令仅供追溯，不能用于新文稿同步服务。新方案见 [云同步设计](design-docs/cloud-sync.md)。本次未改动远端旧数据。
+
 # iOS TestFlight 发布
 
 本文记录 Nomi iOS app 后续发 TestFlight 的默认流程。当前 iOS 发布仍是本机手动流程；CI 只负责仓库和 server，暂不在 GitHub Actions 里保存 Apple 签名密钥。
