@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld(
       ipcRenderer.send("nomi:automation-result", result),
     requestAutomationSettings: (method: string, value?: boolean) =>
       ipcRenderer.invoke("nomi:automation-settings", method, value),
+    requestSync: (method: string, params?: unknown) =>
+      ipcRenderer.invoke("nomi:sync", method, params),
+    notifySyncActivity: () => ipcRenderer.send("nomi:sync-activity"),
     requestUpdates: (method: string, value?: boolean) =>
       ipcRenderer.invoke("nomi:updates", method, value),
     getRuntimeInfo: () => ipcRenderer.invoke("nomi:runtime-info"),
@@ -41,3 +44,6 @@ contextBridge.exposeInMainWorld(
     },
   }),
 );
+
+window.addEventListener("online", () => ipcRenderer.send("nomi:sync-online", true));
+window.addEventListener("offline", () => ipcRenderer.send("nomi:sync-online", false));

@@ -27,7 +27,7 @@ Node host 管理 `.nomi` 包、原件、目录切换、保存事务和 ChatGPT �
 
 ## 下一阶段目标架构（提案）
 
-2026-11-15 的 [个人文稿云同步 v1](design-docs/cloud-sync.md) 收敛了同步范围：默认关闭，未登录保持本地使用；正文 / DSL / 画布与同步版本存 PostgreSQL，附件以引用关联 ObjectStore，开发先使用服务器持久 disk。按 block 乐观并发检查，同块冲突保留双方；首版不采用 CRDT / Node 协作房间、Redis 或实时多人编辑。上传调度与有界历史规则以该文档为准，[开发计划](exec-plans/active/20261115-personal-cloud-sync.md) 按内核、附件、桌面、恢复和试用推进。独立后端内核与原件传输、原生包往返已实现；桌面入口和自动同步尚未接通。
+2026-11-15 的 [个人文稿云同步 v1](design-docs/cloud-sync.md) 收敛了同步范围：默认关闭，未登录保持本地使用；正文 / DSL / 画布与同步版本存 PostgreSQL，附件以引用关联 ObjectStore，开发先使用服务器持久 disk。按 block 乐观并发检查，同块冲突保留双方；首版不采用 CRDT / Node 协作房间、Redis 或实时多人编辑。上传调度与有界历史规则以该文档为准，[开发计划](exec-plans/active/20261115-personal-cloud-sync.md) 按内核、附件、桌面、恢复和试用推进。独立后端内核与原件传输、原生包往返已实现；桌面可选入口与自动同步切片已接通，完整交付仍在验证与完善。运行边界见 [同步实现](design-docs/cloud-sync-runtime.md)。
 
 笔记与无限画布以平台中立 DSL / 语义模型为契约：Note / Block 表达长文、图片、文件、手写及 InteractiveBlock，Placement 独立表达空间展示。交互块包含状态、类型化计算、组件视图与动作；Electron 可先用 React / TypeScript，未来 SwiftUI / UIKit、Compose renderer 可独立实现，不要求移动端必须运行 WebView 或 JavaScript。DSL 快照、协作历史、个人学习状态有明确边界，不设两份可相互覆盖的主状态。
 

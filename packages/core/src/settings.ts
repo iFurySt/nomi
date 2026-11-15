@@ -3,6 +3,7 @@ export const settingsSections = [
   "appearance",
   "chatgpt",
   "mcp",
+  "sync",
 ] as const;
 export type SettingsSection = (typeof settingsSections)[number];
 export function parseSettingsSection(hash: string): SettingsSection {

@@ -1,3 +1,4 @@
+import { CloudSyncSettings } from "./CloudSyncSettings";
 import { MCPSettings } from "./MCPSettings";
 import { UpdateSettings } from "./UpdateSettings";
 import { GeneralSettings } from "./GeneralSettings";
@@ -17,6 +18,7 @@ export function Settings() {
         </>
       )}
       {section === "chatgpt" && <ChatGPTSettings />}
+      {section === "sync" && <CloudSyncSettings />}
       {section === "mcp" && <MCPSettings />}
       {section === "appearance" && (
         <section className="setting-group">

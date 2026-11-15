@@ -1,3 +1,4 @@
+import { stableJSON } from "../../../core/src/sync/protocol";
 import { automationContext, openAutomationNote } from "./automation-context";
 import {
   createContext,
@@ -228,6 +229,7 @@ function useCanvasDocumentState(profile: string) {
     current.current = doc;
     setDocument(doc);
     queue(doc, debounce);
+    window.nomiDesktop?.notifySyncActivity?.();
   };
   const edit = (
     commands: CanvasCommand[],
@@ -308,6 +310,35 @@ function useCanvasDocumentState(profile: string) {
           params.surroundingCharacters,
         ),
       };
+    }
+    if (method === "sync-apply") {
+      const before = current.current;
+      if (
+        composing.current ||
+        pending.current ||
+        running.current ||
+        !before ||
+        stableJSON(before) !== stableJSON(params.before)
+      )
+        throw Error("EDITOR_BUSY: 正在编辑，稍后合并云端内容。");
+      const after = parseCanvasDocument(params.document);
+      if (after.id !== before.id || after.revision !== before.revision + 1)
+        throw Error("云端文稿身份或本地版本无效。");
+      // Whole-document Undo snapshots predate remote changes and cannot safely replay them.
+      history.current = { undo: [], redo: [] };
+      automationSnapshot.current = undefined;
+      for (const item of params.assets)
+        originals.current.set(item.asset.id, {
+          asset: item.asset,
+          blob: new Blob([new Uint8Array(item.bytes)], {
+            type: item.asset.mime,
+          }),
+        });
+      install(after);
+      renderHistory((n) => n + 1);
+      if (!(await persistRef.current()))
+        throw Error("云端内容尚未保存到本机，将保留同步队列重试。");
+      return { revision: after.revision };
     }
     if (method === "commit") {
       const before = current.current;

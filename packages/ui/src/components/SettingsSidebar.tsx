@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sun, Settings2, Search, Sparkles, Plug } from "lucide-react";
+import { Sun, Settings2, Search, Sparkles, Plug, Cloud } from "lucide-react";
 import type { SettingsSection } from "@nomi/core";
 import { useWorkspace } from "../workspace-context";
 export const settingItems: {
@@ -11,6 +11,7 @@ export const settingItems: {
   { id: "general", label: "General", group: "Personal", icon: Settings2 },
   { id: "appearance", label: "Appearance", group: "Personal", icon: Sun },
   { id: "chatgpt", label: "ChatGPT", group: "Personal", icon: Sparkles },
+  { id: "sync", label: "云同步", group: "Personal", icon: Cloud },
   { id: "mcp", label: "MCP", group: "Personal", icon: Plug },
 ];
 export function SettingsSidebar({ onSelect }: { onSelect?: () => void }) {

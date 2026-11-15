@@ -10,6 +10,7 @@ export function registerDocumentStorage(
   documents: DocumentStore,
   expected: string,
   flushWindowDocuments: (window: BrowserWindow) => Promise<boolean>,
+  saved?: () => void,
 ) {
   let choosingDirectory = false;
   ipcMain.handle(
@@ -41,7 +42,10 @@ export function registerDocumentStorage(
           if (!request) throw Error("Invalid save request.");
           if (method === "backup")
             await documents.backup(params as DocumentStorageSave);
-          else await documents.save(params as DocumentStorageSave);
+          else {
+            await documents.save(params as DocumentStorageSave);
+            saved?.();
+          }
         } else if (method === "asset")
           value = await documents.asset(
             request?.profile!,

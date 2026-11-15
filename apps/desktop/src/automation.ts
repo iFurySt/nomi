@@ -224,4 +224,5 @@ export async function registerAutomation(
     }
     pending.clear();
   });
+  return { invoke };
 }

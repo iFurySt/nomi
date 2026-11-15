@@ -97,18 +97,22 @@ try {
     await new Promise((r) => setTimeout(r, 250));
   }
   if (!ready) throw Error("Sync server readiness timeout");
-  const fixture = join(output, "fixture.mjs");
-  await build({
-    entryPoints: [join(root, "scripts/fixtures/sync-package.ts")],
-    outfile: fixture,
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    target: "node24",
-    banner: {
-      js: "import {createRequire} from 'node:module'; const require=createRequire(import.meta.url);",
-    },
-  });
+  const desktop = process.argv.includes("--desktop");
+  const fixture = desktop
+    ? join(root, "scripts/check-sync-desktop.mjs")
+    : join(output, "fixture.mjs");
+  if (!desktop)
+    await build({
+      entryPoints: [join(root, "scripts/fixtures/sync-package.ts")],
+      outfile: fixture,
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      target: "node24",
+      banner: {
+        js: "import {createRequire} from 'node:module'; const require=createRequire(import.meta.url);",
+      },
+    });
   run(process.execPath, [fixture], {
     env: {
       ...process.env,

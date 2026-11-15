@@ -1,3 +1,5 @@
+import { registerCloudSync } from "./cloud-sync";
+import type { CloudSyncHost } from "../../../packages/host/src/cloud-sync";
 import { registerAutomation } from "./automation";
 import { setupUpdates } from "./updates";
 import { configureWindowInput, viewMenu } from "./window-policy";
@@ -474,11 +476,13 @@ if (primaryInstance)
           : join(app.getPath("documents"), applicationName),
       );
       documentStore = documents;
+      let cloudSync: CloudSyncHost | undefined;
       registerDocumentStorage(
         documents,
         devUrl ||
           pathToFileURL(join(__dirname, "../../web/dist/index.html")).href,
         flushWindowDocuments,
+        () => cloudSync?.saved(),
       );
       ipcMain.handle("nomi:runtime-info", () => ({
         kind: "desktop",
@@ -539,7 +543,9 @@ if (primaryInstance)
       );
       await createWindow();
       await drainPackages();
-      await registerAutomation(documents, devUrl || pathToFileURL(join(__dirname, "../../web/dist/index.html")).href);
+      const expectedURL = devUrl || pathToFileURL(join(__dirname, "../../web/dist/index.html")).href;
+      const automation = await registerAutomation(documents, expectedURL);
+      cloudSync = await registerCloudSync(documents, expectedURL, automation.invoke, flushWindowDocuments);
       if (smokeTimeout) clearTimeout(smokeTimeout);
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0)

@@ -24,6 +24,11 @@ declare global {
         method: "status" | "enabled" | "readOnly" | "copyConfig",
         value?: boolean,
       ): Promise<{ enabled: boolean; readOnly: boolean }>;
+      requestSync?(
+        method: import("../../core/src/sync/settings").SyncAction,
+        params?: unknown,
+      ): Promise<import("../../core/src/sync/settings").CloudSyncReply>;
+      notifySyncActivity?(): void;
       requestUpdates?(
         method: import("@nomi/core").UpdateAction,
         value?: boolean,

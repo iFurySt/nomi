@@ -1,0 +1,98 @@
+.cloud-sync-settings {
+  max-width: 800px;
+}
+.cloud-sync-form {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  max-width: 460px;
+}
+.cloud-sync-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--secondary);
+  font-size: 13px;
+}
+.cloud-sync-form input,
+.cloud-sync-download select {
+  width: 100%;
+  min-width: 0;
+  background: var(--surface-muted);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+}
+.cloud-sync-form input:focus,
+.cloud-sync-download select:focus {
+  outline: 1px solid var(--muted);
+  outline-offset: 1px;
+}
+.cloud-sync-form > button {
+  justify-self: start;
+}
+.cloud-sync-binding {
+  padding: 0 20px 20px;
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+}
+.cloud-sync-binding p,
+.cloud-sync-binding small {
+  color: var(--secondary);
+  margin: 0;
+}
+.cloud-sync-download {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.cloud-sync-download select {
+  flex: 1;
+  min-width: 160px;
+}
+.cloud-sync-conflicts h2 {
+  font-size: 16px;
+}
+.cloud-sync-conflict h3 {
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.cloud-sync-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
+.cloud-sync-compare label {
+  min-width: 0;
+  font-size: 13px;
+}
+.cloud-sync-compare input {
+  margin-right: 8px;
+}
+.cloud-sync-compare pre {
+  height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 12px;
+}
+@media (max-width: 680px) {
+  .cloud-sync-compare {
+    grid-template-columns: 1fr;
+  }
+  .cloud-sync-settings .setting-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
