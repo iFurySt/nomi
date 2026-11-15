@@ -1,105 +1,90 @@
-> 历史档案（2026-11-15）：旧家庭服务 / iOS 工程已退役。以下旧命令仅供追溯，不能用于新文稿同步服务。新方案见 [云同步设计](design-docs/cloud-sync.md)。本次未改动远端旧数据。
+# 个人文稿同步服务部署
 
-# amoylab 部署
+2026-11-15：当前后端为 `apps/sync-server`，独立 Go / PostgreSQL / disk ObjectStore。已在本机新数据库与隔离容器验证，尚未部署远端。桌面默认不连接；手机和家庭协作不在 v1 范围内。
 
-Nomi server 部署在 `amoylab:/opt/nomi`，GitHub Actions 在 `server-v*` tag 时构建 `ghcr.io/ifuryst/nomi-server` 并通过受限 SSH 执行部署。
+旧家庭服务的 [amoylab 部署档案](references/legacy-family-deployment.md) 仅供追溯。旧 `server-v*` 自动部署工作流已移除，不得用旧 tag / database / volume 发布新同步服务；后续远端发布需为本服务另定制品和部署目标。本轮未修改旧远端服务或数据。
 
-## 生产拓扑
+## 本地私有部署
 
-- Compose：`/opt/nomi/docker-compose.yml`
-- Secrets：`/opt/nomi/.env`，权限 root-only
-- Data：`/opt/nomi/data` bind 到容器 `/var/lib/nomi`
-- API：容器 `8088` 只绑定宿主机 `127.0.0.1:8088`，nginx 提供 `https://nomi.ifuryst.com`
-- Postgres：复用 `postgres_default` network 的独立 `nomi` database/role
-- SeedX：宿主机 root 的 `nomi-seedx.service`
-- Codex：宿主机 root 的 Codex home 与 ChatGPT 登录态
+从仓库根目录执行，使用 Docker Compose。配置见 [compose.yml](../infra/sync/compose.yml)，服务、数据库和两个持久卷独立；数据库不暴露宿主端口，API 仅绑定 loopback。服务器以非 root、只读根文件系统运行，原件卷可写。
 
-2026-08-23 线上验证版本为 SeedX `0.2.1`、Codex CLI `0.149.0`。Codex 版本固定升级是为了兼容当前模型目录 schema；升级后必须重启 `nomi-seedx.service` 并跑实际 turn，不能只看 `codex login status`。
+准备一个权限 `0600`、仓库外的环境文件，包含：
 
-容器内 workspace 是 `/var/lib/nomi/workspaces/<household>`；发送给宿主机 Codex 的 cwd 是 `/opt/nomi/data/workspaces/<household>`。两者必须指向同一个 bind mount。
-
-## 必需环境变量
-
-以 `infra/amoylab/env.example` 为模板：
-
-- `NOMI_DATABASE_URL`
-- `NOMI_SEEDX_API_KEY`
-- `NOMI_BOOTSTRAP_INVITE_CODE`
-- `NOMI_ASSET_SIGNING_KEY`
-- `NOMI_SESSION_DURATION`
-- `NOMI_SEEDX_CODEX_REASONING_EFFORT=low`
-- `NOMI_SEEDX_COMMAND_TIMEOUT=5m`
-
-生成 secret 时使用 CSPRNG，例如 `openssl rand -base64 32`，但不要把结果留在 shell history、仓库或日志中。bootstrap code 只用于创建第一个家庭；数据库已有 household 后会被服务端拒绝。
-
-## 首次同步配置
-
-```sh
-scp infra/amoylab/docker-compose.yml amoylab:/tmp/nomi-compose.yml
-scp infra/amoylab/nomi-seedx.service amoylab:/tmp/nomi-seedx.service
-ssh amoylab 'sudo install -d -m 700 /opt/nomi/data && sudo install -m 600 /tmp/nomi-compose.yml /opt/nomi/docker-compose.yml && sudo install -m 600 /tmp/nomi-seedx.service /etc/systemd/system/nomi-seedx.service && sudo systemctl daemon-reload'
+```dotenv
+NOMI_SYNC_DB_PASSWORD=<CSPRNG 生成的十六进制密码>
+NOMI_SYNC_PORT=8089
 ```
 
-Codex auth 可以从受控开发机复制到 root Codex home，但只能经 SSH 直接传输，复制后检查目录/文件权限为 root-only；不得经过仓库、镜像或普通临时共享目录。
-
-## 发布
+密码限用十六进制，避免连接 URL 转义歧义；不要提交文件或输出内容。以下 `$SYNC_ENV` 指向该文件，项目名固定为个人同步，不复用旧家庭项目。
 
 ```sh
-git tag server-vX.Y.Z
-git push origin server-vX.Y.Z
+docker compose --env-file "$SYNC_ENV" -f infra/sync/compose.yml build sync
+docker compose --env-file "$SYNC_ENV" -f infra/sync/compose.yml up -d --wait postgres
+docker compose --env-file "$SYNC_ENV" -f infra/sync/compose.yml run --rm -T sync migrate
+python3 -c 'import getpass; print(getpass.getpass("Private account password: "))' | docker compose --env-file "$SYNC_ENV" -f infra/sync/compose.yml run --rm -T sync create-user --email you@example.com --password-stdin
+docker compose --env-file "$SYNC_ENV" -f infra/sync/compose.yml up -d sync
+curl --fail http://127.0.0.1:8089/health
 ```
 
-workflow 成功后：
+`serve` 不自动迁移，启动时校验 schema / migration checksum。每次升级先备份，停止同步服务写入，再显式迁移、启动及检查 health / synthetic 往返。容器重建不删除持久卷，日常停机不使用 `down -v`。
+
+远程使用须配置 HTTPS reverse proxy，客户端只对 loopback 放行 HTTP。代理的请求体限制应覆盖 20 MiB 单原件与协议 JSON 预算，超时至少覆盖服务端 60 秒；关闭鉴权响应缓存。后端不信任 forwarded IP，登录限流当前按直接 peer 计算：单代理后的用户共享限额，私有小规模试用可接受，公开运营前需单独设计可信代理与账号级限流。
+
+## 身份与数据
+
+运维 `create-user` 创建私有账号，无公开注册或密码找回 UI。密码 bcrypt；设备会话为 30 天随机 token 的哈希，用户可从设置撤销单设备。桌面凭据由 safeStorage 加密；不开同步无需登录。不要复用 ChatGPT token。
+
+PostgreSQL 保存正文 / DSL / 画布、版本、权限、引用和收据；`objects` 卷只保存鉴权不可变原件。disk 是开发阶段 ObjectStore，不具备云 OSS 的跨故障域冗余；实际数据使用前配置异机加密备份。
+
+## 配对备份
+
+脚本 [backup-sync-server.sh](../scripts/backup-sync-server.sh) 支持原生 CLI 或显式容器 ID；从不猜测生产目标。需要 Python 3.11+、gzip 与匹配 PostgreSQL 主版本的 dump / restore 工具（容器模式使用数据库容器自带工具）。
 
 ```sh
-ssh amoylab 'sudo /usr/local/sbin/nomi-deploy-root health'
-ssh amoylab 'docker compose -f /opt/nomi/docker-compose.yml --env-file /opt/nomi/.env ps'
-ssh amoylab 'systemctl is-active nomi-seedx.service'
-curl -fsS https://nomi.ifuryst.com/health
+export NOMI_SYNC_PG_CONTAINER="$(docker compose --env-file "$SYNC_ENV" -f infra/sync/compose.yml ps -q postgres)"
+export NOMI_SYNC_SERVICE_CONTAINER="$(docker compose --env-file "$SYNC_ENV" -f infra/sync/compose.yml ps -q sync)"
+./scripts/backup-sync-server.sh /private/backups/nomi-sync-NEW_TIMESTAMP
 ```
 
-## Private beta 初始化
+先取得一致性的 `database.dump`，再导出全部 ready 原件并逐个校验摘要；当前原件不可变且物理 GC 关闭，因此并发新增只会多带原件，不会遗漏 dump 引用。只有两份文件完成后才生成 SHA-256 `COMPLETE.json`。没有完成标记的目录不是有效备份；目录已有时脚本拒绝覆盖。
 
-1. 用 bootstrap code 在 iOS 注册 owner，创建唯一家庭。
-2. owner 在“家庭”页生成一次性家人邀请码。
-3. 家人在自己的 iPhone 用该邀请码注册。
-4. 上传非敏感测试资料，确认 job 从 queued/processing 到 completed。
-5. 提问并确认 assistant answer 带 workspace relative citations。
+建议每天备份并复制到异机加密存储；备份文件包含私密正文与账号哈希，不上传公开制品。备份调度 / 异机目的地由部署环境配置，本仓库不自动创建定时任务。版本历史保留规则不等于灾备保留策略。
 
-## 旧知识库一次性导入
+## 隔离恢复与回退
 
-历史 filesystem 知识库先用不带 `--delete` 的 rsync 放入 `/opt/nomi/data/imports/<import-id>`。排除 `.git`、临时收件箱和模板目录，并核对文件数与总字节数。正式导入前备份 Postgres；如果目标 workspace 已存在，也要单独保留其快照。
+[restore-sync-server.sh](../scripts/restore-sync-server.sh) 要求**新的空数据库和空原件目录**。先检查备份完整标记与两个归档摘要，任何已有表 / 原件都拒绝覆盖；恢复后校验 schema、全部文稿引用和原件哈希。失败时保留隔离目标用于诊断，不自动删除用户数据。
 
-新版本部署后先 dry-run，再用精确家庭名和显式成员映射执行：
+原生恢复设置 `NOMI_SYNC_BINARY`、`NOMI_SYNC_DATABASE_URL`、`NOMI_SYNC_OBJECT_DIR`；Docker 恢复设置目标 `NOMI_SYNC_PG_CONTAINER` 和 `NOMI_SYNC_SERVICE_CONTAINER`。如使用另一个 Compose 项目恢复，先启动新 Postgres，再启动挂载新 objects 卷、继承相同环境的临时维护容器；**不要运行 migrate 或 serve**。例如：
 
 ```sh
-docker exec nomi-server /usr/local/bin/nomi-server import-legacy-workspace \
-  --source-root /var/lib/nomi/imports/<import-id> \
-  --household-name '<exact-household-name>' \
-  --person 'legacy-slug=Display Name:Relationship' \
-  --dry-run
+# 新项目、新端口、新卷；使用独立恢复环境文件。
+docker compose --env-file "$RESTORE_ENV" -f infra/sync/compose.yml -p nomi-sync-restore up -d --wait postgres
+docker compose --env-file "$RESTORE_ENV" -f infra/sync/compose.yml -p nomi-sync-restore run -d --no-deps --name nomi-sync-recovery --entrypoint sh sync -c 'sleep 86400'
+export NOMI_SYNC_PG_CONTAINER="$(docker compose --env-file "$RESTORE_ENV" -f infra/sync/compose.yml -p nomi-sync-restore ps -q postgres)"
+export NOMI_SYNC_SERVICE_CONTAINER=nomi-sync-recovery
+./scripts/restore-sync-server.sh /private/backups/nomi-sync-COMPLETE_TIMESTAMP
+# 验证通过后移除临时维护容器，再启动新项目 sync 进行独立客户端验收。
+docker rm -f nomi-sync-recovery
+docker compose --env-file "$RESTORE_ENV" -f infra/sync/compose.yml -p nomi-sync-restore up -d sync
 ```
 
-去掉 `--dry-run` 才会创建缺失成员、把资料复制到 UUID scope、改写导入副本中的引用、提交 workspace git，并 upsert App 的 knowledge projection。导入不覆盖不同内容；重复执行应报告 `files_added=0` 且条目计数不增长。完成后核对成员数、knowledge 数、workspace git clean、旧 slug 引用为零和审核家庭计数不变。
+不提供破坏性 down migration。升级回退使用旧制品和**升级前配对备份**在新目标恢复，验收后显式切换服务地址。恢复的服务保留原 space / entity / receipt 身份；恢复后已有客户端仍需按其基线对账，旧版本竞争保留双方。回退窗口之后的云端写入不会凭空出现在旧备份里，应保留原数据库 / 原件和客户端待同步版本供恢复。
 
-## 运维与回滚
+## 维护与观测
+
+- `nomi-sync maintain` 默认 dry-run，`--apply` 执行历史 / 日志清理；服务启动与每 24 小时也执行。保留并集规则见 [设计](design-docs/cloud-sync.md)。物理对象 GC 关闭。
+- `nomi-sync verify` 输出原件数、总字节和空间数，逐个校验原件与图；适合恢复后 / 定期离线演练，成本随数据量增加。
+- HTTP 日志只记录操作类别、方法、状态码和耗时；按 409 / 401 / 429 / 5xx 汇总冲突 / 会话 / 限流 / 错误，不记录正文、账号、token、路径 ID。客户端设置显示待同步、错误、冲突数与最后成功时间。
+- 持续监控 Postgres、对象卷容量、备份完成时间及 health；首版不接 Redis、公开 metrics 或告警平台。历史 30 天高频修改与永久收据 / tombstone 均可能增长，不把最近 50 条误当总量上限。
+
+## 可重复验收
 
 ```sh
-ssh amoylab 'journalctl -u nomi-seedx.service --since "10 minutes ago" --no-pager -n 100'
-ssh amoylab 'docker logs --since 10m nomi-server'
-ssh amoylab 'docker inspect nomi-server --format "revision={{index .Config.Labels \"org.opencontainers.image.revision\"}} version={{index .Config.Labels \"org.opencontainers.image.version\"}}"'
+./scripts/test-sync-server.sh
+node scripts/check-sync-package.mjs --backup
+node scripts/check-sync-compose.mjs
+# macOS，两套独立 Electron profile / 原生资料目录 / 设备会话
+node scripts/check-sync-package.mjs --desktop
 ```
 
-回滚时在 `/opt/nomi/.env` 把 `NOMI_IMAGE` 固定到上一 `server-v*`，再运行 `nomi-deploy-root deploy`。代码回滚不会自动回滚 Postgres 或 workspace，执行破坏性迁移前必须单独备份。
-
-备份必须同时覆盖：
-
-- Postgres `nomi` database
-- `/opt/nomi/data/assets`
-- `/opt/nomi/data/workspaces`
-
-## 已知限制
-
-- SeedX 0.2.1 daemon 内部单命令上限为 60 秒；systemd 的 `--timeout` 是连接生命周期，不是 command timeout，因此常驻 unit 不设置该参数。
-- 当前 private beta 使用 root 的个人 Codex 登录态，只允许受信任家庭；扩大用户范围前必须更换凭据与运营模型。
-- 不在 deploy/history/log 中记录真实 health 数据、数据库 URL、token 或 Codex auth。
+均使用 synthetic 文稿与唯一临时项目，只清理自己创建的容器。产物位于忽略的 `.artifacts`。本机隔离验证不等于两个物理 Mac 或公网生产验收。

@@ -1,0 +1,9 @@
+**
+!apps/
+!apps/sync-server/
+!apps/sync-server/**
+apps/sync-server/.env*
+apps/sync-server/bin/
+apps/sync-server/tmp/
+apps/sync-server/.artifacts/
+apps/sync-server/**/node_modules/

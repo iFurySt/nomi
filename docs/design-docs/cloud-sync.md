@@ -1,6 +1,6 @@
 # 个人文稿云同步 v1
 
-状态：2026-11-15，方案已收敛；后端内核与原件 / 包往返已实现，桌面自动同步切片已接通，完整验收仍在开发。实现边界见 [运行说明](cloud-sync-runtime.md)。开发顺序见 [执行计划](../exec-plans/active/20261115-personal-cloud-sync.md)。本文取代 [早期画布设计](notes-infinite-canvas.md) 中面向第一版同步的 CRDT / Node 协作房间建议，不改变当前本地保存行为。
+状态：2026-11-15，个人同步 v1 已实现，真实 Go / PostgreSQL、两个隔离 Electron 客户端、保留清理及备份恢复验证通过；未远端部署或发布。实现边界见 [运行说明](cloud-sync-runtime.md)。开发顺序见 [执行计划](../exec-plans/completed/20261115-personal-cloud-sync.md)。本文取代 [早期画布设计](notes-infinite-canvas.md) 中面向第一版同步的 CRDT / Node 协作房间建议，不改变当前本地保存行为。
 
 ## 目标与范围
 

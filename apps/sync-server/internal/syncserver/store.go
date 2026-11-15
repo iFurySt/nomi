@@ -357,6 +357,7 @@ func (s *Store) Changes(ctx context.Context, user, space string, after int64, li
 		return Changes{}, err
 	}
 	out := Changes{Protocol: Protocol, Cursor: after, Changes: []Change{}}
+	size := 128 // response envelope; individual commits are never split
 	for rows.Next() {
 		var c Change
 		var data []byte
@@ -368,6 +369,15 @@ func (s *Store) Changes(ctx context.Context, user, space string, after int64, li
 			rows.Close()
 			return Changes{}, err
 		}
+		encoded, encodeErr := json.Marshal(c)
+		if encodeErr != nil {
+			rows.Close()
+			return Changes{}, encodeErr
+		}
+		if len(out.Changes) > 0 && size+len(encoded) > MaxBody {
+			break
+		}
+		size += len(encoded)
 		out.Changes = append(out.Changes, c)
 		out.Cursor = c.Sequence
 	}

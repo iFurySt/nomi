@@ -1,0 +1,42 @@
+name: nomi-personal-sync
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: nomi
+      POSTGRES_DB: nomi_sync
+      POSTGRES_PASSWORD: ${NOMI_SYNC_DB_PASSWORD:?Set a generated hexadecimal database password}
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nomi -d nomi_sync"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  sync:
+    build:
+      context: ../..
+      dockerfile: apps/sync-server/Dockerfile
+    environment:
+      NOMI_SYNC_DATABASE_URL: postgres://nomi:${NOMI_SYNC_DB_PASSWORD}@postgres:5432/nomi_sync?sslmode=disable
+      NOMI_SYNC_OBJECT_DIR: /data/objects
+    volumes:
+      - objects:/data/objects
+    ports:
+      - "127.0.0.1:${NOMI_SYNC_PORT:-8089}:8089"
+    command: ["serve", "--addr", "0.0.0.0:8089"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    restart: unless-stopped
+volumes:
+  postgres:
+  objects:

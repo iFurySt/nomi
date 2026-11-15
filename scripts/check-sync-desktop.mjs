@@ -42,11 +42,14 @@ const {registerCloudSync}=require(${JSON.stringify(join(root, "apps/desktop/src/
 const path=require('node:path'),fs=require('node:fs/promises'),{pathToFileURL}=require('node:url');
 const folder=${JSON.stringify(folder)};
 app.setName('Nomi(Dev) Sync ${name}');app.setPath('userData',path.join(folder,'profile'));
-let win,automation,host;
+let win,automation,host,loseAck=false;
+const realFetch=globalThis.fetch;
+globalThis.fetch=async (...args)=>{const response=await realFetch(...args);if(loseAck&&String(args[0]).endsWith('/commit')&&response.ok){loseAck=false;await response.arrayBuffer();throw Error('Synthetic response lost after real commit');}return response;};
 process.on('message',async m=>{try{let value;
 if(m.action==='eval')value=await win.webContents.executeJavaScript(m.source,true);
 else if(m.action==='snapshot')value=(await automation.invoke('snapshot',{})).document;
 else if(m.action==='edit'){const s=await automation.invoke('snapshot',{});const d=structuredClone(s.document);d.blocks.find(b=>b.id===m.block).source=m.text;d.revision++;await automation.invoke('commit',{document:d,expectedRevision:s.document.revision,snapshotId:s.snapshotId,assets:[]});value=true;}
+else if(m.action==='loseAck'){loseAck=true;value=true;}
 else if(m.action==='online'){host.online(m.online);value=true;}
 else if(m.action==='capture'){if(m.width)win.setSize(m.width,m.height||850);await new Promise(r=>setTimeout(r,150));await fs.writeFile(m.path,(await win.webContents.capturePage()).toPNG());value=true;}
 else if(m.action==='undo'){win.webContents.undo();value=true;}
@@ -55,12 +58,12 @@ process.send({id:m.id,value});}catch(e){process.send({id:m.id,error:e.message});
 app.whenReady().then(async()=>{
  const store=new DocumentStore(path.join(folder,'directory.json'),path.join(folder,'library'));
  if(!await store.load('local-device','document.home')){
-  const d={...createCanvasDocument(),notes:[{id:'note.sync',title:'同步测试',blocks:['text.one','text.two']}],blocks:[{id:'text.one',type:'markdown',source:${JSON.stringify('# 双端同步\n\n本机文稿。')}},{id:'text.two',type:'markdown',source:'另一段文字。'}],assets:[],board:{id:'board.home',placements:[]}};
+  const d={...createCanvasDocument(),notes:[{id:'note.sync',title:'同步测试',blocks:['text.one','text.two']}],blocks:[{id:'text.one',type:'markdown',source:${JSON.stringify("# 双端同步\n\n本机文稿。")}},{id:'text.two',type:'markdown',source:'另一段文字。'}],assets:[],board:{id:'board.home',placements:[]}};
   await store.save({profile:'local-device',documentId:d.id,document:d,baseRevision:null,assets:[]});
  }
  const expected=pathToFileURL(${JSON.stringify(join(root, "apps/web/dist/index.html"))}).href;
  const flush=async w=>w.webContents.executeJavaScript('(async()=>{const writes=[];window.dispatchEvent(new CustomEvent("nomi-flush-documents",{detail:{waitUntil:p=>writes.push(p)}}));return (await Promise.all(writes)).every(Boolean)})()');
- registerDocumentStorage(store,expected,flush,()=>host?.saved());
+ registerDocumentStorage(store,expected,flush,document=>host?.saved(document));
  ipcMain.handle('nomi:runtime-info',()=>({kind:'desktop',platform:process.platform,version:'sync-fixture'}));
  ipcMain.handle('nomi:updates',()=>({version:'sync-fixture',available:false,reason:'Disabled'}));
  ipcMain.handle('nomi:chatgpt',()=>({ok:false,error:'No fixture account'}));
@@ -231,6 +234,47 @@ try {
   successes.push(
     "offline independent edits automatically merge across isolated Electron processes",
   );
+  await a.ui("eval", { source: "location.hash='#/notes?note=note.sync';true" });
+  await until(
+    () => a.ui("eval", { source: "!!document.querySelector('.notes-scroll')" }),
+    "notes undo surface",
+  );
+  const beforeUndo = await a.ui("snapshot");
+  const undo = () =>
+    a.ui("eval", {
+      source:
+        "document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'z',metaKey:true,bubbles:true,cancelable:true}));true",
+    });
+  await undo();
+  await delay(100);
+  assert.deepEqual((await a.ui("snapshot")).blocks, beforeUndo.blocks);
+  await a.ui("edit", { block: "text.two", text: "可撤销的新输入" });
+  await undo();
+  await until(
+    async () =>
+      (await a.ui("snapshot")).blocks.find((b) => b.id === "text.two")
+        .source === "B 离线编辑第二块",
+    "new local undo",
+  );
+  await writeFile(
+    join(a.folder, "library", "文稿", "同步测试.nomi", "text", "text.two.md"),
+    "来自外部文件的修改",
+  );
+  await until(
+    async () =>
+      (await a.ui("snapshot")).blocks.find((b) => b.id === "text.two")
+        .source === "来自外部文件的修改",
+    "external file readback",
+  );
+  await a.request("sync");
+  await b.request("sync");
+  assert.equal(
+    (await b.ui("snapshot")).blocks.find((b) => b.id === "text.two").source,
+    "来自外部文件的修改",
+  );
+  successes.push(
+    "remote apply clears stale whole-document Undo, new edits remain undoable, and external Markdown edits synchronize",
+  );
   await a.ui("online", { online: false });
   await b.ui("online", { online: false });
   await a.ui("edit", { block: "text.one", text: "同块 A 修改" });
@@ -285,11 +329,116 @@ try {
   successes.push(
     "same-block conflict retains both sides and actual UI resolves reviewed versions",
   );
+  await a.ui("eval", { source: "location.hash='#/settings/sync';true" });
+  await until(
+    () =>
+      a.ui("eval", {
+        source:
+          "[...document.querySelectorAll('button')].some(b=>b.textContent==='历史版本')",
+      }),
+    "history entry",
+  );
+  await a.ui("eval", {
+    source:
+      "[...document.querySelectorAll('button')].find(b=>b.textContent==='历史版本').click();true",
+  });
+  await until(
+    () =>
+      a.ui("eval", {
+        source:
+          "!!document.querySelector('[aria-label=选择历史内容块] option[value=\"text.two\"]')",
+      }),
+    "history entities",
+  );
+  await a.ui("eval", {
+    source:
+      "(()=>{const select=document.querySelector('[aria-label=选择历史内容块]');select.value='text.two';select.dispatchEvent(new Event('change',{bubbles:true}));return true})()",
+  });
+  await until(
+    () =>
+      a.ui("eval", {
+        source:
+          "!document.querySelector('[aria-label=选择历史内容块]').disabled && document.querySelector('[aria-label=选择历史内容块]').value==='text.two' && [...document.querySelectorAll('.cloud-history-list > button')].some(b=>!b.disabled && b.querySelector('span')?.textContent==='版本 1')",
+      }),
+    "initial historical version",
+  );
+  await a.ui("eval", {
+    source:
+      "[...document.querySelectorAll('.cloud-history-list > button')].find(b=>b.querySelector('span')?.textContent==='版本 1').click();true",
+  });
+  await until(
+    () =>
+      a.ui("eval", {
+        source:
+          "(()=>{const text=document.querySelector('[aria-label=历史内容预览]')?.textContent;if(text!=='另一段文字。')throw Error('History preview: '+text);return true})()",
+      }),
+    "history preview",
+  );
+  await a.ui("capture", { path: join(output, "sync-history.png") });
+  await a.ui("eval", {
+    source:
+      "[...document.querySelectorAll('button')].find(b=>b.textContent==='恢复为新版本').click();true",
+  });
+  await until(async () => {
+    await a.request("sync");
+    return (
+      (await a.ui("snapshot")).blocks.find((b) => b.id === "text.two")
+        .source === "另一段文字。"
+    );
+  }, "history restore");
+  await b.request("sync");
+  assert.equal(
+    (await b.ui("snapshot")).blocks.find((b) => b.id === "text.two").source,
+    "另一段文字。",
+  );
+  successes.push(
+    "actual history picker previews and restores a previous block as a new synchronized version",
+  );
+  await a.ui("loseAck");
+  await a.ui("edit", { block: "text.one", text: "服务端成功但确认丢失" });
+  await a.request("sync");
+  assert.equal((await a.request("status")).phase, "error");
+  await a.ui("edit", { block: "text.one", text: "恢复后新输入" });
+  await a.stop();
+  await a.launch();
+  await until(async () => {
+    await a.request("sync");
+    return (await a.request("status")).phase === "ready";
+  }, "replay lost acknowledgement");
+  await b.request("sync");
+  assert.equal(
+    (await b.ui("snapshot")).blocks.find((b) => b.id === "text.one").source,
+    "恢复后新输入",
+  );
+  const old = await a.request("history", { id: "text.one" });
+  assert.equal(
+    old.filter((r) => r.data?.source === "服务端成功但确认丢失").length,
+    1,
+  );
+  successes.push(
+    "real successful commit with lost response, newer input and process restart replay without duplicates",
+  );
+  const sessions = await a.request("sessions"),
+    deviceB = sessions.find((s) => s.deviceName.includes("mac-b"));
+  assert(deviceB);
+  await a.request("revoke", { id: deviceB.id });
+  await b.request("sync");
+  assert.equal((await b.request("status")).phase, "auth");
+  await b.ui("edit", { block: "text.two", text: "登录过期仍可编辑" });
+  await b.request("login", {
+    server: url,
+    email: "test@example.invalid",
+    password,
+  });
+  await b.request("sync");
+  successes.push(
+    "device revocation pauses sync while local editing survives; reauthentication resumes the same binding",
+  );
   await b.stop();
   await b.launch();
   assert.equal(
     (await b.ui("snapshot")).blocks.find((b) => b.id === "text.one").source,
-    "同块 A 修改",
+    "恢复后新输入",
   );
   assert((await b.request("status")).account);
   await b.request("enabled", { enabled: false });

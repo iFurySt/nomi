@@ -1,10 +1,11 @@
 import { build } from "esbuild";
 import { spawn, execFileSync } from "node:child_process";
-import { mkdtemp, mkdir } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:net";
+import assert from "node:assert/strict";
 const root = fileURLToPath(new URL("../", import.meta.url));
 await mkdir(join(root, ".artifacts/sync-package"), { recursive: true });
 const output = await mkdtemp(join(root, ".artifacts/sync-package/run-"));
@@ -122,7 +123,109 @@ try {
     },
     stdio: "inherit",
   });
-  console.log(`Report: ${join(output, "report.json")}`);
+  if (process.argv.includes("--backup")) {
+    const backup = join(output, "backup");
+    const backupEnv = {
+      ...env,
+      NOMI_SYNC_BINARY: binary,
+      NOMI_SYNC_PG_CONTAINER: container,
+      NOMI_SYNC_DB_USER: "nomi_test",
+      NOMI_SYNC_DB_NAME: "nomi_sync_test",
+    };
+    run("bash", ["scripts/backup-sync-server.sh", backup], {
+      env: backupEnv,
+      stdio: "inherit",
+    });
+    run("docker", [
+      "exec",
+      container,
+      "createdb",
+      "-U",
+      "nomi_test",
+      "nomi_sync_restore",
+    ]);
+    const restoreEnv = {
+      ...backupEnv,
+      NOMI_SYNC_DB_NAME: "nomi_sync_restore",
+      NOMI_SYNC_DATABASE_URL: env.NOMI_SYNC_DATABASE_URL.replace(
+        "/nomi_sync_test?",
+        "/nomi_sync_restore?",
+      ),
+      NOMI_SYNC_OBJECT_DIR: join(output, "restored-objects"),
+    };
+    run("bash", ["scripts/restore-sync-server.sh", backup], {
+      env: restoreEnv,
+      stdio: "inherit",
+    });
+    for (const table of [
+      "sync_users",
+      "sync_sessions",
+      "sync_spaces",
+      "sync_entities",
+      "sync_history",
+      "sync_changes",
+      "sync_receipts",
+      "sync_objects",
+      "sync_asset_identities",
+    ]) {
+      const sql = `SELECT md5(string_agg(row_to_json(t)::text, ',' ORDER BY row_to_json(t)::text)) FROM ${table} t`;
+      const checksum = (db) =>
+        run("docker", [
+          "exec",
+          container,
+          "psql",
+          "-U",
+          "nomi_test",
+          "-d",
+          db,
+          "-At",
+          "-c",
+          sql,
+        ]);
+      assert.equal(
+        checksum("nomi_sync_restore"),
+        checksum("nomi_sync_test"),
+        table,
+      );
+    }
+    assert.throws(
+      () =>
+        run("bash", ["scripts/restore-sync-server.sh", backup], {
+          env: restoreEnv,
+        }),
+      /failed/i,
+    );
+    const archive = join(backup, "objects.tar.gz"),
+      bytes = await readFile(archive);
+    bytes[10] ^= 255;
+    await writeFile(archive, bytes);
+    assert.throws(
+      () =>
+        run("bash", ["scripts/restore-sync-server.sh", backup], {
+          env: restoreEnv,
+        }),
+      /failed/i,
+    );
+    await writeFile(
+      join(output, "backup-report.json"),
+      JSON.stringify(
+        {
+          databaseTables: 9,
+          hashesVerified: true,
+          existingTargetRefused: true,
+          corruptArchiveRefused: true,
+        },
+        null,
+        2,
+      ),
+    );
+    console.log(
+      "PASS: paired PostgreSQL/original backup restored into a new database and empty disk directory",
+    );
+  }
+  console.log(
+    `Report: ${join(output, desktop ? "desktop-report.json" : "report.json")}`,
+  );
 } finally {
   if (service && service.exitCode === null) {
     const done = new Promise((r) => service.once("exit", r));

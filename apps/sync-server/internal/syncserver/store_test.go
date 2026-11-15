@@ -326,3 +326,69 @@ func TestSchemaReadiness(t *testing.T) {
 		t.Fatal("partial schema served")
 	}
 }
+
+func TestByteBoundedChangesAndHistory(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	u, sp := fixture(t, s)
+	seed(t, s, u, sp)
+	for i := int64(1); i <= 8; i++ {
+		if _, err := s.Commit(ctx, u.ID, sp.ID, commit(block("text.a", i, strings.Repeat("x", 1<<20)+fmt.Sprint(i)))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cursor := int64(1)
+	seen := 0
+	pages := 0
+	for {
+		page, err := s.Changes(ctx, u.ID, sp.ID, cursor, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		encoded, _ := json.Marshal(page)
+		if len(encoded) > MaxBody || len(page.Changes) == 0 {
+			t.Fatalf("unbounded/stalled page: %d bytes", len(encoded))
+		}
+		for _, change := range page.Changes {
+			if change.Sequence != cursor+1 || len(change.Records) != 1 {
+				t.Fatal("skipped or split commit")
+			}
+			cursor = change.Sequence
+			seen++
+		}
+		pages++
+		if !page.HasMore {
+			break
+		}
+	}
+	if seen != 8 || pages < 2 {
+		t.Fatalf("incomplete incremental pages: %d / %d", seen, pages)
+	}
+	before := int64(0)
+	versions := 0
+	pages = 0
+	for {
+		page, err := s.HistoryPage(ctx, u.ID, sp.ID, "block", "text.a", before, 500)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page) == 0 {
+			break
+		}
+		encoded, _ := json.Marshal(page)
+		if len(encoded) > MaxBody {
+			t.Fatal("history response too large")
+		}
+		for _, r := range page {
+			if before != 0 && r.Version >= before {
+				t.Fatal("repeated history version")
+			}
+			before = r.Version
+			versions++
+		}
+		pages++
+	}
+	if versions != 8 || pages < 2 {
+		t.Fatalf("incomplete history pages: %d / %d", versions, pages)
+	}
+}

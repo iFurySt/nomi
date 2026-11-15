@@ -1,6 +1,6 @@
 # 个人云同步运行说明
 
-2026-11-15：个人文稿同步 v1 已实现，本机隔离验证；未发布 / 未部署到远端。设计与默认调度见 [cloud-sync.md](cloud-sync.md)，验收进度见 [执行计划](../exec-plans/active/20261115-personal-cloud-sync.md)。
+2026-11-15：个人文稿同步 v1 已实现，本机隔离验证；未发布 / 未部署到远端。设计与默认调度见 [cloud-sync.md](cloud-sync.md)，验收进度见 [执行计划](../exec-plans/completed/20261115-personal-cloud-sync.md)。
 
 ## 当前入口与边界
 
@@ -36,8 +36,10 @@ v1 限制：每库 live payload 4 MiB / 4,000 个实体身份（含 tombstone）
 
 - `./scripts/test-sync-server.sh`：隔离 PostgreSQL 18、Go race、身份 / 版本 / 对象异常。
 - `node scripts/check-sync-package.mjs`：真实 Go API、独立原生资料目录、原件摘要与单块增量。
-- `node scripts/check-sync-package.mjs --desktop`：真实服务 + 两个 Electron 进程；独立 userData、资料目录、设备 ID 和登录凭据。覆盖默认关闭、实际登录表单、不同块离线汇合、同块冲突 UI 选择、历史选择恢复、丢失提交响应与在途新输入、重启重放、设备撤销 / 重登录和停用后本地编辑；产物写入忽略的 `.artifacts/sync-package`。
+- `node scripts/check-sync-package.mjs --desktop`：真实服务 + 两个 Electron 进程；独立 userData、资料目录、设备 ID 和登录凭据。覆盖默认关闭、实际登录表单、不同块离线汇合、同块冲突 UI 选择、外部 Markdown 修改、远端 Undo 保护、历史选择恢复、丢失提交响应与在途新输入、重启重放、设备撤销 / 重登录和停用后本地编辑；产物写入忽略的 `.artifacts/sync-package`。
 - `node scripts/check-sync-package.mjs --backup`：真实数据库 dump、不可变原件归档、全新数据库 / 空对象目录恢复、9 张表比对及摘要验证；拒绝非空目标和损坏备份。
 - `pnpm exec vitest run packages/core/src/sync packages/host/src/sync-engine.test.ts`：调度时钟、三方合并、冻结 outbox、丢确认 / 在途输入、编辑器竞争、旧游标重建和过期冲突选择。
 
 所有 fixture 为 synthetic 文稿，本机双进程不代表双物理 Mac。未访问正式版资料，不为本轮测试创建远端生产部署。
+
+增量日志与历史分页同时受数量和字节预算约束，提交批次不拆分；首次全量为有预算上限的固定水位单响应。

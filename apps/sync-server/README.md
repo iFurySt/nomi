@@ -41,7 +41,7 @@ Every protected route is under `/v1/` and requires `Authorization: Bearer <devic
 - `GET /v1/me`, `GET /v1/sessions`, `DELETE /v1/sessions/{id}`.
 - `GET /v1/spaces`, `POST /v1/spaces`: `{name}` creates a private library.
 - `GET /v1/spaces/{space}/snapshot`: repeatable-read `{protocol,cursor,records}`.
-- `GET /v1/spaces/{space}/changes?after=0&limit=50`: ordered **whole commit batches**, `{protocol,cursor,hasMore,changes}`; limit 1–100.
+- `GET /v1/spaces/{space}/changes?after=0&limit=50`: ordered **whole commit batches**, `{protocol,cursor,hasMore,changes}`; limit 1–100, also byte-bounded; a commit is never split.
 - `POST /v1/spaces/{space}/commit`: `{protocol:"nomi-sync/v1",requestId,mutations:[{kind,id,baseVersion,deleted,data}]}` → `{sequence,versions}`.
 - `GET /v1/spaces/{space}/history/{kind}/{id}`: previous versions, newest first; `?before=VERSION&limit=50` (exclusive cursor, 1–500). Each page is byte-bounded; continue from its last version until empty.
 
