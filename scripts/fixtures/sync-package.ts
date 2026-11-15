@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { DocumentStore } from "../../packages/host/src/document-store";
-import { SyncClient } from "../../packages/host/src/sync-client";
+import { SyncClient, SyncAPIError } from "../../packages/host/src/sync-client";
 import {
   createCanvasDocument,
   emptyCanvasScene,
@@ -30,13 +30,13 @@ const b = new DocumentStore(
 );
 const unauth = new SyncClient(url);
 const loginA = await unauth.login(
-  "test@example.invalid",
+  process.env.NOMI_SYNC_TEST_EMAIL ?? "test@example.invalid",
   password,
   "device.mac-a",
   "Mac A isolated",
 );
 const loginB = await unauth.login(
-  "test@example.invalid",
+  process.env.NOMI_SYNC_TEST_EMAIL ?? "test@example.invalid",
   password,
   "device.mac-b",
   "Mac B isolated",
@@ -191,6 +191,61 @@ assert.deepEqual(
   documentToSync((await a.load("local-device", merged.id))!),
   documentToSync(next),
 );
+// A repeated acknowledgement is stable, and an old device cannot overwrite newer content.
+const current = await ca.snapshot(space.id);
+const target = current.records.find(
+  (r) => r.kind === "block" && r.data?.type === "markdown",
+)!;
+const batch = {
+  protocol: SYNC_PROTOCOL,
+  requestId: `req.${randomUUID()}`,
+  mutations: [
+    {
+      kind: target.kind,
+      id: target.id,
+      baseVersion: target.version,
+      deleted: false,
+      data: { ...target.data!, source: "Synthetic public conflict winner" },
+    },
+  ],
+};
+const receipt = await ca.commit(space.id, batch);
+assert.deepEqual(await ca.commit(space.id, batch), receipt);
+await assert.rejects(
+  cb.commit(space.id, {
+    ...batch,
+    requestId: `req.${randomUUID()}`,
+    mutations: [
+      {
+        ...batch.mutations[0],
+        data: { ...target.data!, source: "stale writer" },
+      },
+    ],
+  }),
+  (e) => e instanceof SyncAPIError && e.status === 409,
+);
+assert.equal(
+  (await cb.snapshot(space.id)).records.find(
+    (r) => r.kind === target.kind && r.id === target.id,
+  )?.data?.source,
+  "Synthetic public conflict winner",
+);
+assert.equal(
+  (
+    await fetch(
+      `${url}/v1/spaces/${space.id}/objects/${originals[0].asset.sha256}`,
+    )
+  ).status,
+  401,
+);
+if (process.env.NOMI_SYNC_TEST_REVOKE === "1") {
+  await ca.revoke(loginA.sessionId);
+  await cb.revoke(loginB.sessionId);
+  await assert.rejects(
+    ca.me(),
+    (e) => e instanceof SyncAPIError && e.status === 401,
+  );
+}
 await mkdir(root, { recursive: true });
 await writeFile(
   join(root, "report.json"),
@@ -205,6 +260,9 @@ await writeFile(
       initialEntities: initial.length,
       incrementalEntities: edits.length,
       packageRoundTrip: true,
+      conflictPreservesWinner: true,
+      idempotentRetry: true,
+      unauthenticatedOriginalRejected: true,
       sharedBlocks: true,
       nestedCanvas: true,
     },
