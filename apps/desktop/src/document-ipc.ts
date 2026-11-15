@@ -10,9 +10,10 @@ export function registerDocumentStorage(
   documents: DocumentStore,
   expected: string,
   flushWindowDocuments: (window: BrowserWindow) => Promise<boolean>,
-  saved?: () => void,
+  saved?: (document: DocumentStorageSave["document"]) => void,
 ) {
   let choosingDirectory = false;
+  const observedRevisions = new Map<string, number>();
   ipcMain.handle(
     "nomi:documents",
     async (event, method: DocumentStorageMethod, params?: unknown) => {
@@ -36,15 +37,29 @@ export function registerDocumentStorage(
             }
           | undefined;
         if (method === "status") value = await documents.status();
-        else if (method === "load")
-          value = await documents.load(request?.profile!, request?.documentId!);
-        else if (method === "save" || method === "backup") {
+        else if (method === "load") {
+          const document = await documents.load(
+            request?.profile!,
+            request?.documentId!,
+          );
+          value = document;
+          const key = `${request?.profile}:${request?.documentId}`;
+          if (document && observedRevisions.get(key) !== document.revision) {
+            observedRevisions.set(key, document.revision);
+            saved?.(document);
+          }
+        } else if (method === "save" || method === "backup") {
           if (!request) throw Error("Invalid save request.");
           if (method === "backup")
             await documents.backup(params as DocumentStorageSave);
           else {
             await documents.save(params as DocumentStorageSave);
-            saved?.();
+            const savedDocument = (params as DocumentStorageSave).document;
+            observedRevisions.set(
+              `${request?.profile}:${request?.documentId}`,
+              savedDocument.revision,
+            );
+            saved?.(savedDocument);
           }
         } else if (method === "asset")
           value = await documents.asset(

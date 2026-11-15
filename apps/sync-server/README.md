@@ -2,7 +2,7 @@
 
 Independent Go + Cobra + PostgreSQL service for the current document-based Nomi. No household model, SeedX, legacy iOS API, Redis or desktop subprocess dependency.
 
-Implementation is staged. The transactional content/auth core is implemented; immutable disk attachment transport is implemented; desktop integration is tracked in [the plan](../../docs/exec-plans/active/20261115-personal-cloud-sync.md).
+Personal sync v1 includes desktop opt-in, durable queues, conflicts, bounded history and restoration. Deployment and paired backup instructions: [deployment](../../docs/DEPLOYMENT.md). No production deployment is implied.
 
 ## Run locally
 
@@ -26,6 +26,9 @@ From repository root:
 ```sh
 ./scripts/test-sync-server.sh
 node scripts/check-sync-package.mjs
+node scripts/check-sync-package.mjs --backup
+# macOS: two isolated Electron clients, no real user documents
+node scripts/check-sync-package.mjs --desktop
 ```
 
 Starts a disposable loopback PostgreSQL 18 container, runs Go integration tests with the race detector, then removes only that test container. Tests use independent schemas and synthetic data. To use an existing **test-only** database set `NOMI_SYNC_TEST_DATABASE_URL`; no production database should be supplied. `go test` without that variable explicitly skips database integration cases.
@@ -40,7 +43,7 @@ Every protected route is under `/v1/` and requires `Authorization: Bearer <devic
 - `GET /v1/spaces/{space}/snapshot`: repeatable-read `{protocol,cursor,records}`.
 - `GET /v1/spaces/{space}/changes?after=0&limit=50`: ordered **whole commit batches**, `{protocol,cursor,hasMore,changes}`; limit 1–100.
 - `POST /v1/spaces/{space}/commit`: `{protocol:"nomi-sync/v1",requestId,mutations:[{kind,id,baseVersion,deleted,data}]}` → `{sequence,versions}`.
-- `GET /v1/spaces/{space}/history/{kind}/{id}`: previous versions (initial endpoint capped at 500, pagination scheduled with retention UI).
+- `GET /v1/spaces/{space}/history/{kind}/{id}`: previous versions, newest first; `?before=VERSION&limit=50` (exclusive cursor, 1–500). Each page is byte-bounded; continue from its last version until empty.
 
 Record kinds: `document` (native document header, excluding revision/content arrays, plus `noteOrder`), `note` (native note without block order), `order` (`{id:noteId,blocks:[...]}`), `block` (native block), `asset` (native asset metadata), `board` (native board). Shared block IDs occur once in a space. A library mirrors a native CanvasDocument, not one remote space per note. Native `document.home` IDs can repeat across isolated spaces.
 
@@ -49,3 +52,11 @@ Version 0 means not created; deleted IDs retain a version and require explicit c
 Postgres stores Markdown `source` in a `text` column and other payload in `jsonb`. A space row lock serializes commit watermarks; no auto-increment/commit-order gap can hide a change. Old content is archived in the same transaction; semantic no-ops create no version or change event. Snapshots are bounded full responses (4 MiB live entity data; 4,000 total entity identities including tombstones); incremental reads are paginated. Current Nomi native content budgets still apply when importing to the renderer. Server validates IDs, JSON budget, native block discriminators and references; native DSL/render validation remains required at the client trust boundary.
 
 Objects must be ready before committing asset metadata. `PUT /v1/spaces/{space}/objects/{sha256}` streams originals (max 20 MiB), checks digest and size, and durably publishes before recording readiness. Authenticated `GET` / `HEAD` on the same path support download and byte ranges. Disk objects use a private persistent directory, confined paths and immutable content-addressed writes. Asset IDs keep immutable hash, size and MIME identity even across deletion/restoration. No physical object GC is enabled. The package smoke command runs an isolated server/database with two synthetic native document directories and verifies asset hashes, native roundtrip and one-block incremental edits. Unknown protocol/schema/block types fail rather than being rewritten. JSON formatting is not preserved; Markdown source is.
+
+## Retention and recovery
+
+`nomi-sync maintain` reports candidates; `--apply` prunes. The server also runs maintenance on startup and every 24 hours. Each entity keeps the union of the latest 50 archived versions and every version archived within 30 days. Current versions do not consume that quota. Only a contiguous 90-day-old log prefix is removed; stale cursors return `reset_required`. Tombstones, request receipts and immutable asset identities remain. Object audit reports never-published originals older than seven days; no physical object deletion occurs.
+
+`export-objects` streams a verified tar to stdout; `import-objects` reads a tar from stdin and requires an empty object directory. `verify` checks migrations, live document graphs and every ready original's length/hash. Use the repository backup/restore scripts to pair a PostgreSQL dump with originals and a SHA-256 manifest. A complete tar without the matching database dump is not a library backup.
+
+Operational logs contain only operation, HTTP status and duration, never request content or credentials. The client settings show pending/error/conflict state and last synchronization. This is a private beta service: provision accounts explicitly, monitor disk/database growth, and keep off-host encrypted backups before real use.

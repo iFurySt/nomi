@@ -74,7 +74,14 @@ func (s *Server) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		mux.ServeHTTP(w, r)
+		start := time.Now()
+		response := &observedResponse{ResponseWriter: w, status: http.StatusOK}
+		mux.ServeHTTP(response, r)
+		if r.URL.Path != "/health" {
+			// No path IDs, bodies, emails, tokens or original names in operational logs.
+			slog.Info("sync request", "operation", operationName(r.URL.Path), "method", r.Method,
+				"status", response.status, "duration_ms", time.Since(start).Milliseconds())
+		}
 	})
 }
 func (s *Server) authorized(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +152,23 @@ func (s *Server) authorized(w http.ResponseWriter, r *http.Request) {
 			out, err := s.Store.Changes(ctx, user, space, after, limit)
 			reply(w, out, err)
 		case len(parts) == 5 && parts[2] == "history" && validKind(parts[3]) && safeID(parts[4]) && r.Method == "GET":
-			out, err := s.Store.History(ctx, user, space, parts[3], parts[4])
+			before, limit := int64(0), 50
+			var err error
+			if q := r.URL.Query().Get("before"); q != "" {
+				before, err = strconv.ParseInt(q, 10, 64)
+			}
+			if err != nil {
+				writeError(w, problem(400, "invalid_history_cursor", "Invalid before"))
+				return
+			}
+			if q := r.URL.Query().Get("limit"); q != "" {
+				limit, err = strconv.Atoi(q)
+			}
+			if err != nil {
+				writeError(w, problem(400, "invalid_history_cursor", "Invalid limit"))
+				return
+			}
+			out, err := s.Store.HistoryPage(ctx, user, space, parts[3], parts[4], before, limit)
 			reply(w, out, err)
 		default:
 			writeError(w, problem(404, "not_found", "Route not found"))
@@ -198,4 +221,52 @@ func stringErrorType(err error) string {
 	default:
 		return "storage_or_internal"
 	}
+}
+
+// Preserve ResponseController support while recording the first HTTP status.
+type observedResponse struct {
+	http.ResponseWriter
+	status int
+	wrote  bool
+}
+
+func (w *observedResponse) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+func (w *observedResponse) WriteHeader(status int) {
+	if !w.wrote {
+		w.status = status
+		w.wrote = true
+		w.ResponseWriter.WriteHeader(status)
+	}
+}
+func (w *observedResponse) Write(b []byte) (int, error) {
+	if !w.wrote {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(b)
+}
+func operationName(path string) string {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if path == "/auth/login" {
+		return "login"
+	}
+	if len(parts) >= 2 && parts[0] == "v1" {
+		if parts[1] == "sessions" {
+			return "sessions"
+		}
+		if parts[1] == "me" {
+			return "me"
+		}
+		if parts[1] == "spaces" {
+			if len(parts) == 2 {
+				return "spaces"
+			}
+			if len(parts) >= 4 {
+				switch parts[3] {
+				case "snapshot", "changes", "commit", "history", "objects":
+					return parts[3]
+				}
+			}
+		}
+	}
+	return "unknown"
 }

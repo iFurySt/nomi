@@ -482,7 +482,7 @@ if (primaryInstance)
         devUrl ||
           pathToFileURL(join(__dirname, "../../web/dist/index.html")).href,
         flushWindowDocuments,
-        () => cloudSync?.saved(),
+        (document) => cloudSync?.saved(document),
       );
       ipcMain.handle("nomi:runtime-info", () => ({
         kind: "desktop",

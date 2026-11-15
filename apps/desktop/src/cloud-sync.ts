@@ -91,7 +91,7 @@ export async function registerCloudSync(
       }
       const p = params as Record<string, any> | undefined;
       if (method === "status") return host.status;
-      if (["bind", "sync", "resolve"].includes(method)) {
+      if (["bind", "sync", "resolve", "restore"].includes(method)) {
         const window = BrowserWindow.fromWebContents(event.sender);
         if (!window || !(await flush(window)))
           throw Error("请先保存当前文稿。");
@@ -124,13 +124,35 @@ export async function registerCloudSync(
             p.structural !== "remote")
         )
           throw Error("冲突选择无效。");
-        return host.resolve(p.choices, p.structural);
+        return host.resolve(p.choices, p.structural, p.reviewId);
       }
       if (method === "sessions") return host.sessions();
       if (method === "revoke") {
         if (typeof p?.id !== "string" || p.id.length > 100)
           throw Error("设备无效。");
         return host.revoke(p.id);
+      }
+      if (method === "historyItems") return host.historyItems();
+      if (method === "history" || method === "restore") {
+        if (typeof p?.id !== "string" || !/^[a-zA-Z][\w.-]{0,95}$/.test(p.id))
+          throw Error("内容块无效。");
+        if (method === "history") {
+          if (
+            p.before !== undefined &&
+            (!Number.isSafeInteger(p.before) || p.before < 0)
+          )
+            throw Error("历史位置无效。");
+          return host.history(p.id, p.before);
+        }
+        if (
+          !Number.isSafeInteger(p.version) ||
+          p.version < 1 ||
+          !Number.isSafeInteger(p.expectedVersion) ||
+          p.expectedVersion < 0 ||
+          (p.noteId !== undefined && typeof p.noteId !== "string")
+        )
+          throw Error("恢复版本无效。");
+        return host.restore(p.id, p.version, p.expectedVersion, p.noteId);
       }
       throw Error("Unknown sync action");
     },

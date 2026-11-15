@@ -2,6 +2,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { atomicFile, regularFile } from "./document-files";
+import type { CanvasDocument } from "../../core/src/canvas/document";
 import { SyncClient, SyncAPIError, syncServerURL } from "./sync-client";
 import { SyncEngine, type SyncBinding, type SyncLocalIO } from "./sync-engine";
 import { SyncSchedule } from "../../core/src/sync/schedule";
@@ -23,6 +24,10 @@ interface Config {
   deviceId: string;
   enabled: boolean;
   binding?: SyncBinding;
+  pendingSince?: number;
+  lastStarted?: number;
+  retryAt?: number;
+  retryFailures?: number;
 }
 interface Options {
   folder: string;
@@ -93,6 +98,23 @@ export class CloudSyncHost {
         host.authExpired = true;
       }
     }
+    for (const key of [
+      "pendingSince",
+      "lastStarted",
+      "retryAt",
+      "retryFailures",
+    ] as const) {
+      const value = host.config[key];
+      if (
+        value !== undefined &&
+        (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+      )
+        throw Error("同步调度状态损坏，请保留设置以恢复。");
+    }
+    host.schedule.firstPending = host.config.pendingSince;
+    host.schedule.lastStarted = host.config.lastStarted ?? -Infinity;
+    host.schedule.retryAt = host.config.retryAt ?? 0;
+    host.schedule.failures = host.config.retryFailures ?? 0;
     return host;
   }
   private async save() {
@@ -101,12 +123,34 @@ export class CloudSyncHost {
       JSON.stringify(this.config),
     );
   }
+  private async saveSchedule() {
+    const values = {
+      pendingSince: this.schedule.firstPending,
+      lastStarted: Number.isFinite(this.schedule.lastStarted)
+        ? this.schedule.lastStarted
+        : undefined,
+      retryAt: this.schedule.retryAt,
+      retryFailures: this.schedule.failures,
+    };
+    if (
+      Object.entries(values).every(
+        ([key, value]) => this.config[key as keyof Config] === value,
+      )
+    )
+      return;
+    this.config = { ...this.config, ...values };
+    await this.save();
+  }
   start() {
     if (!this.timer)
       this.timer = setInterval(() => {
-        void this.tick();
+        void this.tick().catch(() => {
+          this.error = "同步设置暂未保存，将自动重试。";
+        });
       }, 1000);
-    void this.tick();
+    void this.tick().catch(() => {
+      this.error = "同步设置暂未保存，将自动重试。";
+    });
   }
   stop() {
     if (this.timer) clearInterval(this.timer);
@@ -115,7 +159,22 @@ export class CloudSyncHost {
   activity() {
     this.schedule.activity(this.now());
   }
-  saved() {
+  saved(document?: CanvasDocument) {
+    if (document && this.engine && !this.actionBusy) {
+      const engine = this.engine,
+        binding = this.config.binding;
+      void this.options
+        .library()
+        .then(async (path) => {
+          if (this.engine !== engine || !binding || binding.library !== path)
+            return;
+          engine.observe(document);
+          await engine.flushObservations();
+        })
+        .catch(() => {
+          this.error = "同步队列暂未保存，将自动重试。";
+        });
+    }
     this.dirty = true;
     if (!this.authExpired) this.schedule.paused = false;
     this.schedule.activity(this.now());
@@ -123,7 +182,9 @@ export class CloudSyncHost {
   wake() {
     this.lastPull = -Infinity;
     this.dirty = true;
-    void this.tick();
+    void this.tick().catch(() => {
+      this.error = "同步设置暂未保存，将自动重试。";
+    });
   }
   focus(foreground: boolean) {
     this.foreground = foreground;
@@ -243,6 +304,7 @@ export class CloudSyncHost {
       this.error = undefined;
       this.schedule.paused = false;
       this.schedule.succeeded();
+      await this.saveSchedule();
       await this.save();
       await this.attach();
       return this.status;
@@ -319,6 +381,7 @@ export class CloudSyncHost {
       await this.save();
       this.engine = engine;
       this.schedule = new SyncSchedule();
+      await this.saveSchedule();
       this.dirty = true;
       this.error = undefined;
       this.lastPull = -Infinity;
@@ -350,14 +413,72 @@ export class CloudSyncHost {
   async resolve(
     choices: Record<string, "local" | "remote">,
     structural?: "local" | "remote",
+    reviewId?: string,
   ) {
     return this.exclusive(async () => {
       await this.attach();
       if (!this.engine) throw Error("尚未绑定资料库。");
-      await this.engine.resolve(choices, structural);
+      await this.engine.resolve(choices, structural, reviewId);
       this.error = undefined;
       this.dirty = true;
       this.schedule.paused = false;
+      return this.status;
+    });
+  }
+  async historyItems() {
+    await this.attach();
+    if (!this.config.binding) throw Error("尚未绑定资料库。");
+    const snapshot = await this.requireClient().snapshot(
+      this.config.binding.space,
+    );
+    const local = await this.options.local.read();
+    return {
+      notes: local.notes.map((n) => ({ id: n.id, title: n.title })),
+      blocks: snapshot.records
+        .filter((r) => r.kind === "block")
+        .map((r) => ({
+          id: r.id,
+          version: r.version,
+          deleted: r.deleted,
+          title:
+            typeof r.data?.source === "string"
+              ? r.data.source.split("\n").find(Boolean)?.slice(0, 60) || r.id
+              : r.id,
+        })),
+    };
+  }
+  async history(id: string, before = 0) {
+    await this.attach();
+    if (!this.config.binding) throw Error("尚未绑定资料库。");
+    return this.requireClient().history(
+      this.config.binding.space,
+      "block",
+      id,
+      before,
+    );
+  }
+  async restore(
+    id: string,
+    version: number,
+    expectedVersion: number,
+    noteId?: string,
+  ) {
+    return this.exclusive(async () => {
+      await this.attach();
+      if (!this.engine || !this.config.binding) throw Error("尚未绑定资料库。");
+      const versions = await this.requireClient().history(
+        this.config.binding.space,
+        "block",
+        id,
+        version + 1,
+        1,
+      );
+      if (versions[0]?.version !== version)
+        throw Error("该历史版本已不在保留范围内。");
+      await this.options.backup();
+      await this.engine.restoreBlock(versions[0], expectedVersion, noteId);
+      this.dirty = true;
+      this.error = undefined;
       return this.status;
     });
   }
@@ -394,7 +515,7 @@ export class CloudSyncHost {
               this.schedule.changed(now);
           } else this.schedule.clear();
         }
-        if (this.engine.status.conflict) return;
+
         const upload = now >= this.schedule.deadline(manual);
         if (
           !manual &&
@@ -445,7 +566,7 @@ export class CloudSyncHost {
         }
       }
     };
-    this.work = run();
+    this.work = run().finally(() => this.saveSchedule());
     try {
       await this.work;
     } finally {

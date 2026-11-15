@@ -87,6 +87,27 @@ class Remote implements SyncTransport {
     }
     return structuredClone(receipt);
   }
+  async history(
+    _space: string,
+    kind: string,
+    id: string,
+    before = 0,
+    limit = 50,
+  ) {
+    return structuredClone(
+      this.log
+        .flatMap((b) => b.records)
+        .filter(
+          (r) =>
+            r.kind === kind &&
+            r.id === id &&
+            r.version < (before || Infinity) &&
+            r.version < this.records.get(syncKey(r))!.version,
+        )
+        .sort((a, b) => b.version - a.version)
+        .slice(0, limit),
+    );
+  }
   async upload() {}
   async download(): Promise<Buffer> {
     throw Error("unexpected asset");
@@ -129,6 +150,7 @@ async function device(remote: Remote, _name: string) {
       if (b.type !== "markdown") throw Error("fixture");
       b.source = source;
       doc.revision++;
+      engine.observe(doc);
     },
     async reopen() {
       engine = await SyncEngine.open(folder, binding, remote, io);
@@ -169,8 +191,13 @@ describe("durable sync engine", () => {
     expect(b.text(first)).toBe("B competing");
     await b.reopen();
     expect(b.engine.status.conflict).toBeTruthy();
-    remote.records.get("block:" + first)!.updatedAt = "2026-01-01T00:00:00.123456Z"; // Snapshot timestamp precision is not a semantic edit.
-    await b.engine.resolve({ ["block:" + first]: "local" });
+    remote.records.get("block:" + first)!.updatedAt =
+      "2026-01-01T00:00:00.123456Z"; // Snapshot timestamp precision is not a semantic edit.
+    await b.engine.resolve(
+      { ["block:" + first]: "local" },
+      undefined,
+      b.engine.status.conflict?.reviewId,
+    );
     await b.engine.run();
     await a.engine.run(false);
     expect(a.text(first)).toBe("B competing");
@@ -254,10 +281,145 @@ describe("durable sync engine", () => {
     a.edit(first, "remote moved");
     await a.engine.run();
     await expect(
-      b.engine.resolve({ ["block:" + first]: "local" }),
+      b.engine.resolve(
+        { ["block:" + first]: "local" },
+        undefined,
+        b.engine.status.conflict?.reviewId,
+      ),
     ).rejects.toThrow("已变化");
     expect(b.engine.status.conflict?.conflicts[0].remote?.data?.source).toBe(
       "remote moved",
+    );
+  });
+  it("restores an old block as a new durable edit and rejects stale review", async () => {
+    const remote = new Remote(),
+      a = await device(remote, "a");
+    await a.init("upload");
+    await a.engine.run();
+    const [id] = textIDs(a.doc);
+    a.edit(id, "version two");
+    await a.engine.run();
+    const old = (await remote.history("space.test", "block", id))[0];
+    await expect(a.engine.restoreBlock(old, 1)).rejects.toThrow("已变化");
+    await a.engine.restoreBlock(old, 2);
+    await a.engine.run();
+    expect(remote.records.get("block:" + id)?.version).toBe(3);
+    expect(a.text(id)).toBe(old.data!.source);
+  });
+  it("restores a deleted attachment block with its retained asset identity and original", async () => {
+    const remote = new Remote(),
+      a = await device(remote, "a");
+    const bytes = Buffer.from("synthetic original");
+    const asset = {
+      id: "asset.restore",
+      name: "restore.pdf",
+      mime: "application/pdf",
+      bytes: bytes.length,
+      sha256: "a".repeat(64),
+    };
+    a.doc.assets.push(asset);
+    a.doc.blocks.push({ id: "file.restore", type: "file", asset: asset.id });
+    const note = a.doc.notes[0];
+    note.blocks.push("file.restore");
+    a.io.asset = async () => bytes;
+    await a.init("upload");
+    await a.engine.run();
+    a.doc.blocks = a.doc.blocks.filter((b) => b.id !== "file.restore");
+    note.blocks = note.blocks.filter((id) => id !== "file.restore");
+    a.doc.assets = [];
+    a.doc.revision++;
+    a.engine.observe(a.doc);
+    await a.engine.run();
+    expect(remote.records.get("block:file.restore")?.deleted).toBe(true);
+    a.io.asset = async () => undefined;
+    let downloads = 0;
+    remote.download = async () => {
+      downloads++;
+      return bytes;
+    };
+    const version = (
+      await remote.history("space.test", "block", "file.restore")
+    )[0];
+    await a.engine.restoreBlock(version, 2, note.id);
+    expect(a.doc.notes[0].blocks).toContain("file.restore");
+    expect(a.doc.assets).toContainEqual(asset);
+    expect(downloads).toBe(1);
+    a.io.asset = async () => bytes;
+    await a.engine.run();
+    expect(remote.records.get("block:file.restore")?.version).toBe(3);
+    expect(remote.records.get("asset:asset.restore")?.deleted).toBe(false);
+  });
+  it("lets separate save groups sync while a conflicting atomic group waits", async () => {
+    const remote = new Remote(),
+      a = await device(remote, "a");
+    await a.init("upload");
+    await a.engine.run();
+    const b = await device(remote, "b");
+    await b.init("download");
+    const [first, second] = textIDs(a.doc);
+    a.edit(first, "cloud conflict");
+    await a.engine.run();
+    b.edit(first, "local conflict");
+    await b.engine.run();
+    const reviewed = b.engine.status.conflict!.reviewId;
+    b.edit(second, "independent change");
+    await b.engine.run();
+    expect(remote.records.get("block:" + second)?.data?.source).toBe(
+      "independent change",
+    );
+    expect(remote.records.get("block:" + first)?.data?.source).toBe(
+      "cloud conflict",
+    );
+    expect(b.engine.status.conflict).toBeTruthy();
+    await expect(
+      b.engine.resolve({ ["block:" + first]: "local" }, undefined, reviewed),
+    ).rejects.toThrow("已变化");
+    await b.reopen();
+    expect(b.engine.status.conflict).toBeTruthy();
+    await b.engine.resolve(
+      { ["block:" + first]: "local" },
+      undefined,
+      b.engine.status.conflict!.reviewId,
+    );
+    await b.engine.run();
+    expect(remote.records.get("block:" + first)?.data?.source).toBe(
+      "local conflict",
+    );
+  });
+  it("does not split one atomic save just because only one of its blocks conflicts", async () => {
+    const remote = new Remote(),
+      a = await device(remote, "a");
+    await a.init("upload");
+    await a.engine.run();
+    const b = await device(remote, "b");
+    await b.init("download");
+    const [first, second] = textIDs(a.doc);
+    const old = remote.records.get("block:" + second)?.data?.source;
+    a.edit(first, "cloud");
+    await a.engine.run();
+    for (const id of [first, second])
+      (
+        b.doc.blocks.find((block) => block.id === id) as { source: string }
+      ).source = "atomic local";
+    b.doc.revision++;
+    b.engine.observe(b.doc);
+    await b.engine.flushObservations();
+    await b.reopen();
+    await b.engine.run();
+    expect(b.engine.status.conflict).toBeTruthy();
+    expect(remote.records.get("block:" + second)?.data?.source).toBe(old);
+    expect(await b.engine.hasChanges()).toBe(false);
+  });
+  it("waits for the local save journal before a manual upload", async () => {
+    const remote = new Remote(),
+      a = await device(remote, "a");
+    await a.init("upload");
+    await a.engine.run();
+    const [id] = textIDs(a.doc);
+    a.edit(id, "immediate sync");
+    await Promise.all([a.engine.flushObservations(), a.engine.run()]);
+    expect(remote.records.get("block:" + id)?.data?.source).toBe(
+      "immediate sync",
     );
   });
   it("poll-only has no cloud writes and refuses uninitialized or changed bindings", async () => {

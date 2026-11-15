@@ -1,3 +1,4 @@
+import { CloudSyncHistory } from "./CloudSyncHistory";
 import { useEffect, useState } from "react";
 import { Cloud, RefreshCw, Laptop } from "lucide-react";
 import { Button } from "../components/primitives";
@@ -38,6 +39,7 @@ export function CloudSyncSettings() {
     [devices, setDevices] = useState<CloudSyncSession[]>();
   const [conflict, setConflict] = useState<CloudSyncConflictView>(),
     [choices, setChoices] = useState<Record<string, "local" | "remote">>({});
+  const [showHistory, setShowHistory] = useState(false);
   const [structural, setStructural] = useState<"local" | "remote">();
   useEffect(() => {
     if (!request) return;
@@ -282,6 +284,14 @@ export function CloudSyncSettings() {
           </>
         )}
       </div>
+      {status?.account && status.binding && (
+        <div className="cloud-history-entry">
+          <Button onClick={() => setShowHistory((v) => !v)}>
+            {showHistory ? "收起历史" : "历史版本"}
+          </Button>
+          {showHistory && <CloudSyncHistory />}
+        </div>
+      )}
       {(error || status?.error) && <p role="alert">{error || status?.error}</p>}
       {devices && (
         <div className="setting-card" aria-label="已登录设备">
@@ -360,7 +370,13 @@ export function CloudSyncSettings() {
                 ? !structural
                 : conflict.conflicts.some((c) => !choices[c.key]))
             }
-            onClick={() => void action("resolve", { choices, structural })}
+            onClick={() =>
+              void action("resolve", {
+                choices,
+                structural,
+                reviewId: conflict.reviewId,
+              })
+            }
           >
             应用所选版本
           </Button>

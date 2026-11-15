@@ -96,3 +96,45 @@
     gap: 12px;
   }
 }
+
+.cloud-sync-history > p {
+  color: var(--secondary);
+  font-size: 13px;
+}
+.cloud-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow: auto;
+}
+.cloud-history-list > button {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.cloud-history-list > button:hover,
+.cloud-history-list > button[aria-pressed="true"] {
+  background: var(--interaction-hover);
+}
+.cloud-history-list small {
+  color: var(--secondary);
+}
+.cloud-sync-history .cloud-sync-compare > pre {
+  margin: 0;
+  height: 260px;
+}
+.cloud-history-entry {
+  margin-top: 12px;
+}
+.cloud-sync-history > .cloud-sync-download {
+  margin: 14px 0;
+}

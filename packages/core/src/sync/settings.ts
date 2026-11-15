@@ -11,7 +11,10 @@ export type SyncAction =
   | "conflict"
   | "resolve"
   | "sessions"
-  | "revoke";
+  | "revoke"
+  | "historyItems"
+  | "history"
+  | "restore";
 export interface CloudSyncStatus {
   enabled: boolean;
   account?: { email: string; server: string };
@@ -23,6 +26,7 @@ export interface CloudSyncStatus {
   conflicts: number;
 }
 export interface CloudSyncConflictView {
+  reviewId: string;
   conflicts: SyncConflict[];
   structuralError?: string;
   local: { kind: string; id: string; data: Record<string, unknown> }[];
@@ -40,4 +44,11 @@ export type CloudSyncReply =
   | SyncSpace[]
   | CloudSyncSession[]
   | CloudSyncConflictView
+  | CloudHistoryItems
+  | SyncRecord[]
   | undefined;
+
+export interface CloudHistoryItems {
+  notes: { id: string; title: string }[];
+  blocks: { id: string; title: string; version: number; deleted: boolean }[];
+}

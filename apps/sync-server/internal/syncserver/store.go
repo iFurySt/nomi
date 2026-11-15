@@ -380,6 +380,12 @@ func (s *Store) Changes(ctx context.Context, user, space string, after int64, li
 	return out, tx.Commit(ctx)
 }
 func (s *Store) History(ctx context.Context, user, space, kind, id string) ([]Record, error) {
+	return s.HistoryPage(ctx, user, space, kind, id, 0, 500)
+}
+func (s *Store) HistoryPage(ctx context.Context, user, space, kind, id string, before int64, limit int) ([]Record, error) {
+	if before < 0 || limit < 1 || limit > 500 {
+		return nil, problem(400, "invalid_history_cursor", "Invalid history cursor or limit")
+	}
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -388,12 +394,13 @@ func (s *Store) History(ctx context.Context, user, space, kind, id string) ([]Re
 	if _, _, err = owned(ctx, tx, user, space, false); err != nil {
 		return nil, err
 	}
-	rows, err := tx.Query(ctx, `SELECT kind,id,version,deleted,data,source,archived_at FROM sync_history WHERE space_id=$1 AND kind=$2 AND id=$3 ORDER BY version DESC LIMIT 500`, space, kind, id)
+	rows, err := tx.Query(ctx, `SELECT kind,id,version,deleted,data,source,archived_at FROM sync_history WHERE space_id=$1 AND kind=$2 AND id=$3 AND ($4::bigint=0 OR version<$4) ORDER BY version DESC LIMIT $5`, space, kind, id, before, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := []Record{}
+	size := 0
 	for rows.Next() {
 		var r Record
 		var src *string
@@ -401,6 +408,14 @@ func (s *Store) History(ctx context.Context, user, space, kind, id string) ([]Re
 			return nil, err
 		}
 		restoreSource(&r, src)
+		encoded, encodeErr := json.Marshal(r)
+		if encodeErr != nil {
+			return nil, encodeErr
+		}
+		if len(out) > 0 && size+len(encoded) > MaxBody {
+			break
+		}
+		size += len(encoded)
 		out = append(out, r)
 	}
 	return out, rows.Err()

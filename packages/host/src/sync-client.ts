@@ -236,13 +236,33 @@ export class SyncClient {
     }
     return r;
   }
-  history(space: string, kind: string, id: string) {
-    return this.json<SyncRecord[]>(
+  async history(
+    space: string,
+    kind: string,
+    id: string,
+    before = 0,
+    limit = 50,
+  ) {
+    const records = await this.json<SyncRecord[]>(
       this.path(
         space,
-        `history/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`,
+        `history/${encodeURIComponent(kind)}/${encodeURIComponent(id)}?before=${before}&limit=${limit}`,
       ),
     );
+    if (!Array.isArray(records) || records.length > limit)
+      throw Error("历史记录响应无效。");
+    let previous = before || Infinity;
+    for (const record of records) {
+      validateSyncRecord(record);
+      if (
+        record.kind !== kind ||
+        record.id !== id ||
+        record.version >= previous
+      )
+        throw Error("历史记录顺序无效。");
+      previous = record.version;
+    }
+    return records;
   }
   async upload(space: string, sha256: string, bytes: Uint8Array) {
     if (

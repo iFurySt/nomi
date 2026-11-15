@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -42,6 +43,65 @@ func root() *cobra.Command {
 		}
 	}
 	cmd.AddCommand(&cobra.Command{Use: "migrate", Short: "Apply explicit, checksummed database migrations", RunE: withStore(func(ctx context.Context, s *syncserver.Store) error { return s.Migrate(ctx) })})
+	objectStore := func() (*syncserver.DiskObjects, error) {
+		dir := os.Getenv("NOMI_SYNC_OBJECT_DIR")
+		if dir == "" {
+			return nil, errors.New("NOMI_SYNC_OBJECT_DIR required")
+		}
+		return syncserver.NewDiskObjects(dir)
+	}
+	cmd.AddCommand(&cobra.Command{Use: "export-objects", Short: "Stream verified immutable originals as a tar archive", RunE: withStore(func(ctx context.Context, s *syncserver.Store) error {
+		objects, err := objectStore()
+		if err != nil {
+			return err
+		}
+		defer objects.Close()
+		return s.ExportObjects(ctx, objects, os.Stdout)
+	})})
+	cmd.AddCommand(&cobra.Command{Use: "verify", Short: "Verify schema, document graph and original hashes after recovery", RunE: withStore(func(ctx context.Context, s *syncserver.Store) error {
+		objects, err := objectStore()
+		if err != nil {
+			return err
+		}
+		defer objects.Close()
+		report, err := s.Verify(ctx, objects)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(report)
+	})})
+	cmd.AddCommand(&cobra.Command{Use: "import-objects", Short: "Restore a tar stream into an EMPTY object directory", RunE: func(cmd *cobra.Command, _ []string) error {
+		dir := os.Getenv("NOMI_SYNC_OBJECT_DIR")
+		if dir == "" {
+			return errors.New("NOMI_SYNC_OBJECT_DIR required")
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if len(entries) > 0 {
+			return errors.New("restore requires an empty object directory")
+		}
+		objects, err := objectStore()
+		if err != nil {
+			return err
+		}
+		defer objects.Close()
+		return syncserver.ImportObjects(cmd.Context(), objects, os.Stdin)
+	}})
+	var apply bool
+	maintain := &cobra.Command{Use: "maintain", Short: "Report retained-history and log cleanup; objects are never deleted", RunE: withStore(func(ctx context.Context, s *syncserver.Store) error {
+		if err := s.CheckSchema(ctx); err != nil {
+			return err
+		}
+		report, err := s.Maintain(ctx, time.Now().UTC(), apply)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(report)
+	})}
+	maintain.Flags().BoolVar(&apply, "apply", false, "Prune history/log candidates (default dry-run)")
+	cmd.AddCommand(maintain)
 	var email string
 	var stdin bool
 	provision := &cobra.Command{Use: "create-user", Short: "Provision a private user (password from stdin)", RunE: withStore(func(ctx context.Context, s *syncserver.Store) error {
@@ -79,6 +139,30 @@ func root() *cobra.Command {
 		srv := &http.Server{Addr: addr, Handler: (&syncserver.Server{Store: s, Objects: objects}).Handler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 60 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 90 * time.Second, MaxHeaderBytes: 16 << 10}
 		ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 		defer stop()
+		go func() {
+			// Run once at startup and then daily; only aggregate counts are logged.
+			clean := func() {
+				report, err := s.Maintain(ctx, time.Now().UTC(), true)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "sync maintenance failed")
+					return
+				}
+				if report.History+report.Changes > 0 {
+					_ = json.NewEncoder(os.Stdout).Encode(report)
+				}
+			}
+			clean()
+			ticker := time.NewTicker(24 * time.Hour)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					clean()
+				}
+			}
+		}()
 		done := make(chan error, 1)
 		go func() { done <- srv.ListenAndServe() }()
 		fmt.Println("Nomi sync listening on", addr)
