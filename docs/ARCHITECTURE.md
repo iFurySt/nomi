@@ -1,6 +1,6 @@
 # 架构总览
 
-Nomi / 知己是个人一站式工作台，覆盖学习、笔记、信息 hub、知识、健康与财富管理，并可扩展到家庭成员。总体产品范围见 [个人工作台规格](product-specs/personal-workbench.md)。当前产品以 Electron 文稿 / 画布工作台为起点，独立个人同步后端 v1 已实现并完成本机隔离验证；旧家庭资料 beta 已退役。
+Nomi / 知己是个人一站式工作台，覆盖学习、笔记、信息 hub、知识、健康与财富管理，并可扩展到家庭成员。总体产品范围见 [个人工作台规格](product-specs/personal-workbench.md)。当前产品以 Electron 文稿 / 画布工作台为起点，独立个人同步后端 v1 已实现、完成隔离验证并部署至 amoylab；旧家庭资料 beta 已退役。
 
 ## 桌面 0.1.0 边界
 
@@ -27,7 +27,7 @@ Node host 管理 `.nomi` 包、原件、目录切换、保存事务和 ChatGPT �
 
 ## 个人同步与跨端边界
 
-2026-11-15 的 [个人文稿云同步 v1](design-docs/cloud-sync.md) 收敛了同步范围：默认关闭，未登录保持本地使用；正文 / DSL / 画布与同步版本存 PostgreSQL，附件以引用关联 ObjectStore，开发先使用服务器持久 disk。按 block 乐观并发检查，同块冲突保留双方；首版不采用 CRDT / Node 协作房间、Redis 或实时多人编辑。上传调度与有界历史规则以该文档为准，[开发计划](exec-plans/completed/20261115-personal-cloud-sync.md) 按内核、附件、桌面、恢复和试用推进。独立后端、原件传输、桌面可选同步、分组冲突、有界历史 / 恢复与配对灾备均已通过本机隔离验证；未远端部署或发布。运行边界见 [同步实现](design-docs/cloud-sync-runtime.md)。
+2026-11-15 的 [个人文稿云同步 v1](design-docs/cloud-sync.md) 收敛了同步范围：默认关闭，未登录保持本地使用；正文 / DSL / 画布与同步版本存 PostgreSQL，附件以引用关联 ObjectStore，开发先使用服务器持久 disk。按 block 乐观并发检查，同块冲突保留双方；首版不采用 CRDT / Node 协作房间、Redis 或实时多人编辑。上传调度与有界历史规则以该文档为准，[开发计划](exec-plans/completed/20261115-personal-cloud-sync.md) 按内核、附件、桌面、恢复和试用推进。独立后端、原件传输、桌面可选同步、分组冲突、有界历史 / 恢复与配对灾备均已通过本机隔离验证；后端已部署 amoylab，桌面同步尚未随新 DMG 发布。运行边界见 [同步实现](design-docs/cloud-sync-runtime.md)。
 
 笔记与无限画布以平台中立 DSL / 语义模型为契约：Note / Block 表达长文、图片、文件、手写及 InteractiveBlock，Placement 独立表达空间展示。交互块包含状态、类型化计算、组件视图与动作；Electron 可先用 React / TypeScript，未来 SwiftUI / UIKit、Compose renderer 可独立实现，不要求移动端必须运行 WebView 或 JavaScript。DSL 快照、协作历史、个人学习状态有明确边界，不设两份可相互覆盖的主状态。
 

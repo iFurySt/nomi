@@ -1,6 +1,6 @@
 # 个人云同步运行说明
 
-2026-11-15：个人文稿同步 v1 已实现，本机隔离验证；未发布 / 未部署到远端。设计与默认调度见 [cloud-sync.md](cloud-sync.md)，验收进度见 [执行计划](../exec-plans/completed/20261115-personal-cloud-sync.md)。
+2026-11-15：个人文稿同步 v1 已实现并完成本机隔离验证；后端已部署 amoylab，桌面同步尚未随新 DMG 发布。设计与默认调度见 [cloud-sync.md](cloud-sync.md)，验收进度见 [执行计划](../exec-plans/completed/20261115-personal-cloud-sync.md)。
 
 ## 当前入口与边界
 
@@ -40,6 +40,6 @@ v1 限制：每库 live payload 4 MiB / 4,000 个实体身份（含 tombstone）
 - `node scripts/check-sync-package.mjs --backup`：真实数据库 dump、不可变原件归档、全新数据库 / 空对象目录恢复、9 张表比对及摘要验证；拒绝非空目标和损坏备份。
 - `pnpm exec vitest run packages/core/src/sync packages/host/src/sync-engine.test.ts`：调度时钟、三方合并、冻结 outbox、丢确认 / 在途输入、编辑器竞争、旧游标重建和过期冲突选择。
 
-所有 fixture 为 synthetic 文稿，本机双进程不代表双物理 Mac。未访问正式版资料，不为本轮测试创建远端生产部署。
+所有 fixture 为 synthetic 文稿，本机双进程不代表双物理 Mac。未访问正式版资料。公网部署测试使用独立 synthetic 账号，不上传真实文稿；后端入口与运维见 [部署说明](../DEPLOYMENT.md)。
 
 增量日志与历史分页同时受数量和字节预算约束，提交批次不拆分；首次全量为有预算上限的固定水位单响应。

@@ -9,4 +9,5 @@
 
 ## 当前同步计划
 
-- [个人文稿可选云同步 v1](active/20261115-personal-cloud-sync.md)：已完成设计，待按内核 → 附件 → 桌面 → 恢复 → 试用推进。
+- [个人文稿可选云同步 v1](completed/20261115-personal-cloud-sync.md)：内核、原件、桌面、冲突 / 恢复及隔离验收已完成。
+- [个人同步首次部署 amoylab](completed/20261115-sync-amoylab.md)：独立服务、HTTPS `/api/`、私有账号与公网验收已完成；周期异机备份另行配置。

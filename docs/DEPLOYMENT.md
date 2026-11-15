@@ -1,8 +1,8 @@
 # 个人文稿同步服务部署
 
-2026-11-15：当前后端为 `apps/sync-server`，独立 Go / PostgreSQL / disk ObjectStore。已在本机新数据库与隔离容器验证，尚未部署远端。桌面默认不连接；手机和家庭协作不在 v1 范围内。
+2026-11-15：当前后端为 `apps/sync-server`，独立 Go / PostgreSQL / disk ObjectStore。已在本机新数据库与隔离容器验证，并部署至 amoylab 的独立服务。桌面默认不连接；手机和家庭协作不在 v1 范围内。
 
-旧家庭服务的 [amoylab 部署档案](references/legacy-family-deployment.md) 仅供追溯。旧 `server-v*` 自动部署工作流已移除，不得用旧 tag / database / volume 发布新同步服务；后续远端发布需为本服务另定制品和部署目标。本轮未修改旧远端服务或数据。
+旧家庭服务的 [amoylab 部署档案](references/legacy-family-deployment.md) 仅供追溯。旧 `server-v*` 自动部署工作流已移除，不得用旧 tag / database / volume 发布新同步服务；新服务使用下述独立制品和部署目标。本轮仅切换该域名的入口，旧服务进程、数据库和数据保留。
 
 ## 本地私有部署
 
@@ -96,3 +96,26 @@ node scripts/check-sync-package.mjs --desktop
 `https://nomi.ifuryst.com/api/` 分流至 loopback 8089，代理去除 `/api/` 前缀，外部 health 为 `/api/health`，登录为 `/api/auth/login`。桌面同步地址填写 `https://nomi.ifuryst.com/api`；客户端支持规范化可选前缀，仍拒绝远程 HTTP、userinfo、query / fragment。官网使用 `/`，静态目录 `/var/www/nomi-site`；具体官网另外开发，不用根路径代理旧 API。
 
 Nginx 模板为 `infra/sync/amoylab/nginx.conf`，应用前保存原配置并执行 `nginx -t`，仅成功后 reload。域名和 Certbot 证书已有，未要求新增 DNS 或改变整个 Cloudflare zone 设置。旧 `/opt/nomi` 与家庭数据库保留，不复用 / 不删除。
+
+## 当前 amoylab 部署（2026-11-15）
+
+- 首次服务 tag：`sync-v0.1.0`，release 配置提交 `76e37f1`；`/opt/nomi-sync/current` 指向 `releases/76e37f1`。
+- 运行镜像：`nomi-sync:fcc6fcf`，image ID `sha256:52d59a364b31196fc8201bba148c86644587e12f193be59be102863328241633`。Go 制品来自 `fcc6fcf`；`76e37f1` 仅补充验收与入口配置，Go 源码不变。
+- 私密环境：`/opt/nomi-sync/.env`（0600），独立 PG18 与原件卷。个人账号已建立，初始凭据在操作者本机私密目录，不写入仓库；公网测试使用独立 synthetic 账号，结束后撤销全部验收会话。
+- 官网 `/` 当前仅是最小占位页；API `/api/health` 200，匿名 `/api/v1/me` 401，根路径 `/v1/me` 404。已有 DNS / Certbot 证书继续使用，本次未修改 Cloudflare 记录。
+- 公网 HTTPS 双客户端原生包往返、共享块 / 内嵌画布 / DSL、两份附件摘要、单块增量、幂等重放、同块 409 保留新版本和匿名附件拒绝均通过。个人账号仅做空云库登录验收，没有真实文稿上传。
+- 首次配对备份：`/opt/nomi-sync/backups/initial-20261115`，有 `COMPLETE.json`。`verify` 校验 1 个 synthetic 空间、2 份原件；`maintain` dry-run 无待清理内容。**尚未配置周期备份或异机加密副本**，初始同机备份不代替灾备。
+- 旧入口配置备份：`/opt/nomi-sync/backups/nginx-before-sync-20261115.conf`；旧 `nomi-server` 仍运行，旧数据未改动。紧急回退入口时恢复此文件至 `/etc/nginx/conf.d/nomi.ifuryst.com.conf`，`nginx -t` 成功后 reload；这只恢复旧服务入口，不迁移新同步库数据。
+
+日常命令从 `/opt/nomi-sync/current` 运行，始终同时指定 base 与 amoylab overlay：
+
+```sh
+docker compose --env-file /opt/nomi-sync/.env -f infra/sync/compose.yml -f infra/sync/amoylab/compose.yml ps
+docker compose --env-file /opt/nomi-sync/.env -f infra/sync/compose.yml -f infra/sync/amoylab/compose.yml exec -T sync nomi-sync verify
+```
+
+公网重验使用私有文件（`server` / `email` / `password` 字段），仅接受 `@example.invalid` 专用账号，不读取已有文稿目录；每次创建独立 synthetic 云库，测试成功后撤销会话。失败时运维检查并撤销该测试账号的残留会话。
+
+```sh
+node scripts/check-sync-remote.mjs /private/synthetic-account.json .artifacts/sync-remote/NEW_RUN
+```

@@ -41,7 +41,7 @@ make ci
 
 ## 可选个人云同步
 
-正在按 [云同步设计](docs/design-docs/cloud-sync.md) 和 [执行计划](docs/exec-plans/active/20261115-personal-cloud-sync.md) 开发。后端独立于桌面，位于 `apps/sync-server`；使用 PostgreSQL 保存文稿内容与版本，开发阶段用服务器持久磁盘存附件。不开启同步无需账号。旧家庭资料 server、iOS 和 Swift macOS 工程已退役，历史发布不会被新工程自动覆盖。
+个人 v1 已按 [云同步设计](docs/design-docs/cloud-sync.md) 和 [执行计划](docs/exec-plans/completed/20261115-personal-cloud-sync.md) 实现，并部署至 amoylab；API 为 `https://nomi.ifuryst.com/api`，桌面功能尚未随新的 DMG 发布。后端独立于桌面，位于 `apps/sync-server`；使用 PostgreSQL 保存文稿内容与版本，开发阶段用服务器持久磁盘存附件。不开启同步无需账号。旧家庭资料 server、iOS 和 Swift macOS 工程已退役，历史发布不会被新工程自动覆盖。
 
 ## 文档入口
 
