@@ -32,6 +32,8 @@ export interface StateDefinition {
 }
 export const interactiveComponents = [
   "Panel",
+  "TokenFlow",
+  "Stepper",
   "Row",
   "Text",
   "Button",

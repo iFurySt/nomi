@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 type TokenCell = {
   tokens: string[];
@@ -121,6 +121,9 @@ export function InteractiveTable({
             {displayed.map((row, i) => (
               <tr
                 key={start + i}
+                style={
+                  { "--learning-row-order": Math.min(i, 12) } as CSSProperties
+                }
                 data-emphasis={start + i === highlightRow || undefined}
               >
                 {row.map((cell, j) => (

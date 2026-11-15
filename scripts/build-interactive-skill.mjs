@@ -36,11 +36,11 @@ if (!contract)
   );
 await writeFile(
   path.join(skill, "references/contract.md"),
-  "# Portable contract snapshot\n\nGenerated from Nomi's generation contract. Snapshot: 2026-11-11. UI design refinements and unsupported preview features are documented in design.md.\n\n" +
-    contract +
+  "# Portable contract snapshot\n\nGenerated from Nomi's generation contract. Snapshot: 2026-11-15. UI design refinements and unsupported preview features are documented in design.md.\n\n" +
+    contract.trimEnd() +
     "\n",
 );
-for (const name of ["wave", "temperature"])
+for (const name of ["wave", "temperature", "bpe-guided"])
   await copyFile(
     path.join(repo, `packages/core/src/interactive/${name}.json`),
     path.join(skill, `assets/${name}.nomi-ui.json`),

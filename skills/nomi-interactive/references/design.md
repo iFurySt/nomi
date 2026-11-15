@@ -33,3 +33,9 @@ Candidate frequencies answer “what merges next?”; ordered rules answer “wh
 ## BPE reference fidelity
 
 Use the approved HTML as the visual baseline, not just a broad style reference. The next candidate has a flat blue row with black tokens and an arrow; adjacent tokens to merge share one blue capsule without underlines. Rules read `a + b → ab` and only the latest result chip is blue. Vocabulary uses the same result-chip emphasis. Use ▁ consistently, six visible rows, a round counter beside the title, and muted section hints. Avoid substituting five raw columns or blue rule/vocabulary rows.
+
+## Guided BPE (2026-11-15)
+
+The newer accepted design is linear: split one word → inspect pair counts → merge → record → recount → add special tokens → assign IDs. Use `assets/bpe-guided.nomi-ui.json` when the target supports its explicit capabilities; the four-table compact version remains available for older targets. Keep the sentence visible throughout. Matching arrow controls allow rapid navigation without waiting for animation. Playback/hover are view-local; lesson position is persistent. Final results contain vocabulary and ordered merge rules. Special tokens and IDs are teaching choices, not a real model tokenizer.
+
+Numbering is the final step, not a separate confirmation before completion. Special-token entrance, list movement, then IDs and ordered rules are host motion within those two ending steps. Keep them interruptible; respect reduced motion.

@@ -54,6 +54,17 @@ const text = (v: unknown, max = 4096) => {
 };
 const fields: Record<string, string[]> = {
   Panel: ["children"],
+  TokenFlow: ["label", "rows", "layout", "hint"],
+  Stepper: [
+    "position",
+    "previousAction",
+    "nextAction",
+    "atStart",
+    "disabled",
+    "checkpoint",
+    "delay",
+    "nextLabel",
+  ],
   TextInput: ["label", "multiline"],
   Table: ["columns", "rows", "caption"],
   Metric: ["label", "value", "unit"],
@@ -67,6 +78,7 @@ const fields: Record<string, string[]> = {
   Plot: ["series", "markers", "xAxis", "yAxis", "seriesLabels"],
 };
 const enhancedFields: Record<string, string[]> = {
+  Panel: ["visible"],
   Table: [
     "visibleRows",
     "window",
@@ -99,6 +111,46 @@ export function validateResolvedProps(
   p: Record<string, any>,
   version = 1,
 ) {
+  if (
+    component === "Panel" &&
+    p.visible !== undefined &&
+    typeof p.visible !== "boolean"
+  )
+    fail("Invalid panel visibility.");
+  if (component === "Stepper") {
+    integer(p.position, 0, 10000);
+    integer(p.delay, 200, 5000);
+    text(p.nextLabel, 128);
+    for (const k of ["atStart", "disabled", "checkpoint"])
+      if (typeof p[k] !== "boolean") fail("Invalid stepper state.");
+    id(p.previousAction);
+    id(p.nextAction);
+  }
+  if (component === "TokenFlow") {
+    text(p.label, 128);
+    if (p.hint !== undefined) text(p.hint, 128);
+    if (!["words", "chips", "list"].includes(p.layout))
+      fail("Invalid token layout.");
+    const rowIds = new Set<string>();
+    for (const row of list(p.rows, 1024)) {
+      keys(object(row), ["id", "tokens"]);
+      text(row.id, 2048);
+      if (rowIds.has(row.id)) fail("Duplicate token row.");
+      rowIds.add(row.id);
+      const tokenIds = new Set<string>();
+      for (const t of list(row.tokens, 1024)) {
+        keys(object(t), ["id", "text", "tone", "members", "number"]);
+        text(t.id, 2048);
+        text(t.text, 2048);
+        if (tokenIds.has(t.id)) fail("Duplicate token identity.");
+        tokenIds.add(t.id);
+        if (!["normal", "known", "accent", "muted"].includes(t.tone))
+          fail("Invalid token emphasis.");
+        list(t.members, 1024).forEach((m) => text(m, 2048));
+        if (t.number !== undefined) integer(t.number, 0, 10000);
+      }
+    }
+  }
   if (component === "TextInput") {
     text(p.label, 128);
     if (p.hideLabel !== undefined && typeof p.hideLabel !== "boolean")
@@ -405,7 +457,15 @@ export function parseInteractiveProgram(
     if (
       !interactiveComponents.includes(k as any) ||
       (v !== 1 && !(v2 && v === 2 && Object.hasOwn(enhancedFields, k))) ||
-      (!v2 && ["TextInput", "Table", "Metric", "Scene"].includes(k))
+      (!v2 &&
+        [
+          "TextInput",
+          "Table",
+          "Metric",
+          "Scene",
+          "TokenFlow",
+          "Stepper",
+        ].includes(k))
     )
       fail(`Unsupported component: ${k}`, "capability");
   for (const [k, v] of Object.entries(object(req.functions)))
@@ -635,6 +695,14 @@ export function parseInteractiveProgram(
         )
           fail("Invalid reset target.");
       }
+    }
+    if (node.component === "Stepper") {
+      for (const k of ["previousAction", "nextAction"])
+        if (
+          typeof node.props[k] !== "string" ||
+          !Object.hasOwn(actions, node.props[k])
+        )
+          fail("Unknown stepper action.", "reference");
     }
     data(node.props);
     if (node.bind) {

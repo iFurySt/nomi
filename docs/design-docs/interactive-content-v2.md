@@ -6,7 +6,7 @@
 
 - 新增 `nomi-interactive-ir/draft-2` / `portable.learning/draft-2`，旧 draft-1 保留。12 个组件，声明式输入、状态、纯计算和动作；不包含 DOM、JavaScript 源或外部依赖。
 - `TextInput`、`Metric`、`Table`、`Scene`；后者只有受校验的 rect / circle / line / text 和语义颜色，可由其他平台原生绘制。Web 采用 SVG，窄屏按容器重排。
-- 有界字符串状态、`set` 动作、基础数学、数据访问、格式化与版本化 BPE 教学计算。动态数组状态、时间轴、矩阵、通用循环及播放控制未实现。
+- 有界字符串状态、`set` 动作、基础数学、数据访问、格式化与版本化 BPE 教学计算。动态数组状态、通用时间轴、矩阵和通用循环未实现；2026-11-15 增加下文所述的有界教学步骤与宿主播放控制。
 - 流式响应中，每个完整且可验证的节点子树会提前显示；完整结果仍独立校验、一次提交。停止 / 失败丢弃预览。
 - 实际调用模型生成 BPE 和正弦波实验，并继续聊天修改波形；验证输入、单步、重置、曲线 / 小球 / 数值联动。生成结果已作为合成 fixture 保留。详见 [验收记录](interactive-v2-validation.md)。
 - 390px Web 窄屏和深色检查不等于 iOS / Android renderer 已交付。Swift 参考仍仅覆盖 draft-1；v2 原生端须新增 capability 和同值测试后才可宣布支持。
@@ -193,3 +193,17 @@ BPE 第一版明确是字符级教学模型，不声称等同模型生产 tokeni
 - [生成提示样例](https://github.com/thesysdev/open-intelligent-ui/blob/03213439358bf3408ad61a46ec9e3230c5572e48/src/lib/prompt-options.ts) 提供不同任务的组合范例；Nomi 应建立自己的学习任务目录和验收样例。
 - [ChatGPT Intelligent UI 说明](https://help.openai.com/en/articles/20001598-intelligent-ui-in-chatgpt) 可用于体验目标对照，不据此假设存在已公开的内部 DSL 或可直接复用的生成接口。
 - 更完整的源码版本、语言差异与证据见 [参考评估](../references/openui-genui-review.md)。
+
+## 2026-11-15 BPE 引导版 DSL 对照
+
+用户选择先把已确认的 HTML 原型转成 portable DSL，实际对照后再决定 HTML 路径。HTML 支持仍是确定的后续方向，但必须先完成上文隔离、资源和消息桥验收，本轮未启用生成代码执行。
+
+新增显式 capability：`Panel@2.visible`、`TokenFlow@1`、`Stepper@1`、`learning.bpeWalkthrough@1`。旧程序不迁移；旧客户端不认识新 capability 时拒绝执行。示例 `packages/core/src/interactive/bpe-guided.json` 提供输入、逐词拆分、相邻对统计、合并、记录、特殊词元、编号及最终规则。输入始终保留，学习位置是持久状态；动画 / 自动播放是可中断的视图状态，前后操作不等待动画完成，离屏或后台停止播放。
+
+计算保持既有字符级 BPE 的并列排序与非重叠替换规则，600 字符 / 128 词 / 32 次合并上限。新教学时间线采用初次出现的字母表顺序，再追加合并产物；示例特殊词元 `[PAD] [UNK] [BOS] [EOS]` 在最终编号前插入。这是教学约定，不代表任何生产 tokenizer 的 ID。
+
+当前 React renderer 支持词元合拢和位置变化动画；并非 HTML 的像素无损转换。手机原生 renderer 尚未实现这些 capability。后续 HTML 扩展不得借这些组件传递 CSS、脚本或宿主权限。
+
+引导版收尾细化：特殊词元依次进入；编号步骤内先将词元排成一列，再依次呈现 ID 与合并规则。编号即完成，不再增加只改变提示的空步骤；已保存的旧结束位置向新终点收敛。动效可被连续前后操作打断，减少动态效果时直接显示终态。
+
+教学导航的重新开始、上一步、下一步在同一组显示。React renderer 将同一 Panel 下单个 Row 中的唯一 restart 图标按钮与唯一 Stepper 归组，沿用原按钮的动作与状态；存在歧义时保持原布局，不改写已导入程序。

@@ -1,3 +1,5 @@
+import { InteractiveTokenFlow } from "./InteractiveTokenFlow";
+import { InteractiveStepper } from "./InteractiveStepper";
 import { useId, useMemo } from "react";
 import type { ReactNode } from "react";
 import katex from "katex";
@@ -250,7 +252,30 @@ export function InteractiveRenderer({
     );
     return { props, errors };
   }, [program, state]);
-  const node = (id: string): ReactNode => {
+  // Group an unambiguous restart control with its lesson navigation. This is
+  // presentation only: imported programs retain their original action and state.
+  const stepperRestarts = new Map<string, string>();
+  for (const panel of program.nodes.filter((n) => n.component === "Panel")) {
+    const children = (output.props.get(panel.id)?.children ?? []) as string[];
+    const siblings = program.nodes.filter((n) => children.includes(n.id));
+    const steppers = siblings.filter((n) => n.component === "Stepper");
+    if (steppers.length !== 1) continue;
+    const rowChildren = siblings
+      .filter((n) => n.component === "Row")
+      .flatMap((n) => (output.props.get(n.id)?.children ?? []) as string[]);
+    const restarts = program.nodes.filter(
+      (n) =>
+        rowChildren.includes(n.id) &&
+        n.component === "Button" &&
+        output.props.get(n.id)?.icon === "restart" &&
+        !output.errors.has(n.id),
+    );
+    if (restarts.length === 1)
+      stepperRestarts.set(steppers[0].id, restarts[0].id);
+  }
+  const relocated = new Set(stepperRestarts.values());
+  const node = (id: string, inNavigation = false): ReactNode => {
+    if (relocated.has(id) && !inNavigation) return null;
     const n = program.nodes.find((v) => v.id === id)!;
     const p = output.props.get(id)! as any;
     const binding = n.bind?.value;
@@ -261,6 +286,21 @@ export function InteractiveRenderer({
         </div>
       );
     switch (n.component) {
+      case "TokenFlow":
+        return <InteractiveTokenFlow key={id} id={id} {...p} />;
+      case "Stepper":
+        return (
+          <InteractiveStepper
+            key={id}
+            {...p}
+            onAction={onAction}
+            restartControl={
+              stepperRestarts.has(id)
+                ? node(stepperRestarts.get(id)!, true)
+                : undefined
+            }
+          />
+        );
       case "TextInput":
         return (
           <label key={id} data-node={id} className="learning-input">
@@ -372,15 +412,16 @@ export function InteractiveRenderer({
         );
       }
       case "Panel":
+        if (p.visible === false) return null;
         return (
           <section key={id} className="interactive-panel" data-node={id}>
-            {p.children.map(node)}
+            {p.children.map((child: string) => node(child))}
           </section>
         );
       case "Row":
         return (
           <div key={id} className="interactive-row" data-node={id}>
-            {p.children.map(node)}
+            {p.children.map((child: string) => node(child))}
           </div>
         );
       case "Text":

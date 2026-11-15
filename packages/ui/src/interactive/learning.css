@@ -873,3 +873,252 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* Portable lesson primitives: no BPE-specific DOM or executable source. */
+.lesson-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+.lesson-heading small {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.lesson-flow {
+  min-width: 0;
+  margin: 16px 0;
+}
+.lesson-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 10px;
+  position: relative;
+}
+.lesson-token-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+}
+.lesson-token-entry {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+.lesson-token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 28px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: var(--surface-muted);
+  font:
+    15px/1.4 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  color: var(--text);
+}
+.lesson-token[data-tone="accent"],
+.lesson-token-ghost {
+  color: var(--learning-accent);
+  background: color-mix(in srgb, var(--learning-accent) 10%, transparent);
+  box-shadow: 0 1.5px 0 var(--learning-accent);
+}
+.lesson-token[data-tone="known"] {
+  color: var(--text);
+  background: color-mix(in srgb, var(--learning-accent) 6%, transparent);
+}
+.lesson-token[data-tone="muted"] {
+  color: var(--muted);
+  background: transparent;
+}
+.lesson-token-ghost {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+}
+.lesson-tokens[data-layout="chips"] {
+  gap: 7px;
+}
+.lesson-tokens[data-layout="list"] {
+  flex-direction: column;
+  gap: 0;
+}
+.lesson-tokens[data-layout="list"] .lesson-token-row {
+  border-top: 1px solid var(--border);
+  padding: 4px 0;
+  min-height: 36px;
+}
+.lesson-tokens[data-layout="list"] .lesson-token-entry {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+.lesson-tokens[data-layout="list"] .lesson-token {
+  background: none;
+  box-shadow: none;
+  padding-left: 0;
+}
+.lesson-token-id {
+  color: var(--muted);
+  font:
+    13px/1.4 ui-monospace,
+    monospace;
+  animation: lesson-id-in 0.4s ease-out both;
+  animation-delay: calc(440ms + var(--lesson-order, 0) * 12ms);
+}
+@keyframes lesson-id-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.lesson-stepper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 20px;
+}
+.lesson-mode,
+.lesson-navigation {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lesson-mode {
+  background: var(--surface-muted);
+  padding: 2px;
+  border-radius: 8px;
+}
+.interactive-surface .lesson-stepper button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  min-height: 28px;
+  border-radius: 6px;
+  font-size: 13px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.interactive-surface .lesson-mode button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--text);
+}
+.interactive-surface .lesson-navigation button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-muted);
+  color: var(--text);
+  border-radius: 8px;
+}
+.interactive-surface .lesson-stepper button:hover {
+  background: var(--interaction-hover);
+}
+.interactive-surface .lesson-stepper button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.interactive-panel:has(> .lesson-stepper) > .learning-input textarea {
+  min-height: 72px;
+  font-size: 16px;
+  padding: 10px 14px;
+}
+.interactive-panel:has(> .lesson-stepper) > .interactive-row:first-child {
+  justify-content: space-between;
+  align-items: center;
+}
+.interactive-panel:has(> .lesson-stepper) > .interactive-row:first-child h2 {
+  flex: 1;
+  font-size: 22px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lesson-token-id {
+    animation: none;
+  }
+}
+@media (pointer: coarse) {
+  .interactive-surface .lesson-stepper button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+.interactive-surface[data-profile="portable.learning/draft-2"]
+  .interactive-panel:has(> .lesson-stepper)
+  > .interactive-row:first-child {
+  padding-right: 76px;
+}
+.interactive-panel:has(> .lesson-stepper) .learning-table {
+  max-height: none;
+}
+.interactive-panel:has(> .lesson-stepper)
+  > .interactive-row:has(.lesson-tokens[data-layout="chips"])
+  > .interactive-panel {
+  flex-basis: 100%;
+}
+.interactive-panel:has(> .lesson-stepper)
+  > .interactive-row:has(.lesson-tokens[data-layout="list"])
+  > .interactive-panel:first-child {
+  flex-grow: 0.8;
+}
+.interactive-panel:has(> .lesson-stepper) .learning-data {
+  margin-top: 16px;
+}
+
+/* Numbering finishes in one step: tokens settle, then IDs and ordered rules enter. */
+.interactive-panel:has(> .lesson-stepper)
+  > .interactive-row:has(.lesson-tokens[data-layout="list"])
+  .learning-data {
+  animation: lesson-result-in 380ms 440ms ease-out both;
+}
+.interactive-panel:has(> .lesson-stepper)
+  > .interactive-row:has(.lesson-tokens[data-layout="list"])
+  .learning-data
+  tbody
+  tr {
+  animation: lesson-result-in 360ms ease-out both;
+  animation-delay: calc(520ms + var(--learning-row-order, 0) * 24ms);
+}
+@keyframes lesson-result-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .interactive-panel:has(> .lesson-stepper)
+    > .interactive-row:has(.lesson-tokens[data-layout="list"])
+    .learning-data,
+  .interactive-panel:has(> .lesson-stepper)
+    > .interactive-row:has(.lesson-tokens[data-layout="list"])
+    .learning-data
+    tbody
+    tr {
+    animation: none;
+  }
+}

@@ -16,7 +16,7 @@ BPE 是教学用字符算法：最多 1024 个 UTF-16 长度单位、128 个空�
 
 ## 2026-11-11 紧凑 presentation
 
-在 draft-2 中，Table / Button / TextInput 新增组件 version 2，必须同时在 requires 与 node 声明。Table 提供 visibleRows、window、highlightRow 、hint/showCount/columnAlign/emptyText 与 tokens/emphasis/groups/joiners 单元格；Button 提供语义 icon、variant、disabled；TextInput 支持 hideLabel 保留无障碍名称；resetTargets 在内容变化时恢复关联状态的默认值。其余组件仍为 version 1，既有定义继续可用。
+在 draft-2 中，Table / Button / TextInput 新增组件 version 2，必须同时在 requires 与 node 声明。Table 提供 visibleRows、window、highlightRow 、hint/showCount/columnAlign/emptyText 与 tokens/emphasis/groups/joiners 单元格；Button 提供语义 icon、variant、disabled；TextInput 支持 hideLabel 保留无障碍名称；resetTargets 在内容变化时恢复关联状态的默认值。既有定义继续可用；2026-11-15 的引导学习扩展另增加 Panel version 2（见下）。
 
 折叠不截断求值数据；输入变化会清空 BPE 步数，保留用户语料。紧凑 BPE 同源于 core、Skill 及 host 生成示例，详见 [外部 Agent 创作规范](interactive-authoring-skill.md)。React renderer 采用黑白灰与少量蓝色、两列紧凑表格及窄屏堆叠；文稿宿主不重复添加标题和外层留白。Swift 参考尚不支持这些新组件版本。
 
@@ -79,3 +79,9 @@ Swift 和 TypeScript 读取同一份 IR 与事件 fixture，对默认状态及�
 ## 下一轮
 
 最小 Note / Block / Placement、长文编辑、画布摆放、图片 / 文件与保存重开已在 [Canvas](canvas-workspace-runtime.md) 落地，继续沿用同一 renderer。并行前置风险仍包括 OpenUI 受限文本 profile 的严格往返、真实 iPad 笔迹与可接入原生的同步核心。AI 后续只能生成 / 修改受 catalog 约束的定义，经过相同校验与显式应用；生成通道不承担每次滑块计算。
+
+## 2026-11-15：有界引导学习
+
+新增 `Panel@2.visible` 条件展示、`TokenFlow@1` 稳定词元身份与 `Stepper@1` 前后 / 自动手动播放；需在 requires 中显式声明。`learning.bpeWalkthrough@1` 将真实 BPE 计算映射为有限教学步骤，沿用原 BPE 的排序和替换规则。输入上限 600 字符，最多 128 词 / 32 次合并，位置范围 0..228。原 `learning.bpe@1` 的输出契约不变。
+
+动画只在宿主视图运行，不执行用户脚本，不阻塞动作；减少动态效果时直接显示结果。自动播放在检查点、离屏和后台停止。新组件 / 函数尚无 Swift 或 Android renderer；不支持的客户端按 capability 拒绝执行。完整语义、限制与实例见 [BPE 引导版 DSL 对照](interactive-content-v2.md#2026-11-15-bpe-引导版-dsl-对照)。

@@ -1,0 +1,593 @@
+{
+  "schema": "nomi-interactive-ir/draft-2",
+  "id": "bpe-guided-lesson",
+  "version": 1,
+  "profile": "portable.learning/draft-2",
+  "requires": {
+    "components": {
+      "Text": 1,
+      "Button": 2,
+      "Row": 1,
+      "TextInput": 2,
+      "Stepper": 1,
+      "TokenFlow": 1,
+      "Panel": 2,
+      "Table": 2
+    },
+    "functions": {
+      "learning.bpeWalkthrough": 1,
+      "object.get": 1
+    },
+    "expressions": ["literal", "state", "derived", "call"],
+    "hostEffects": []
+  },
+  "budget": {
+    "maxSamplePointsPerSeries": 128,
+    "maxSeries": 8,
+    "maxStepsPerEvaluation": 100000
+  },
+  "state": {
+    "corpus": {
+      "type": "string",
+      "scope": "user",
+      "default": "we learn to learn and we love learning",
+      "maxLength": 600
+    },
+    "position": {
+      "type": "number",
+      "scope": "user",
+      "default": 0,
+      "min": 0,
+      "max": 228,
+      "step": 1
+    }
+  },
+  "derived": {
+    "lesson": {
+      "kind": "call",
+      "function": "learning.bpeWalkthrough",
+      "version": 1,
+      "args": [
+        {
+          "kind": "state",
+          "id": "corpus"
+        },
+        {
+          "kind": "state",
+          "id": "position"
+        }
+      ]
+    }
+  },
+  "actions": {
+    "next": {
+      "kind": "set",
+      "scope": "user",
+      "target": "position",
+      "value": {
+        "kind": "call",
+        "function": "object.get",
+        "version": 1,
+        "args": [
+          {
+            "kind": "derived",
+            "id": "lesson"
+          },
+          {
+            "kind": "literal",
+            "value": "next"
+          }
+        ]
+      }
+    },
+    "previous": {
+      "kind": "set",
+      "scope": "user",
+      "target": "position",
+      "value": {
+        "kind": "call",
+        "function": "object.get",
+        "version": 1,
+        "args": [
+          {
+            "kind": "derived",
+            "id": "lesson"
+          },
+          {
+            "kind": "literal",
+            "value": "previous"
+          }
+        ]
+      }
+    },
+    "restart": {
+      "kind": "reset",
+      "scope": "user",
+      "targets": ["position"]
+    }
+  },
+  "root": "root",
+  "nodes": [
+    {
+      "id": "title",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "BPE 分词",
+        "role": "heading"
+      }
+    },
+    {
+      "id": "restart",
+      "component": "Button",
+      "version": 2,
+      "props": {
+        "label": "从头开始",
+        "icon": "restart"
+      },
+      "on": {
+        "activate": "restart"
+      }
+    },
+    {
+      "id": "header",
+      "component": "Row",
+      "version": 1,
+      "props": {
+        "children": ["title", "restart"]
+      }
+    },
+    {
+      "id": "sentence",
+      "component": "TextInput",
+      "version": 2,
+      "props": {
+        "label": "输入句子",
+        "hideLabel": true,
+        "multiline": true,
+        "resetTargets": ["position"]
+      },
+      "bind": {
+        "value": "corpus"
+      }
+    },
+    {
+      "id": "navigation",
+      "component": "Stepper",
+      "version": 1,
+      "props": {
+        "position": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "position"
+            }
+          ]
+        },
+        "atStart": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "atStart"
+            }
+          ]
+        },
+        "disabled": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "disabled"
+            }
+          ]
+        },
+        "checkpoint": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "checkpoint"
+            }
+          ]
+        },
+        "delay": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "delay"
+            }
+          ]
+        },
+        "nextLabel": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "nextLabel"
+            }
+          ]
+        },
+        "previousAction": "previous",
+        "nextAction": "next"
+      }
+    },
+    {
+      "id": "wordFlow",
+      "component": "TokenFlow",
+      "version": 1,
+      "props": {
+        "label": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "title"
+            }
+          ]
+        },
+        "hint": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "progress"
+            }
+          ]
+        },
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "words"
+            }
+          ]
+        },
+        "layout": "words"
+      }
+    },
+    {
+      "id": "wordSection",
+      "component": "Panel",
+      "version": 2,
+      "props": {
+        "children": ["wordFlow"],
+        "visible": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "showWords"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "candidates",
+      "component": "Table",
+      "version": 2,
+      "props": {
+        "caption": "相邻对",
+        "columns": ["相邻词元", "", "频次"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "pairs"
+            }
+          ]
+        },
+        "columnAlign": ["left", "right", "right"],
+        "visibleRows": 5,
+        "highlightRow": 0,
+        "showCount": false,
+        "emptyText": "已全部合并"
+      }
+    },
+    {
+      "id": "pairSection",
+      "component": "Panel",
+      "version": 2,
+      "props": {
+        "children": ["candidates"],
+        "visible": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "showPairs"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "equation",
+      "component": "TokenFlow",
+      "version": 1,
+      "props": {
+        "label": "",
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "equation"
+            }
+          ]
+        },
+        "layout": "words"
+      }
+    },
+    {
+      "id": "mergeSection",
+      "component": "Panel",
+      "version": 2,
+      "props": {
+        "children": ["equation"],
+        "visible": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "showMerge"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "vocabulary",
+      "component": "TokenFlow",
+      "version": 1,
+      "props": {
+        "label": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "vocabularyLabel"
+            }
+          ]
+        },
+        "hint": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "vocabularyHint"
+            }
+          ]
+        },
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "vocabulary"
+            }
+          ]
+        },
+        "layout": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "vocabularyLayout"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "vocabularySection",
+      "component": "Panel",
+      "version": 2,
+      "props": {
+        "children": ["vocabulary"],
+        "visible": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "showVocabulary"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rules",
+      "component": "Table",
+      "version": 2,
+      "props": {
+        "caption": "合并规则",
+        "columns": ["规则", "顺序"],
+        "rows": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "rules"
+            }
+          ]
+        },
+        "columnAlign": ["left", "right"],
+        "showCount": true,
+        "emptyText": "—"
+      }
+    },
+    {
+      "id": "ruleSection",
+      "component": "Panel",
+      "version": 2,
+      "props": {
+        "children": ["rules"],
+        "visible": {
+          "kind": "call",
+          "function": "object.get",
+          "version": 1,
+          "args": [
+            {
+              "kind": "derived",
+              "id": "lesson"
+            },
+            {
+              "kind": "literal",
+              "value": "showFinalRules"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "results",
+      "component": "Row",
+      "version": 1,
+      "props": {
+        "children": ["vocabularySection", "ruleSection"]
+      }
+    },
+    {
+      "id": "root",
+      "component": "Panel",
+      "version": 2,
+      "props": {
+        "children": [
+          "header",
+          "sentence",
+          "navigation",
+          "wordSection",
+          "pairSection",
+          "mergeSection",
+          "results"
+        ]
+      }
+    }
+  ]
+}
