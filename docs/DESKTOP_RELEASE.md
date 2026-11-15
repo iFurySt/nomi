@@ -166,3 +166,9 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、点击下载后自
 从公开地址重新下载 arm64 / x64 DMG，两者的长度、SHA-256、Sparkle Ed25519 签名和公证票据均通过；两个 appcast 的签名、0.3.3 版本和地址通过。挂载 arm64 App 后，严格深度签名、公证票据、Gatekeeper 与内嵌版本检查通过，验证卷已卸载。校验制品位于 ignored `.artifacts/desktop-033-verification/`。
 
 本版本包含紧凑交互学习与标准创作 Skill、交互块复制和 DSL 编辑、正文留白框选与批量操作，以及默认关闭的本机 MCP。开发版已保存后重启并确认文稿恢复；未启动、替换正式版或操作用户文稿，公开制品验证不等同用户机器上的跨版本安装完成。
+
+## 0.4.0 发布进度
+
+`desktop-v0.4.0` 固定于 `cd14d2f`。[首次双架构运行](https://github.com/iFurySt/nomi/actions/runs/43726490638) 的应用回归、452 项单测及代码签名通过，Apple 公证提交失败，尚未公开 Release 或更新 Sparkle feed。
+
+[只读诊断](https://github.com/iFurySt/nomi/actions/runs/43728000212) 返回 HTTP 403，明确提示开发者协议缺失或过期。账号持有人处理 Apple Developer 协议后，重新运行失败任务；不绕过公证、不移动已准备的 tag。开发版已重启并确认 0.4.0；公开制品验收待发布完成。
