@@ -2,7 +2,7 @@
 
 Independent Go + Cobra + PostgreSQL service for the current document-based Nomi. No household model, SeedX, legacy iOS API, Redis or desktop subprocess dependency.
 
-Implementation is staged. The transactional content/auth core is implemented; attachment transport and desktop integration are tracked in [the plan](../../docs/exec-plans/active/20261115-personal-cloud-sync.md).
+Implementation is staged. The transactional content/auth core is implemented; immutable disk attachment transport is implemented; desktop integration is tracked in [the plan](../../docs/exec-plans/active/20261115-personal-cloud-sync.md).
 
 ## Run locally
 
@@ -10,6 +10,7 @@ Use a dedicated PostgreSQL database, never the retired family database. Requires
 
 ```sh
 export NOMI_SYNC_DATABASE_URL='postgres://USER:PASSWORD@127.0.0.1:5432/nomi_sync?sslmode=disable'
+export NOMI_SYNC_OBJECT_DIR='/persistent/nomi-sync/objects'
 go run ./cmd/nomi-sync migrate
 # Pipe a private password from a password manager or interactive input, not a CLI argument.
 go run ./cmd/nomi-sync create-user --email you@example.com --password-stdin
@@ -24,6 +25,7 @@ From repository root:
 
 ```sh
 ./scripts/test-sync-server.sh
+node scripts/check-sync-package.mjs
 ```
 
 Starts a disposable loopback PostgreSQL 18 container, runs Go integration tests with the race detector, then removes only that test container. Tests use independent schemas and synthetic data. To use an existing **test-only** database set `NOMI_SYNC_TEST_DATABASE_URL`; no production database should be supplied. `go test` without that variable explicitly skips database integration cases.
@@ -46,4 +48,4 @@ Version 0 means not created; deleted IDs retain a version and require explicit c
 
 Postgres stores Markdown `source` in a `text` column and other payload in `jsonb`. A space row lock serializes commit watermarks; no auto-increment/commit-order gap can hide a change. Old content is archived in the same transaction; semantic no-ops create no version or change event. Snapshots are bounded full responses (4 MiB live entity data; 4,000 total entity identities including tombstones); incremental reads are paginated. Current Nomi native content budgets still apply when importing to the renderer. Server validates IDs, JSON budget, native block discriminators and references; native DSL/render validation remains required at the client trust boundary.
 
-Objects must be ready before committing asset metadata. Object transport is the next implementation stage. Unknown protocol/schema/block types fail rather than being rewritten. JSON formatting is not preserved; Markdown source is.
+Objects must be ready before committing asset metadata. `PUT /v1/spaces/{space}/objects/{sha256}` streams originals (max 20 MiB), checks digest and size, and durably publishes before recording readiness. Authenticated `GET` / `HEAD` on the same path support download and byte ranges. Disk objects use a private persistent directory, confined paths and immutable content-addressed writes. Asset IDs keep immutable hash, size and MIME identity even across deletion/restoration. No physical object GC is enabled. The package smoke command runs an isolated server/database with two synthetic native document directories and verifies asset hashes, native roundtrip and one-block incremental edits. Unknown protocol/schema/block types fail rather than being rewritten. JSON formatting is not preserved; Markdown source is.

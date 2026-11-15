@@ -13,3 +13,5 @@ export * from "./settings";
 export * from "./updates";
 
 export * from "./canvas/generation";
+
+export * from "./sync/protocol";

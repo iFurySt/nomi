@@ -15,6 +15,7 @@ import (
 
 type Server struct {
 	Store   *Store
+	Objects ObjectStore
 	limiter loginLimiter
 }
 type loginWindow struct {
@@ -115,6 +116,8 @@ func (s *Server) authorized(w http.ResponseWriter, r *http.Request) {
 	case len(parts) >= 3 && parts[0] == "spaces" && safeID(parts[1]):
 		space := parts[1]
 		switch {
+		case len(parts) == 4 && parts[2] == "objects":
+			s.object(w, r, user, space, parts[3])
 		case len(parts) == 3 && parts[2] == "commit" && r.Method == "POST":
 			var in Commit
 			if !decode(w, r, &in) {

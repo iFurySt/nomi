@@ -312,3 +312,17 @@ func TestProtocolValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestSchemaReadiness(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	if err := s.CheckSchema(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec(ctx, `DELETE FROM sync_migrations WHERE name='002_asset_identity.sql'`); err != nil {
+		t.Fatal(err)
+	}
+	if s.CheckSchema(ctx) == nil {
+		t.Fatal("partial schema served")
+	}
+}

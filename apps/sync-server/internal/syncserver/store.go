@@ -62,6 +62,26 @@ func (s *Store) Migrate(ctx context.Context) error {
 	}
 	return tx.Commit(ctx)
 }
+
+// CheckSchema refuses to serve partially migrated or modified schemas.
+func (s *Store) CheckSchema(ctx context.Context) error {
+	entries, err := migrations.ReadDir("migrations")
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		sql, err := migrations.ReadFile("migrations/" + e.Name())
+		if err != nil {
+			return err
+		}
+		var hash string
+		if err = s.DB.QueryRow(ctx, `SELECT sha256 FROM sync_migrations WHERE name=$1`, e.Name()).Scan(&hash); err != nil || hash != digest(sql) {
+			return fmt.Errorf("migration missing or checksum mismatch: %s; run migrate", e.Name())
+		}
+	}
+	return nil
+}
+
 func digest(b []byte) string { sum := sha256.Sum256(b); return hex.EncodeToString(sum[:]) }
 
 type Space struct {
@@ -202,6 +222,7 @@ func (s *Store) Commit(ctx context.Context, user, space string, c Commit) (Recei
 	for _, m := range c.Mutations {
 		k := key(m.Kind, m.ID)
 		old := records[k]
+
 		// Tombstones can only be explicitly restored using their current version.
 		same := old.Version > 0 && old.Deleted == m.Deleted
 		if same && !m.Deleted {
@@ -237,6 +258,31 @@ func (s *Store) Commit(ctx context.Context, user, space string, c Commit) (Recei
 			return Receipt{}, problem(422, "invalid_asset", "Attachment byte count mismatch")
 		}
 	}
+	// Original identity remains immutable even after deletion and explicit restoration.
+	for _, r := range changed {
+		if r.Kind != "asset" || r.Deleted {
+			continue
+		}
+		o := object(r)
+		hash := stringField(o, "sha256")
+		mime := stringField(o, "mime")
+		size := int64(o["bytes"].(float64))
+		var oldHash, oldMime string
+		var oldSize int64
+		err = tx.QueryRow(ctx, `SELECT sha256,bytes,mime FROM sync_asset_identities WHERE space_id=$1 AND id=$2`, space, r.ID).Scan(&oldHash, &oldSize, &oldMime)
+		if err == nil {
+			if oldHash != hash || oldSize != size || oldMime != mime {
+				return Receipt{}, problem(422, "immutable_asset", "Use a new asset ID when replacing an original")
+			}
+		} else if errors.Is(err, pgx.ErrNoRows) {
+			if _, err = tx.Exec(ctx, `INSERT INTO sync_asset_identities(space_id,id,sha256,bytes,mime) VALUES($1,$2,$3,$4,$5)`, space, r.ID, hash, size, mime); err != nil {
+				return Receipt{}, err
+			}
+		} else {
+			return Receipt{}, err
+		}
+	}
+
 	for _, r := range changed {
 		if _, err = tx.Exec(ctx, `INSERT INTO sync_history(space_id,kind,id,version,deleted,data,source,archived_at) SELECT space_id,kind,id,version,deleted,data,source,$4 FROM sync_entities WHERE space_id=$1 AND kind=$2 AND id=$3`, space, r.Kind, r.ID, now); err != nil {
 			return Receipt{}, err

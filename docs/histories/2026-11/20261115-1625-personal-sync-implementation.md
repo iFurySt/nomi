@@ -17,3 +17,11 @@
 新增独立 `apps/sync-server`，显式校验和迁移，Cobra migrate / create-user / serve，bcrypt 与可撤销设备会话。实体版本检查、批次事务、稳定水位、幂等收据、tombstone、历史与固定快照；Markdown 原文独立 text。新增隔离 PostgreSQL 自动测试脚本和 CI job。
 
 验证：真实 PostgreSQL 18 + Go race 测试通过，涵盖双 HTTP 会话、不同块并发、同块冲突、原子拒绝、重试 / request ID 复用、no-op、Markdown 存储、删除恢复、并发成环、事务游标与分页、过期游标、账号隔离、设备撤销 / 过期与登录限流。附件和桌面尚未接入，不将内核测试作为完整目标验收。
+
+## 阶段 2：原件与原生包往返
+
+新增 disk ObjectStore，通过私有根目录、流式摘要 / 大小验证、fsync 与原子发布保存不可变原件；上传完成才允许资产引用进入同步事务。原件下载鉴权并支持 Range，附件身份在删除后仍不可偷换。启动检查完整迁移校验和。
+
+core 提供平台中立实体投影与原生校验重建，host 提供有界响应、HTTPS 默认和摘要校验的客户端。真实服务验证两套独立文稿目录往返，包括共享块、内嵌画布、交互 DSL、LaTeX、图片 / PDF 及单块增量。此阶段不是两个完整 Electron 客户端验收。
+
+验证：Go race / PostgreSQL 通过；类型检查、25 项投影 / 文件包测试、`node scripts/check-sync-package.mjs` 通过。磁盘测试覆盖中断、重复上传、symlink / 路径逃逸、重开与引用保护。物理对象 GC 未开启。
