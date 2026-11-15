@@ -5,10 +5,14 @@ umask 077
 backup_dir="${1:?Usage: restore-sync-server.sh BACKUP_DIRECTORY}"
 python3 - "${backup_dir}" <<'PY'
 import hashlib,json,pathlib,sys
+def digest(f):
+    h=hashlib.sha256()
+    for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
+    return h.hexdigest()
 root=pathlib.Path(sys.argv[1]); manifest=json.loads((root/'COMPLETE.json').read_text())
 assert manifest['format']=='nomi-sync-backup/v1','Unknown backup format'
 for name in ('database.dump','objects.tar.gz'):
-    with (root/name).open('rb') as f: assert hashlib.file_digest(f,'sha256').hexdigest()==manifest['files'][name],f'Corrupt {name}'
+    with (root/name).open('rb') as f: assert digest(f)==manifest['files'][name],f'Corrupt {name}'
 PY
 if [[ -n "${NOMI_SYNC_SERVICE_CONTAINER:-}" ]]; then
   sync_command=(docker exec -i "${NOMI_SYNC_SERVICE_CONTAINER}" nomi-sync)

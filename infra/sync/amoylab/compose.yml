@@ -1,0 +1,18 @@
+# Overlay for a release checkout; base build context remains the repository root.
+services:
+  postgres:
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+  sync:
+    image: ${NOMI_SYNC_IMAGE:?Set the immutable release image tag}
+    healthcheck:
+      test:
+        ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8089/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

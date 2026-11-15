@@ -28,13 +28,13 @@ export function syncServerURL(input: string): string {
     url.password ||
     url.search ||
     url.hash ||
-    url.pathname !== "/"
+    !/^\/(?:[A-Za-z0-9_-]+\/?)*$/.test(url.pathname)
   )
-    throw Error("同步服务地址应仅包含协议、域名和端口。");
+    throw Error("同步服务地址不能包含账号、查询参数或特殊路径字符。");
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   if (url.protocol !== "https:" && !(local && url.protocol === "http:"))
     throw Error("云同步需要 HTTPS，本机开发可使用 HTTP。");
-  return url.origin;
+  return url.origin + url.pathname.replace(/\/$/, "");
 }
 async function readBounded(response: Response, limit: number): Promise<Buffer> {
   const expected = Number(response.headers.get("content-length") ?? 0);

@@ -38,7 +38,7 @@ PostgreSQL 保存正文 / DSL / 画布、版本、权限、引用和收据；`ob
 
 ## 配对备份
 
-脚本 [backup-sync-server.sh](../scripts/backup-sync-server.sh) 支持原生 CLI 或显式容器 ID；从不猜测生产目标。需要 Python 3.11+、gzip 与匹配 PostgreSQL 主版本的 dump / restore 工具（容器模式使用数据库容器自带工具）。
+脚本 [backup-sync-server.sh](../scripts/backup-sync-server.sh) 支持原生 CLI 或显式容器 ID；从不猜测生产目标。需要 Python 3.8+、gzip 与匹配 PostgreSQL 主版本的 dump / restore 工具（容器模式使用数据库容器自带工具）。
 
 ```sh
 export NOMI_SYNC_PG_CONTAINER="$(docker compose --env-file "$SYNC_ENV" -f infra/sync/compose.yml ps -q postgres)"
@@ -88,3 +88,11 @@ node scripts/check-sync-package.mjs --desktop
 ```
 
 均使用 synthetic 文稿与唯一临时项目，只清理自己创建的容器。产物位于忽略的 `.artifacts`。本机隔离验证不等于两个物理 Mac 或公网生产验收。
+
+## amoylab 首次部署约定
+
+用户于 2026-11-15 授权将当前服务部署到 amoylab。使用 `/opt/nomi-sync/releases/<commit>` 的精确提交归档、独立 `/opt/nomi-sync/.env` 和 `nomi-personal-sync` Compose 项目；叠加 `infra/sync/amoylab/compose.yml`，`NOMI_SYNC_IMAGE` 指向本次提交的不可变镜像 tag。服务 release tag 使用 `sync-v*`，与退役的 `server-v*` 区分。
+
+`https://nomi.ifuryst.com/api/` 分流至 loopback 8089，代理去除 `/api/` 前缀，外部 health 为 `/api/health`，登录为 `/api/auth/login`。桌面同步地址填写 `https://nomi.ifuryst.com/api`；客户端支持规范化可选前缀，仍拒绝远程 HTTP、userinfo、query / fragment。官网使用 `/`，静态目录 `/var/www/nomi-site`；具体官网另外开发，不用根路径代理旧 API。
+
+Nginx 模板为 `infra/sync/amoylab/nginx.conf`，应用前保存原配置并执行 `nginx -t`，仅成功后 reload。域名和 Certbot 证书已有，未要求新增 DNS 或改变整个 Cloudflare zone 设置。旧 `/opt/nomi` 与家庭数据库保留，不复用 / 不删除。
