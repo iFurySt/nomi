@@ -29,6 +29,8 @@ Node host 管理 `.nomi` 包、原件、目录切换、保存事务和 ChatGPT �
 
 ## 下一阶段目标架构（提案）
 
+2026-11-15 的 [个人文稿云同步 v1](design-docs/cloud-sync.md) 收敛了同步范围：默认关闭，未登录保持本地使用；正文 / DSL / 画布与同步版本存 PostgreSQL，附件以引用关联 ObjectStore，开发先使用服务器持久 disk。按 block 乐观并发检查，同块冲突保留双方；首版不采用 CRDT / Node 协作房间、Redis 或实时多人编辑。上传调度与有界历史规则以该文档为准，[开发计划](exec-plans/active/20261115-personal-cloud-sync.md) 按内核、附件、桌面、恢复和试用推进。目前仅完成设计，未接通云同步。
+
 笔记与无限画布以平台中立 DSL / 语义模型为契约：Note / Block 表达长文、图片、文件、手写及 InteractiveBlock，Placement 独立表达空间展示。交互块包含状态、类型化计算、组件视图与动作；Electron 可先用 React / TypeScript，未来 SwiftUI / UIKit、Compose renderer 可独立实现，不要求移动端必须运行 WebView 或 JavaScript。DSL 快照、协作历史、个人学习状态有明确边界，不设两份可相互覆盖的主状态。
 
 交互 IR、React 温度探索器、本机独立进度与 Swift 计算参考已实现，见 [运行时说明](design-docs/interactive-learning-runtime.md)。新增 Document / Note / Block / Placement / Connector 本地内核和画布编辑器，支持基础 shape、对齐吸附与摆放端点绑定，桌面结构与附件原件在可配置目录内以 `.nomi` 文件包保存（Markdown / GenUI 源、原件及 children 子包），完整工作区投影用于恢复；浏览器使用 IndexedDB；桌面文稿层级与实际文件夹双向联动，camera / study state 单独保存，见 [画布实现](design-docs/canvas-workspace-runtime.md)。这仍是单机实现，笔迹、跨端同步与对外 DSL 包规范仍待开发，不能混同金融 SQLite 或家庭 workspace。推荐的存储、鉴权、同步房间和手写实验见 [整体设计](design-docs/notes-infinite-canvas.md)；文档语法与往返约束见 [DSL 草案](design-docs/notes-canvas-dsl.md)。GenUI、OpenUI 复用评估、跨语言测试与温度探索器的实施顺序以 [交互内容修订](design-docs/generative-interactive-content.md) 为准。

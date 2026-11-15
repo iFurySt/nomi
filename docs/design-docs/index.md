@@ -15,6 +15,8 @@
 
 ## 笔记与无限画布
 
+- [个人文稿云同步 v1](cloud-sync.md)：尚未实现；可选登录、PostgreSQL 内容、disk / OSS 附件、block 增量、上传调度和按条数 / 天数取并集的历史规则。
+
 - [长文与混排性能](notes-performance.md)：可重复 Electron 压测、实测结果、文本结构共享 / 渲染隔离和下一阶段边界。
 
 - [.nomi 文稿文件包提案](nomi-document-package.md)：目录作为单个文稿、包内 DSL / 资产、嵌套子文稿、外部 AI 编辑及迁移的设计基线。

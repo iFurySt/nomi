@@ -4,6 +4,8 @@
 
 ## 核心方案
 
+2026-11-15 修订：个人多设备同步以 [云同步 v1](cloud-sync.md) 为准。本页 CRDT、Yjs、Node 协作房间及客户端 Go 子进程 / SQLite 运输方案仅保留为早期背景，不是 v1 开发要求。v1 使用 block 版本检查与冲突保留，保持现有 `.nomi` 本地存储；正文存 PostgreSQL，附件开发阶段存服务器 disk provider。
+
 构建一个以可寻址内容为中心的笔记系统，画布是组织与编辑这些内容的空间视图。长笔记、图片、附件和笔迹有稳定身份；在画布上的位置、大小和层级单独保存。Nomi DSL 定义这些对象的公开语义及可读文档表示，UI 和 AI 通过同一套命令修改它们。
 
 长期共享的是平台中立文档 / 交互协议及一致性测试。首批 Electron 可用 TypeScript / React 参考实现；未来 SwiftUI / UIKit、Compose renderer 可独立实现。WebView 是可选兼容路径，不是移动端前提。采用本地优先存储，从早期验证多端离线合并。GenUI 的状态、计算、事件与能力边界见 [交互内容设计](generative-interactive-content.md)。
@@ -152,6 +154,8 @@ iPad 的优先候选是原生低延迟输入与共享文档结合。PencilKit �
 完整平台矩阵、能力降级与最小 SwiftUI 学习组件验证见 [生成式交互内容设计](generative-interactive-content.md)。
 
 ## 本地优先与同步
+
+以下是早期协作候选方案，已由 [个人同步 v1](cloud-sync.md) 收窄首版范围；不据此启动 CRDT 选型或 Node 协作服务开发。
 
 同一人的两台设备也会产生并发：Mac 离线改正文，iPad 离线补笔迹，重新联网后应同时保留。因此不采用整文件最后写入覆盖。
 
