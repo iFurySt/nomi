@@ -1,6 +1,6 @@
 # Desktop 发布
 
-桌面主入口仅 Canvas / 文稿；设置保留 General、Appearance、ChatGPT。不启动或分发旧金融 Go / MCP 服务，不携带 Codex CLI。独立 `apps/server` 和 iOS beta 不属于桌面发行包。
+桌面主入口仅 Canvas / 文稿；设置包含 General、Appearance、ChatGPT、Cloud Sync 与本机 MCP。不启动或分发旧金融 Go 服务，不携带 Codex CLI；个人同步后端独立部署，未登录可继续本地使用。旧家庭服务和 iOS beta 已退役，不属于桌面发行包。
 
 ## 制品与身份
 
