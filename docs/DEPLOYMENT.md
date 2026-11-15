@@ -32,7 +32,7 @@ curl --fail http://127.0.0.1:8089/health
 
 ## 身份与数据
 
-运维 `create-user` 创建私有账号，无公开注册或密码找回 UI。密码 bcrypt；设备会话为 30 天随机 token 的哈希，用户可从设置撤销单设备。桌面凭据由 safeStorage 加密；不开同步无需登录。不要复用 ChatGPT token。
+运维 `create-user` 创建私有账号，无公开注册或密码找回 UI。密码 bcrypt；设备会话为 30 天随机 token 的哈希，用户从左下角 Log out 退出本机；单设备撤销 API 保留，当前不提供设备管理 UI。桌面凭据由 safeStorage 加密；不开同步无需登录。不要复用 ChatGPT token。
 
 PostgreSQL 保存正文 / DSL / 画布、版本、权限、引用和收据；`objects` 卷只保存鉴权不可变原件。disk 是开发阶段 ObjectStore，不具备云 OSS 的跨故障域冗余；实际数据使用前配置异机加密备份。
 
@@ -93,11 +93,11 @@ node scripts/check-sync-package.mjs --desktop
 
 用户于 2026-11-15 授权将当前服务部署到 amoylab。使用 `/opt/nomi-sync/releases/<commit>` 的精确提交归档、独立 `/opt/nomi-sync/.env` 和 `nomi-personal-sync` Compose 项目；叠加 `infra/sync/amoylab/compose.yml`，`NOMI_SYNC_IMAGE` 指向本次提交的不可变镜像 tag。服务 release tag 使用 `sync-v*`，与退役的 `server-v*` 区分。
 
-`https://nomi.ifuryst.com/api/` 分流至 loopback 8089，代理去除 `/api/` 前缀，外部 health 为 `/api/health`，登录为 `/api/auth/login`。桌面同步地址填写 `https://nomi.ifuryst.com/api`；客户端支持规范化可选前缀，仍拒绝远程 HTTP、userinfo、query / fragment。官网使用 `/`，静态目录 `/var/www/nomi-site`；具体官网另外开发，不用根路径代理旧 API。
+`https://nomi.ifuryst.com/api/` 分流至 loopback 8089，代理去除 `/api/` 前缀，外部 health 为 `/api/health`，设备登录 API 位于 `/api/auth/desktop/start` 与 `/api/auth/desktop/exchange`，网站表单为 `/login`（旧 `/api/auth/login` 保留供兼容客户端）。桌面 Base URL 默认 `https://nomi.ifuryst.com`，留空同样使用官方地址；旧 `/api` 后缀自动归一化；客户端支持规范化可选前缀，仍拒绝远程 HTTP、userinfo、query / fragment。官网使用 `/`，静态目录 `/var/www/nomi-site`；具体官网另外开发，不用根路径代理旧 API。
 
 Nginx 模板为 `infra/sync/amoylab/nginx.conf`，应用前保存原配置并执行 `nginx -t`，仅成功后 reload。域名和 Certbot 证书已有，未要求新增 DNS 或改变整个 Cloudflare zone 设置。旧 `/opt/nomi` 与家庭数据库保留，不复用 / 不删除。
 
-## 当前 amoylab 部署（2026-11-15）
+## amoylab 首次部署记录（2026-11-15）
 
 - 首次服务 tag：`sync-v0.1.0`，release 配置提交 `76e37f1`；`/opt/nomi-sync/current` 指向 `releases/76e37f1`。
 - 运行镜像：`nomi-sync:fcc6fcf`，image ID `sha256:52d59a364b31196fc8201bba148c86644587e12f193be59be102863328241633`。Go 制品来自 `fcc6fcf`；`76e37f1` 仅补充验收与入口配置，Go 源码不变。
@@ -119,3 +119,17 @@ docker compose --env-file /opt/nomi-sync/.env -f infra/sync/compose.yml -f infra
 ```sh
 node scripts/check-sync-remote.mjs /private/synthetic-account.json .artifacts/sync-remote/NEW_RUN
 ```
+
+## 当前网站登录部署（2026-11-15）
+
+网页登录版本已部署，`current` 指向 `releases/browser-login-20261115-701ad76c`，镜像 `nomi-sync:browser-login-701ad76c`。这次使用范围仅含 sync-server / infra / 备份脚本的工作区源码快照（不是桌面发布），归档 SHA-256 为 `701ad76cd77c8b1fff2e1c20c2865547b434c08a14bef115f5c88713d6a12957`；release 内 `SOURCE.json` 逐文件记录摘要，原始归档位于部署根目录。Git 提交前不把该快照冒称 commit 制品。
+
+显式应用 migration 003（短期网站登录请求），`/login` 通过 Nginx 精确路由到新服务；官网其余静态路由与 `/api/` 保留。先完成配对备份 `backups/before-browser-login-20261115`，再停写 / migrate / 健康检查；原入口及环境备份为 `nginx-before-browser-login-20261115.conf` / `env-before-browser-login-20261115`。数据库回退仍按新库恢复流程，不直接运行旧 binary 连接新 schema。
+
+服务 healthy，原件 / 图校验通过。独立 synthetic 账号经公网 HTTPS 验证网站 CSRF 表单、S256 proof、单次领取、App Link 内容、错误 proof / 重放拒绝和会话撤销，没有真实文稿上传。可重复运行：
+
+```sh
+node scripts/check-browser-login-remote.mjs /private/synthetic-account.json
+```
+
+桌面新版仅构建并重启开发版，尚未发布 DMG；周期异机备份的既有限制不变。

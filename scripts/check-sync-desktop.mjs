@@ -33,7 +33,9 @@ async function device(name) {
   const folder = join(output, name);
   await mkdir(folder, { recursive: true });
   const main = `
-const {app,BrowserWindow,ipcMain,Menu}=require('electron');
+const {app,BrowserWindow,ipcMain,Menu,shell}=require('electron');
+let browserURL,web,appReturn; shell.openExternal=async url=>{browserURL=url;};
+require('node:os').hostname=()=> 'Test Mac';
 const {DocumentStore}=require(${JSON.stringify(join(root, "packages/host/src/document-store.ts"))});
 const {createCanvasDocument}=require(${JSON.stringify(join(root, "packages/core/src/canvas/document.ts"))});
 const {registerDocumentStorage}=require(${JSON.stringify(join(root, "apps/desktop/src/document-ipc.ts"))});
@@ -42,16 +44,23 @@ const {registerCloudSync}=require(${JSON.stringify(join(root, "apps/desktop/src/
 const path=require('node:path'),fs=require('node:fs/promises'),{pathToFileURL}=require('node:url');
 const folder=${JSON.stringify(folder)};
 app.setName('Nomi(Dev) Sync ${name}');app.setPath('userData',path.join(folder,'profile'));
-let win,automation,host,loseAck=false;
+let win,automation,host,loseAck=false,deviceDelay=0,deviceFailure=false,deviceRequests=0;
 const realFetch=globalThis.fetch;
-globalThis.fetch=async (...args)=>{const response=await realFetch(...args);if(loseAck&&String(args[0]).endsWith('/commit')&&response.ok){loseAck=false;await response.arrayBuffer();throw Error('Synthetic response lost after real commit');}return response;};
+globalThis.fetch=async (...args)=>{if(String(args[0]).endsWith('/v1/sessions')){deviceRequests++;await new Promise(r=>setTimeout(r,deviceDelay));if(deviceFailure)throw Error('Synthetic device network unavailable');}const response=await realFetch(...args);if(loseAck&&String(args[0]).endsWith('/commit')&&response.ok){loseAck=false;await response.arrayBuffer();throw Error('Synthetic response lost after real commit');}return response;};
 process.on('message',async m=>{try{let value;
-if(m.action==='eval')value=await win.webContents.executeJavaScript(m.source,true);
+if(m.action==='deviceRequests')value=deviceRequests;
+else if(m.action==='appReturn')value=appReturn;
+else if(m.action==='browserURL')value=browserURL;
+else if(m.action==='webOpen'){web=new BrowserWindow({width:800,height:720,show:false,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});web.webContents.on('will-navigate',(event,url)=>{if(url.startsWith('nomi')){event.preventDefault();appReturn=url;}});await web.loadURL(browserURL);await fs.writeFile(path.join(folder,'browser-login.png'),(await web.webContents.capturePage()).toPNG());value=true;}
+else if(m.action==='webEval')value=await web.webContents.executeJavaScript(m.source,true);
+else if(m.action==='webClose'){web.destroy();browserURL=undefined;value=true;}
+else if(m.action==='eval')value=await win.webContents.executeJavaScript(m.source,true);
 else if(m.action==='snapshot')value=(await automation.invoke('snapshot',{})).document;
 else if(m.action==='edit'){const s=await automation.invoke('snapshot',{});const d=structuredClone(s.document);d.blocks.find(b=>b.id===m.block).source=m.text;d.revision++;await automation.invoke('commit',{document:d,expectedRevision:s.document.revision,snapshotId:s.snapshotId,assets:[]});value=true;}
+else if(m.action==='deviceNetwork'){deviceDelay=m.delay||0;deviceFailure=!!m.fail;value=true;}
 else if(m.action==='loseAck'){loseAck=true;value=true;}
 else if(m.action==='online'){host.online(m.online);value=true;}
-else if(m.action==='capture'){if(m.width)win.setSize(m.width,m.height||850);await new Promise(r=>setTimeout(r,150));await fs.writeFile(m.path,(await win.webContents.capturePage()).toPNG());value=true;}
+else if(m.action==='capture'){if(m.width)win.setSize(m.width,m.height||850);await new Promise(r=>setTimeout(r,200));await win.webContents.executeJavaScript('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');await fs.writeFile(m.path,(await win.webContents.capturePage()).toPNG());value=true;}
 else if(m.action==='undo'){win.webContents.undo();value=true;}
 else if(m.action==='quit'){host.stop();win.destroy();app.quit();return;}
 process.send({id:m.id,value});}catch(e){process.send({id:m.id,error:e.message});}});
@@ -68,8 +77,8 @@ app.whenReady().then(async()=>{
  ipcMain.handle('nomi:updates',()=>({version:'sync-fixture',available:false,reason:'Disabled'}));
  ipcMain.handle('nomi:chatgpt',()=>({ok:false,error:'No fixture account'}));
  Menu.setApplicationMenu(Menu.buildFromTemplate([{role:'editMenu'}]));
- win=new BrowserWindow({width:1200,height:850,show:false,webPreferences:{preload:${JSON.stringify(join(root, "apps/desktop/dist/preload.cjs"))},sandbox:true,contextIsolation:true,nodeIntegration:false}});
- await win.loadURL(expected);automation=await registerAutomation(store,expected);host=await registerCloudSync(store,expected,automation.invoke,flush);
+ win=new BrowserWindow({width:1200,height:850,show:false,webPreferences:{preload:${JSON.stringify(join(root, "apps/desktop/dist/preload.cjs"))},sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});
+ await win.loadURL(expected+'#/settings/sync');await new Promise(r=>setTimeout(r,750));automation=await registerAutomation(store,expected);host=await registerCloudSync(store,expected,automation.invoke,flush);
  if(!host)throw Error('Cloud sync failed to initialize');
  process.send({ready:true});
 }).catch(e=>{console.error(e);app.exit(1)});
@@ -166,33 +175,297 @@ try {
     b = await device("mac-b");
   assert.equal((await a.request("status")).enabled, false);
   assert.equal((await b.request("status")).account, undefined);
-  await a.ui("eval", { source: "location.hash='#/settings/sync';true" });
+  const closeAccount = async (d) => {
+    await d.ui("eval", {
+      source:
+        "document.querySelector('[role=menu]')?.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));true",
+    });
+  };
+  const openAccount = async (d) => {
+    if (
+      await d.ui("eval", {
+        source: "!!document.querySelector('.workspace-menu-identity')",
+      })
+    )
+      return;
+    await d.ui("eval", {
+      source: `document.querySelector('[aria-label="Account menu"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerType:'mouse'}));true`,
+    });
+    await until(
+      () =>
+        d.ui("eval", {
+          source: "!!document.querySelector('.workspace-menu-identity')",
+        }),
+      "account menu",
+    );
+  };
+  const navigate = async (d, section) => {
+    if (section === "account") return openAccount(d);
+    await closeAccount(d);
+    await d.ui("eval", {
+      source: `location.hash='#/settings/${section}';true`,
+    });
+    await until(
+      () =>
+        d.ui("eval", {
+          source: `document.querySelector('.settings-content > h1')?.textContent==='Cloud Sync'`,
+        }),
+      "settings route",
+    );
+  };
+  const click = (d, text) =>
+    d.ui("eval", {
+      source: `[...document.querySelectorAll('button,[role=menuitem]')].find(b=>b.textContent===${JSON.stringify(text)}).click();true`,
+    });
+  const fill = (d, values) =>
+    d.ui("eval", {
+      source: `(()=>{for(const [name,value] of Object.entries(${JSON.stringify(values)})){const input=document.querySelector('[aria-label="'+name+'"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));}return true})()`,
+    });
+  const signIn = async (d, alreadyStarted = false) => {
+    if (!alreadyStarted)
+      await d.ui("eval", {
+        source:
+          "void window.nomiDesktop.requestSync('signIn').then(()=>window.dispatchEvent(new Event('nomi-account-changed')));true",
+      });
+    await until(() => d.ui("browserURL"), "browser login URL");
+    await d.ui("webOpen");
+    assert.equal(
+      await d.ui("webEval", {
+        source: "getComputedStyle(document.querySelector('main')).maxWidth",
+      }),
+      "340px",
+    );
+    await d.ui("webEval", {
+      source: `document.querySelector('[name=email]').value='test@example.invalid';document.querySelector('[name=password]').value=${JSON.stringify(password)};document.querySelector('form').requestSubmit();true`,
+    });
+    await until(
+      () =>
+        d.ui("webEval", {
+          source:
+            "!!document.querySelector('a[href=\"nomi-dev://account/complete\"]')",
+        }),
+      "browser approved",
+    );
+    await until(() => d.ui("appReturn"), "automatic app return");
+    await until(
+      async () => !(await d.request("status")).signingIn,
+      "claim completed",
+    );
+    await d.ui("webClose");
+  };
+  await navigate(a, "sync");
   await until(
     () =>
       a.ui("eval", {
-        source: "!!document.querySelector('[aria-label=同步密码]')",
+        source:
+          "!document.querySelector('[aria-label=\"Base URL\"]')?.disabled",
       }),
-    "login form",
+    "server settings",
   );
-  await a.ui("capture", { path: join(output, "sync-login.png") });
+  assert.equal(
+    await a.ui("eval", {
+      source: "document.querySelector('[aria-label=\"Base URL\"]').value",
+    }),
+    "https://nomi.ifuryst.com",
+  );
+  assert.equal(
+    await a.ui("eval", {
+      source: "document.querySelectorAll('.settings-content input').length",
+    }),
+    1,
+  );
+  assert.equal(
+    await a.ui("eval", {
+      source: "!!document.querySelector('input[type=password]')",
+    }),
+    false,
+  );
+  await fill(a, { "Base URL": url + "/" });
   await a.ui("eval", {
-    source: `(()=>{const values={'同步服务':${JSON.stringify(url)},'同步邮箱':'test@example.invalid','同步密码':${JSON.stringify(password)}};for(const [name,value] of Object.entries(values)){const input=document.querySelector('[aria-label="'+name+'"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));}return true})()`,
+    source:
+      "document.querySelector('.cloud-sync-settings form').requestSubmit();true",
   });
+  await until(
+    async () => (await a.request("status")).server === url,
+    "persist URL",
+  );
+  await until(
+    () =>
+      a.ui("eval", {
+        source:
+          "document.querySelector('.cloud-sync-settings form')?.getAttribute('aria-busy')==='false'",
+      }),
+    "configuration saved",
+  );
+  await assert.rejects(
+    a.request("configure", { server: "http://example.invalid" }),
+    /HTTPS/,
+  );
+  await assert.rejects(
+    a.request("configure", { server: "https://user:pass@example.invalid" }),
+  );
+  await a.stop();
+  await a.launch();
+  assert.equal((await a.request("status")).server, url);
+  await navigate(a, "sync");
+  await a.ui("capture", { path: join(output, "cloud-sync-config.png") });
   await a.ui("eval", {
-    source: "document.querySelector('.cloud-sync-form').requestSubmit();true",
+    source:
+      "document.querySelector('[aria-label=\"Account menu\"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerType:'mouse'}));true",
   });
-  await until(async () => !!(await a.request("status")).account, "UI login");
-  await a.request("bind", { mode: "upload" });
+  await until(
+    () =>
+      a.ui("eval", {
+        source: "!!document.querySelector('.workspace-menu-identity')",
+      }),
+    "profile menu",
+  );
+  assert.equal(
+    await a.ui("eval", {
+      source:
+        "document.querySelector('.workspace-menu-identity').textContent.includes('ChatGPT')",
+    }),
+    false,
+  );
+  await a.ui("eval", {
+    source: "document.querySelector('.workspace-menu-identity').click();true",
+  });
+  assert.equal(
+    await a.ui("eval", {
+      source: "!!document.querySelector('[href=\"#/settings/account\"]')",
+    }),
+    false,
+  );
+  await signIn(a, true);
+  await until(
+    async () => !!(await a.request("status")).binding,
+    "automatic first sync",
+  );
+  assert.equal((await a.request("spaces")).length, 1);
+  await assert.rejects(
+    a.request("configure", { server: "https://example.invalid/api" }),
+    /退出登录/,
+  );
+  assert.equal((await a.request("status")).server, url);
   await a.request("sync");
   const space = (await a.request("status")).binding.space;
+  await b.request("configure", { server: url });
   await b.request("login", {
-    server: url,
+    server: url + "/api",
     email: "test@example.invalid",
     password,
   });
-  await b.request("bind", { mode: "download", space });
+  assert.equal((await b.request("status")).binding, undefined);
+  await signIn(b);
+  await until(
+    async () => (await b.request("status")).binding?.space === space,
+    "automatic existing documents connection",
+  );
+  assert.equal(
+    await b.ui("eval", { source: "!!document.querySelector('[role=dialog]')" }),
+    false,
+  );
   successes.push(
-    "optional default off, real login UI, separate encrypted credentials and explicit cloud binding",
+    "Base URL persists and validates; profile opens Nomi account; login automatically connects new or existing documents; changing servers while signed in is rejected",
+  );
+  // More than one collection needs a choice; cancel leaves the local library untouched.
+  const login = await (
+    await fetch(url + "/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "test@example.invalid",
+        password,
+        deviceId: "setup-check",
+        deviceName: "Setup check",
+      }),
+    })
+  ).json();
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: "Bearer " + login.token,
+  };
+  assert.equal(
+    (
+      await fetch(url + "/v1/spaces", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ name: "Another collection" }),
+      })
+    ).status,
+    200,
+  );
+  await fetch(url + "/v1/sessions/" + login.sessionId, {
+    method: "DELETE",
+    headers,
+  });
+  const c = await device("mac-c");
+  await c.request("configure", { server: url });
+  await signIn(c);
+  await openAccount(c);
+  await click(c, "Continue sign-in");
+  await until(
+    () =>
+      c.ui("eval", {
+        source: "!!document.querySelector('[aria-label=\"Cloud documents\"]')",
+      }),
+    "multiple documents",
+  );
+  assert.equal(
+    await c.ui("eval", {
+      source:
+        "[...document.querySelectorAll('button,[role=menuitem]')].find(b=>b.textContent==='Continue').disabled",
+    }),
+    true,
+  );
+  const beforeCancel = await c.ui("snapshot");
+  await click(c, "Cancel");
+  assert.equal((await c.request("status")).binding, undefined);
+  assert.deepEqual((await c.ui("snapshot")).blocks, beforeCancel.blocks);
+  await openAccount(c);
+  await click(c, "Continue sign-in");
+  await until(
+    () =>
+      c.ui("eval", {
+        source: "!!document.querySelector('[aria-label=\"Cloud documents\"]')",
+      }),
+    "reopen selection",
+  );
+  await c.ui("eval", {
+    source: `(()=>{const el=document.querySelector('[aria-label="Cloud documents"]');el.value=${JSON.stringify(space)};el.dispatchEvent(new Event('change',{bubbles:true}));return true})()`,
+  });
+  await click(c, "Continue");
+  await until(
+    async () => (await c.request("status")).binding?.space === space,
+    "selected connection",
+  );
+  const deviceList = await a.request("sessions");
+  assert.equal(deviceList.filter((d) => d.current).length, 1);
+  await a.request("revoke", {
+    id: deviceList.find((d) => d.deviceName.includes("mac-c")).id,
+  });
+  await c.request("sync");
+  assert.equal((await c.request("status")).phase, "auth");
+  await openAccount(c);
+  await until(
+    () =>
+      c.ui("eval", {
+        source:
+          "document.querySelector('.workspace-menu-identity')?.textContent.includes('Sign in')",
+      }),
+    "expired session menu",
+  );
+  await click(c, "Log out");
+  await until(
+    async () => !(await c.request("status")).account,
+    "expired session sign out",
+  );
+  assert.equal((await c.request("status")).account, undefined);
+  assert.equal((await c.request("status")).server, url);
+  await c.request("configure", { server: "https://example.invalid/api" });
+  await c.stop();
+  successes.push(
+    "multiple collections require selection; cancel preserves local data; device API retains current-device/revocation support; menu logout permits URL change",
   );
   await a.ui("edit", {
     block: "text.one",
@@ -289,17 +562,17 @@ try {
     await b.request("sync");
     return (await b.request("status")).conflicts > 0;
   }, "same-block conflict");
-  await b.ui("eval", { source: "location.hash='#/settings/sync';true" });
+  await openAccount(b);
   await until(
     () =>
       b.ui("eval", {
-        source: "document.body.innerText.includes('查看双方内容')",
+        source: "document.body.innerText.includes('Review changes')",
       }),
     "conflict settings",
   );
   await b.ui("eval", {
     source:
-      "[...document.querySelectorAll('button')].find(b=>b.textContent.includes('查看双方内容')).click();true",
+      "[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent.includes('Review changes')).click();true",
   });
   await until(
     () =>
@@ -329,55 +602,18 @@ try {
   successes.push(
     "same-block conflict retains both sides and actual UI resolves reviewed versions",
   );
-  await a.ui("eval", { source: "location.hash='#/settings/sync';true" });
-  await until(
-    () =>
-      a.ui("eval", {
-        source:
-          "[...document.querySelectorAll('button')].some(b=>b.textContent==='历史版本')",
-      }),
-    "history entry",
+  const historyItems = await a.request("historyItems");
+  const history = await a.request("history", { id: "text.two" });
+  assert.equal(
+    history.find((v) => v.version === 1).data.source,
+    "另一段文字。",
   );
-  await a.ui("eval", {
-    source:
-      "[...document.querySelectorAll('button')].find(b=>b.textContent==='历史版本').click();true",
-  });
-  await until(
-    () =>
-      a.ui("eval", {
-        source:
-          "!!document.querySelector('[aria-label=选择历史内容块] option[value=\"text.two\"]')",
-      }),
-    "history entities",
-  );
-  await a.ui("eval", {
-    source:
-      "(()=>{const select=document.querySelector('[aria-label=选择历史内容块]');select.value='text.two';select.dispatchEvent(new Event('change',{bubbles:true}));return true})()",
-  });
-  await until(
-    () =>
-      a.ui("eval", {
-        source:
-          "!document.querySelector('[aria-label=选择历史内容块]').disabled && document.querySelector('[aria-label=选择历史内容块]').value==='text.two' && [...document.querySelectorAll('.cloud-history-list > button')].some(b=>!b.disabled && b.querySelector('span')?.textContent==='版本 1')",
-      }),
-    "initial historical version",
-  );
-  await a.ui("eval", {
-    source:
-      "[...document.querySelectorAll('.cloud-history-list > button')].find(b=>b.querySelector('span')?.textContent==='版本 1').click();true",
-  });
-  await until(
-    () =>
-      a.ui("eval", {
-        source:
-          "(()=>{const text=document.querySelector('[aria-label=历史内容预览]')?.textContent;if(text!=='另一段文字。')throw Error('History preview: '+text);return true})()",
-      }),
-    "history preview",
-  );
-  await a.ui("capture", { path: join(output, "sync-history.png") });
-  await a.ui("eval", {
-    source:
-      "[...document.querySelectorAll('button')].find(b=>b.textContent==='恢复为新版本').click();true",
+  await a.request("restore", {
+    id: "text.two",
+    version: 1,
+    expectedVersion: historyItems.blocks.find((b) => b.id === "text.two")
+      .version,
+    noteId: "note.sync",
   });
   await until(async () => {
     await a.request("sync");
@@ -392,7 +628,7 @@ try {
     "另一段文字。",
   );
   successes.push(
-    "actual history picker previews and restores a previous block as a new synchronized version",
+    "history API still restores a previous block as a new synchronized version without an account-panel entry",
   );
   await a.ui("loseAck");
   await a.ui("edit", { block: "text.one", text: "服务端成功但确认丢失" });
@@ -426,7 +662,7 @@ try {
   assert.equal((await b.request("status")).phase, "auth");
   await b.ui("edit", { block: "text.two", text: "登录过期仍可编辑" });
   await b.request("login", {
-    server: url,
+    server: url + "/api",
     email: "test@example.invalid",
     password,
   });
@@ -453,7 +689,30 @@ try {
   successes.push(
     "process restart retains encrypted login, remote content, and disabled local editing",
   );
-  await a.ui("eval", { source: "location.hash='#/settings/sync';true" });
+  const deviceRequests = await a.ui("deviceRequests");
+  await openAccount(a);
+  assert.equal(
+    await a.ui("eval", {
+      source:
+        "!!document.querySelector('[role=dialog]') || !!document.querySelector('.account-device-row')",
+    }),
+    false,
+  );
+  assert.equal(
+    await a.ui("eval", {
+      source:
+        "document.querySelector('.workspace-menu-identity').getAttribute('role')",
+    }),
+    null,
+  );
+  assert.equal(
+    await a.ui("deviceRequests"),
+    deviceRequests,
+    "opening menu must not fetch devices",
+  );
+  successes.push(
+    "account identity is static; menu has direct Log out with no account dialog, devices or device fetch",
+  );
   await a.ui("capture", { path: join(output, "sync-connected.png") });
   await a.ui("eval", {
     source: "document.documentElement.dataset.theme='dark';true",
@@ -468,10 +727,37 @@ try {
   );
   assert(!credentials.includes(Buffer.from(password)));
   assert(!credentials.includes(Buffer.from("token")));
+  const beforeLogout = await a.ui("snapshot");
+  await click(a, "Log out");
+  await until(
+    async () => !(await a.request("status")).account,
+    "direct menu logout",
+  );
+  assert.equal((await a.request("status")).enabled, false);
+  assert.deepEqual((await a.ui("snapshot")).blocks, beforeLogout.blocks);
+  await openAccount(a);
+  await until(
+    () =>
+      a.ui("eval", {
+        source:
+          "document.querySelector('.workspace-menu-identity')?.textContent.includes('Sign in to Nomi')",
+      }),
+    "signed out menu",
+  );
+  assert.equal(
+    await a.ui("eval", {
+      source:
+        "[...document.querySelectorAll('[role=menuitem]')].some(el=>el.textContent==='Log out')",
+    }),
+    false,
+  );
+  successes.push(
+    "direct menu logout clears identity and disables sync while preserving local documents",
+  );
   await writeFile(
     join(output, "desktop-report.json"),
     JSON.stringify(
-      { passed: successes, physicalMacs: false, processes: 2, profiles: 2 },
+      { passed: successes, physicalMacs: false, processes: 3, profiles: 3 },
       null,
       2,
     ),

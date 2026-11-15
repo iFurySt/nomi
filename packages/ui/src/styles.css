@@ -3347,19 +3347,22 @@ kbd {
 }
 
 /* Compact settings categories and grouped controls. */
+.settings-shell {
+  --sidebar-width: 240px;
+}
 .settings-main {
   padding: 0;
 }
 .settings-sidebar {
-  padding: 18px 12px;
+  padding: 16px 8px;
 }
 .settings-sidebar h2 {
   font-size: 17px;
   padding: 0 8px;
 }
 .settings-search {
-  padding: 8px 10px;
-  margin: 14px 0 8px;
+  padding: 7px 12px;
+  margin: 12px 0 4px;
   border: 0;
   border-radius: 999px;
   background: var(--surface-muted);
@@ -3376,8 +3379,10 @@ kbd {
 .settings-nav-link {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
+  gap: 8px;
+  padding: 5px 10px;
+  min-height: 30px;
+  line-height: 20px;
   border-radius: 8px;
   font-size: 13px;
 }
@@ -3390,13 +3395,14 @@ kbd {
   background: var(--interaction-hover);
 }
 .settings-content {
-  max-width: 920px;
+  max-width: 800px;
   margin: 0 auto;
   padding: 40px 40px 56px;
 }
 .settings-content > h1 {
-  font-size: 25px;
-  font-weight: 550;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
   margin-bottom: 28px;
 }
 .setting-group {
@@ -3404,7 +3410,7 @@ kbd {
 }
 .setting-group > h2 {
   font-size: 14px;
-  font-weight: 550;
+  font-weight: 500;
   margin-bottom: 12px;
 }
 .setting-card {
@@ -3417,8 +3423,8 @@ kbd {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  min-height: 58px;
-  padding: 12px 0;
+  min-height: 52px;
+  padding: 10px 0;
 }
 .setting-row + .setting-row,
 .setting-inline-form {
@@ -3430,7 +3436,7 @@ kbd {
 .setting-row strong {
   display: block;
   line-height: 1.4;
-  font-weight: 500;
+  font-weight: 400;
   font-size: 14px;
 }
 .setting-row p {
@@ -3444,7 +3450,7 @@ kbd {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   font-size: 12px;
   color: var(--secondary);
 }
@@ -3481,8 +3487,8 @@ kbd {
   background: var(--interaction-hover);
 }
 .setting-switch {
-  width: 38px;
-  height: 23px;
+  width: 34px;
+  height: 21px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--text) 12%, var(--canvas));
   padding: 3px;
@@ -3491,8 +3497,8 @@ kbd {
 }
 .setting-switch span {
   display: block;
-  width: 17px;
-  height: 17px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: var(--canvas);
   box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
@@ -4880,6 +4886,33 @@ kbd {
   .settings-shell .window-toolbar > .window-toolbar-divider {
     display: none;
   }
+}
+
+.settings-content .button {
+  min-height: 28px;
+  padding: 3px 10px;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+}
+.settings-content .button-secondary {
+  background: var(--surface-muted);
+  border-color: transparent;
+}
+.settings-content .button-secondary:hover,
+.settings-content .button-secondary:focus-visible {
+  background: var(--interaction-hover);
+}
+.settings-content .setting-control .button {
+  padding: 3px 10px;
+}
+.settings-content .setting-row p {
+  font-weight: 400;
+}
+.settings-sidebar .settings-nav-link svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* Accessible labels also remain hidden in isolated renderers without Tailwind. */

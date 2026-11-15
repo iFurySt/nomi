@@ -4,7 +4,7 @@
 .cloud-sync-form {
   display: grid;
   gap: 16px;
-  padding: 20px;
+  padding: 8px 0 20px;
   max-width: 460px;
 }
 .cloud-sync-form label {
@@ -31,17 +31,6 @@
 }
 .cloud-sync-form > button {
   justify-self: start;
-}
-.cloud-sync-binding {
-  padding: 0 20px 20px;
-  display: grid;
-  justify-items: start;
-  gap: 14px;
-}
-.cloud-sync-binding p,
-.cloud-sync-binding small {
-  color: var(--secondary);
-  margin: 0;
 }
 .cloud-sync-download {
   display: flex;
@@ -97,44 +86,116 @@
   }
 }
 
-.cloud-sync-history > p {
+.cloud-sync-overview {
+  padding: 14px 0 10px;
+}
+.cloud-sync-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cloud-sync-summary > svg {
+  flex-shrink: 0;
   color: var(--secondary);
-  font-size: 13px;
 }
-.cloud-history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 260px;
-  overflow: auto;
+.cloud-sync-overview > button {
+  flex-shrink: 0;
 }
-.cloud-history-list > button {
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  border: 0;
-  border-radius: 8px;
-  padding: 10px;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
+.cloud-sync-details {
+  color: var(--secondary);
+  font-size: 12px;
+}
+.cloud-sync-details > summary {
   cursor: pointer;
+  width: fit-content;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-left: -8px;
 }
-.cloud-history-list > button:hover,
-.cloud-history-list > button[aria-pressed="true"] {
+.cloud-sync-details > summary:hover {
   background: var(--interaction-hover);
+  color: var(--text);
 }
-.cloud-history-list small {
-  color: var(--secondary);
+.cloud-sync-details > summary:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 2px;
 }
-.cloud-sync-history .cloud-sync-compare > pre {
-  margin: 0;
-  height: 260px;
-}
-.cloud-history-entry {
+.cloud-sync-details > label {
   margin-top: 12px;
 }
-.cloud-sync-history > .cloud-sync-download {
-  margin: 14px 0;
+.cloud-sync-manage {
+  padding-bottom: 8px;
+}
+.cloud-sync-management-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px -8px;
+}
+.cloud-sync-management-actions .button {
+  font-size: 12px;
+  padding: 3px 8px;
+}
+.cloud-sync-server {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+.cloud-sync-connect-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 20px 0 12px;
+}
+.cloud-sync-connect .cloud-sync-download {
+  display: grid;
+  font-size: 13px;
+  color: var(--secondary);
+}
+.cloud-sync-loading {
+  height: 110px;
+  border-radius: 14px;
+  background: var(--surface-muted);
+}
+@media (max-width: 680px) {
+  .cloud-sync-overview {
+    align-items: flex-start;
+  }
+  .cloud-sync-form {
+    max-width: none;
+  }
+}
+
+.cloud-sync-manage > p {
+  margin: 6px 0 0;
+  line-height: 1.45;
+}
+.cloud-sync-settings .cloud-sync-management-actions .button {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+.cloud-sync-form {
+  gap: 12px;
+}
+.cloud-sync-form input {
+  padding: 7px 10px;
+}
+
+.cloud-server-row > label {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.cloud-server-row .setting-control {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.cloud-server-row input {
+  width: min(100%, 370px);
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  border-radius: 7px;
+  color: var(--text);
+  font: inherit;
+  padding: 6px 9px;
 }

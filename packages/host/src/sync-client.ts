@@ -141,6 +141,25 @@ export class SyncClient {
       deviceName,
     });
   }
+  browserStart(
+    challenge: string,
+    deviceId: string,
+    deviceName: string,
+    scheme: "nomi" | "nomi-dev",
+  ) {
+    return this.json<{ id: string; expiresAt: string }>(
+      "/auth/desktop/start",
+      "POST",
+      { challenge, deviceId, deviceName, scheme },
+    );
+  }
+  browserExchange(id: string, verifier: string) {
+    return this.json<SyncLogin | { pending: true }>(
+      "/auth/desktop/exchange",
+      "POST",
+      { id, verifier },
+    );
+  }
   me() {
     return this.json<{
       user: { id: string; email: string };
@@ -313,4 +332,15 @@ export function validateSyncRecord(r: SyncRecord) {
     (!r.deleted && (!r.data || r.data.id !== r.id))
   )
     throw Error("云端实体记录无效。");
+}
+
+/** Public site address; tolerate the previous API-suffixed preference. */
+export function syncWebsiteURL(input: string): string {
+  return syncServerURL(input || "https://nomi.ifuryst.com").replace(
+    /\/api$/,
+    "",
+  );
+}
+export function syncAPIURL(input: string): string {
+  return syncWebsiteURL(input) + "/api";
 }

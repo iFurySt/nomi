@@ -67,15 +67,9 @@ func (s *Store) Login(ctx context.Context, in Login) (LoginResult, error) {
 	if !safeID(in.DeviceID) || len(in.DeviceName) > 100 || len(in.Email) > 254 || len(in.Password) > 72 {
 		return LoginResult{}, problem(400, "invalid_login", "Invalid login fields")
 	}
-	var u User
-	hash := string(dummyHash)
-	err := s.DB.QueryRow(ctx, `SELECT id,email,password_hash FROM sync_users WHERE email=$1`, strings.ToLower(strings.TrimSpace(in.Email))).Scan(&u.ID, &u.Email, &hash)
-	compareErr := bcrypt.CompareHashAndPassword([]byte(hash), []byte(in.Password))
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	u, err := s.passwordUser(ctx, in.Email, in.Password)
+	if err != nil {
 		return LoginResult{}, err
-	}
-	if err != nil || compareErr != nil {
-		return LoginResult{}, problem(401, "invalid_credentials", "Email or password is incorrect")
 	}
 	token := randomID("token")
 	out := LoginResult{Identity: Identity{User: u, SessionID: randomID("session"), DeviceID: in.DeviceID}, Token: token, ExpiresAt: time.Now().UTC().Add(30 * 24 * time.Hour)}
@@ -112,4 +106,21 @@ func (s *Store) Sessions(ctx context.Context, user string) ([]Session, error) {
 func (s *Store) Revoke(ctx context.Context, user, id string) error {
 	_, err := s.DB.Exec(ctx, `DELETE FROM sync_sessions WHERE user_id=$1 AND id=$2`, user, id)
 	return err
+}
+
+func (s *Store) passwordUser(ctx context.Context, email, password string) (User, error) {
+	if len(email) > 254 || len(password) > 72 {
+		return User{}, problem(400, "invalid_login", "Invalid login fields")
+	}
+	var u User
+	hash := string(dummyHash)
+	err := s.DB.QueryRow(ctx, `SELECT id,email,password_hash FROM sync_users WHERE email=$1`, strings.ToLower(strings.TrimSpace(email))).Scan(&u.ID, &u.Email, &hash)
+	compareErr := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return User{}, err
+	}
+	if err != nil || compareErr != nil {
+		return User{}, problem(401, "invalid_credentials", "Email or password is incorrect")
+	}
+	return u, nil
 }

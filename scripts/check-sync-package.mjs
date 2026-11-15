@@ -160,6 +160,7 @@ try {
     for (const table of [
       "sync_users",
       "sync_sessions",
+      "sync_browser_logins",
       "sync_spaces",
       "sync_entities",
       "sync_history",

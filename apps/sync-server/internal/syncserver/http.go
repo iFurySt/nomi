@@ -27,7 +27,8 @@ type loginLimiter struct {
 	windows map[string]loginWindow
 }
 
-func (l *loginLimiter) allow(key string) bool {
+func (l *loginLimiter) allow(key string) bool { return l.allowLimit(key, 10) }
+func (l *loginLimiter) allowLimit(key string, limit int) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now()
@@ -45,10 +46,11 @@ func (l *loginLimiter) allow(key string) bool {
 	}
 	w.count++
 	l.windows[key] = w
-	return w.count <= 10
+	return w.count <= limit
 }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	s.browserRoutes(mux)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.Store.DB.Ping(r.Context()); err != nil {
 			writeError(w, err)
@@ -76,6 +78,13 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		start := time.Now()
 		response := &observedResponse{ResponseWriter: w, status: http.StatusOK}
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			cloned := r.Clone(r.Context())
+			url := *r.URL
+			url.Path = strings.TrimPrefix(url.Path, "/api")
+			cloned.URL = &url
+			r = cloned
+		}
 		mux.ServeHTTP(response, r)
 		if r.URL.Path != "/health" {
 			// No path IDs, bodies, emails, tokens or original names in operational logs.

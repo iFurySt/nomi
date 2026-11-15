@@ -94,8 +94,9 @@ function focusNomi() {
 app.on("open-url", (event, url) => {
   event.preventDefault();
   if (
-    isAuthReturnURL(url) &&
-    url === `${developmentApp ? "nomi-dev" : "nomi"}://auth/complete`
+    (isAuthReturnURL(url) &&
+      url === `${developmentApp ? "nomi-dev" : "nomi"}://auth/complete`) ||
+    url === `${developmentApp ? "nomi-dev" : "nomi"}://account/complete`
   ) {
     if (app.isReady()) focusNomi();
     else void app.whenReady().then(focusNomi);
@@ -543,9 +544,16 @@ if (primaryInstance)
       );
       await createWindow();
       await drainPackages();
-      const expectedURL = devUrl || pathToFileURL(join(__dirname, "../../web/dist/index.html")).href;
+      const expectedURL =
+        devUrl ||
+        pathToFileURL(join(__dirname, "../../web/dist/index.html")).href;
       const automation = await registerAutomation(documents, expectedURL);
-      cloudSync = await registerCloudSync(documents, expectedURL, automation.invoke, flushWindowDocuments);
+      cloudSync = await registerCloudSync(
+        documents,
+        expectedURL,
+        automation.invoke,
+        flushWindowDocuments,
+      );
       if (smokeTimeout) clearTimeout(smokeTimeout);
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0)

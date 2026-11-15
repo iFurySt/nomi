@@ -4,6 +4,7 @@ import {
   ipcMain,
   powerMonitor,
   safeStorage,
+  shell,
 } from "electron";
 import { hostname } from "node:os";
 import { join } from "node:path";
@@ -96,6 +97,24 @@ export async function registerCloudSync(
         if (!window || !(await flush(window)))
           throw Error("请先保存当前文稿。");
       }
+      if (method === "cancelSignIn") return host.cancelSignIn();
+      if (method === "signIn") {
+        await host.signIn(
+          (url) => shell.openExternal(url),
+          app.getName() === "Nomi(Dev)" ||
+            app.getName().startsWith("Nomi(Dev) "),
+        );
+        const window = BrowserWindow.fromWebContents(event.sender);
+        if (!window || !(await flush(window)))
+          throw Error("请先保存当前文稿，再继续同步。");
+        if (host.status.binding) return host.enabled(true);
+        const spaces = await host.spaces();
+        if (spaces.length > 1) return host.status;
+        return spaces.length
+          ? host.bind("download", spaces[0].id)
+          : host.bind("upload");
+      }
+      if (method === "configure") return host.configure(p?.server);
       if (method === "login")
         return host.login(p?.server, p?.email, p?.password);
       if (method === "logout") return host.logout();

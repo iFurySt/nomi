@@ -76,3 +76,7 @@ Nomi 处理个人学习、笔记、信息、知识、健康和财富等资料，
 - 还没有登录速率限制、密码重置、邮箱验证、会话设备管理和安全事件审计表。
 - 还没有完整的家庭资料导出/彻底删除工作流。
 - 还没有 KMS/对象存储加密与备份恢复演练。
+
+## Nomi 网站登录交接（2026-11-15）
+
+桌面密码表单已移除，登录通过系统默认浏览器。网站短期请求采用 S256 proof，主进程保存内存 verifier，App Link 只有固定唤醒路径、无 token。服务端批准和领取分别原子化，5 分钟有效、领取一次后删除；会话仍使用既有 token 哈希和设备撤销机制。网页使用 no-store / no-referrer、CSRF、HTTPS Host-only Secure HttpOnly SameSite cookie 和 nonce CSP，不允许任意 redirect URI。原生应用外部浏览器与 proof 的设计参考 [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) / [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636)；当前自有轮询交接不是完整 OAuth2 实现。限流仍按直连 peer，代理后的共享配额仅适合当前私有试用。

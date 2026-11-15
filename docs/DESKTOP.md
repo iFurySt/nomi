@@ -73,9 +73,13 @@ Settings → General 位于 Appearance 上方，也是设置默认页。文稿�
 
 目录格式与限制见 [.nomi 文件包契约](design-docs/nomi-package-format.md)。目录偏好位于 Electron userData 的 `document-directory.json`；视口、学习参数和界面偏好仍是设备状态。默认工作区的 `文稿/` 下由 `.nomi/children/` 嵌套表达文稿树；Finder 改名、移动和合法文件包的新增会读回，空普通目录不自动成为文稿。外部变化刷新与冲突草稿备份见格式契约。
 
+## Nomi 账号与同步
+
+左下角头像打开 Nomi 账号菜单；未登录点击 Sign in 后用默认浏览器打开网站登录页，通过 App Link 返回，与 ChatGPT 身份独立。设置中不设 Account 分类。Cloud Sync 只配置 Base URL（留空使用 `https://nomi.ifuryst.com`）；账号由服务运维分配，登录自动同步，退出保留本地文稿。账号信息只在菜单顶部展示，Log out 位于底部；账户弹窗和设备管理 UI 已移除，底层设备协议保留。服务 URL、自动连接、备份及历史账号迁移边界见 [同步运行说明](design-docs/cloud-sync-runtime.md)。
+
 ## ChatGPT 与 AI 路径
 
-桌面账号菜单 → **Sign in with ChatGPT** 或 Settings → ChatGPT，在系统浏览器中完成 Nomi 自己的授权后返回。回调页只保留 Continue in Nomi 标题与 Open Nomi 按钮，并自动尝试唤回桌面；实际账号状态以交换凭据和身份验证完成后的 App 为准。等待状态与 Cancel 同行；首次启用订阅显示一次紧凑确认框及 Manage usage 入口，按 [官方 UI/UX 指南](https://developers.openai.com/siwc/ui-ux-guidelines) 保留说明。失败可就地重试或关闭提示，主动取消不显示连接错误；未验证的注册记录保留重试所需 client ID，但不冒充已连接账号。
+Settings → ChatGPT → **Sign in with ChatGPT**，在系统浏览器中完成 Nomi 自己的授权后返回。回调页只保留 Continue in Nomi 标题与 Open Nomi 按钮，并自动尝试唤回桌面；实际账号状态以交换凭据和身份验证完成后的 App 为准。等待状态与 Cancel 同行；首次启用订阅显示一次紧凑确认框及 Manage usage 入口，按 [官方 UI/UX 指南](https://developers.openai.com/siwc/ui-ux-guidelines) 保留说明。失败可就地重试或关闭提示，主动取消不显示连接错误；未验证的注册记录保留重试所需 client ID，但不冒充已连接账号。
 
 正式 macOS 包声明 `nomi://auth/complete`，本地开发包声明 `nomi-dev://auth/complete`，两者仅用于唤醒窗口，不接受查询参数、不携带凭据、不导航文稿。OAuth 继续使用 `127.0.0.1` 的 HTTP callback；回调页设置 no-store / no-referrer 与 nonce CSP，并移除地址栏授权参数。参考 [Electron Deep Links](https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app) 与 [OpenAI OSS 登录协议](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)。可管理多个账号、选择账号提供的模型与 reasoning effort；可用性取决于实际账号权限和服务响应，不保证所有账号都可用。
 

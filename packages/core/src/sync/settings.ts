@@ -2,7 +2,10 @@ import type { SyncRecord, SyncSpace } from "./protocol";
 import type { SyncConflict } from "./reconcile";
 export type SyncAction =
   | "status"
+  | "configure"
   | "login"
+  | "signIn"
+  | "cancelSignIn"
   | "logout"
   | "spaces"
   | "bind"
@@ -17,6 +20,9 @@ export type SyncAction =
   | "restore";
 export interface CloudSyncStatus {
   enabled: boolean;
+  signingIn?: boolean;
+  devices?: CloudSyncSession[];
+  server?: string;
   account?: { email: string; server: string };
   binding?: { space: string; library: string };
   phase:
@@ -36,6 +42,7 @@ export interface CloudSyncSession {
   id: string;
   deviceId: string;
   deviceName: string;
+  current?: boolean;
   createdAt: string;
   expiresAt: string;
 }

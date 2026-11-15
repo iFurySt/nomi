@@ -209,10 +209,10 @@ Chat. Center 64px icon+text buttons in the 76px rail with equal 6px side margins
 keep no extra gutter before the inset panel. The bottom account control uses a
 44px trigger and 36px avatar: a person icon before sign-in, verified name initial
 after connection. Its 228px popup uses 6px padding, a 14px radius and 34px desktop
-rows. Before sign-in use the identity area itself as Sign in with ChatGPT;
-after connection show name/email, with identity opening account settings and
-Usage/Settings as separate actions. Usage opens the official management page; show
-no unverified remaining percentage. Theme lives in the toolbar/Appearance.
+rows. Before sign-in use the identity area itself as Sign in to Nomi;
+after connection show the Nomi email, with a static identity header and a direct Log out menu item. No account dialog or device UI is shown. Signed-out identity opens website sign-in in the default browser, returning via App Link; there is no Account settings category.
+ChatGPT connection and official usage are separate, inside Settings → ChatGPT;
+show no unverified remaining percentage. Theme lives in the toolbar/Appearance.
 Command/Ctrl+, opens Settings and dismisses an open account menu. At mobile widths move the same avatar menu into the page toolbar;
 avoid duplicating sidebar footers. Menus support keyboard navigation, Escape,
 outside dismissal, and focus return. All controls suppress browser/default focus

@@ -11,7 +11,7 @@ export const settingItems: {
   { id: "general", label: "General", group: "Personal", icon: Settings2 },
   { id: "appearance", label: "Appearance", group: "Personal", icon: Sun },
   { id: "chatgpt", label: "ChatGPT", group: "Personal", icon: Sparkles },
-  { id: "sync", label: "云同步", group: "Personal", icon: Cloud },
+  { id: "sync", label: "Cloud Sync", group: "Personal", icon: Cloud },
   { id: "mcp", label: "MCP", group: "Personal", icon: Plug },
 ];
 export function SettingsSidebar({ onSelect }: { onSelect?: () => void }) {

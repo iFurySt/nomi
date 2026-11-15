@@ -16,4 +16,4 @@ Nomi 当前维护 Electron 文稿 / 画布工作台；旧 SwiftUI 家庭客户�
 
 ## 云同步入口
 
-云同步为默认关闭的可选能力；未登录仍可本地编辑。新界面与 host 边界按 [云同步设计](design-docs/cloud-sync.md) 开发。未来手机客户端围绕同一文稿协议重建，不继承旧家庭 UI。
+Nomi 登录为可选能力，登录后自动同步；未登录仍可本地编辑。左下角入口通过默认浏览器登录网站并用 App Link 返回，已登录显示静态账号信息，菜单底部直接 Log out，无账户弹窗或设备界面；设置中没有 Account，Cloud Sync 只配置 Base URL，ChatGPT 连接留在其独立设置。新界面与 host 边界按 [云同步设计](design-docs/cloud-sync.md) 开发。未来手机客户端围绕同一文稿协议重建，不继承旧家庭 UI。

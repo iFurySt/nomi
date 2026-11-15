@@ -52,7 +52,7 @@ export function GeneralSettings() {
             <strong>文稿保存目录</strong>
             <p>
               {available
-                ? "每篇文稿保存为 .nomi 文件包，包含正文、附件和子文稿。更换目录时保留原副本。"
+                ? "更换目录时保留原副本。"
                 : "浏览器中的内容保存在本机浏览器内。请在桌面 App 中设置文稿目录。"}
             </p>
           </div>
