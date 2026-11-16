@@ -1,6 +1,6 @@
 # 个人云同步运行说明
 
-2026-11-15：个人文稿同步 v1 已实现并完成本机隔离验证；后端已部署 amoylab，桌面同步尚未随新 DMG 发布。设计与默认调度见 [cloud-sync.md](cloud-sync.md)，验收进度见 [执行计划](../exec-plans/completed/20261115-personal-cloud-sync.md)。
+2026-11-15：个人文稿同步 v1 已实现并完成本机隔离验证；后端已部署 amoylab，桌面同步已随 0.4.0 于 2026-11-16 发布。设计与默认调度见 [cloud-sync.md](cloud-sync.md)，验收进度见 [执行计划](../exec-plans/completed/20261115-personal-cloud-sync.md)。
 
 ## 当前入口与边界
 

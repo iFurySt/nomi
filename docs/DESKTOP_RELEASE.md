@@ -167,8 +167,12 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、点击下载后自
 
 本版本包含紧凑交互学习与标准创作 Skill、交互块复制和 DSL 编辑、正文留白框选与批量操作，以及默认关闭的本机 MCP。开发版已保存后重启并确认文稿恢复；未启动、替换正式版或操作用户文稿，公开制品验证不等同用户机器上的跨版本安装完成。
 
-## 0.4.0 发布进度
+## 0.4.0 发布验收
 
-`desktop-v0.4.0` 固定于 `cd14d2f`。[首次双架构运行](https://github.com/iFurySt/nomi/actions/runs/43726490638) 的应用回归、452 项单测及代码签名通过，Apple 公证提交失败，尚未公开 Release 或更新 Sparkle feed。
+[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.4.0) 已于 2026-11-16 由 [双架构流水线](https://github.com/iFurySt/nomi/actions/runs/43726490638) 发布，tag 固定于 `cd14d2f`。Apple Silicon / Intel 均通过类型、452 项单测、应用回归、签名、公证、stapling、原生更新 driver 和独立 App 更新初始化验证。
 
-[只读诊断](https://github.com/iFurySt/nomi/actions/runs/43728000212) 返回 HTTP 403，明确提示开发者协议缺失或过期。账号持有人处理 Apple Developer 协议后，重新运行失败任务；不绕过公证、不移动已准备的 tag。开发版已重启并确认 0.4.0；公开制品验收待发布完成。
+首轮 Apple 公证因开发者协议未生效返回 HTTP 403。11 月 16 日账户页面已显示最新 Program License Agreement 当日接受，本机只读公证诊断通过后重跑失败任务成功；没有代用户签署协议，也未移动 tag 或覆盖公开版本制品。
+
+从公开地址重新下载的 arm64 / x64 DMG 均通过长度、SHA-256、Sparkle Ed25519 签名及 stapled 公证票据验证；两个 appcast 的签名、0.4.0 版本和地址通过。挂载 arm64 App 后，严格深度签名、公证票据、Gatekeeper 与内嵌版本检查通过，验证卷已卸载。证据位于 ignored `.artifacts/desktop-040-verification/`。
+
+本版本新增可选个人云同步、网页登录与 App 回跳、精简账户菜单和紧凑设置，以及 BPE 分步引导交互。未登录保持本地使用，账号暂为私有分配，手机端尚未推出。开发版此前已重启并确认 0.4.0；发布校验没有启动、替换正式版或执行用户机器上的跨版本安装。

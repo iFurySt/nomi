@@ -132,4 +132,4 @@ node scripts/check-sync-remote.mjs /private/synthetic-account.json .artifacts/sy
 node scripts/check-browser-login-remote.mjs /private/synthetic-account.json
 ```
 
-桌面新版仅构建并重启开发版，尚未发布 DMG；周期异机备份的既有限制不变。
+桌面 0.4.0 已于 2026-11-16 发布双架构签名公证 DMG，见 [发布验收](DESKTOP_RELEASE.md#040-发布验收)；周期异机备份的既有限制不变。
