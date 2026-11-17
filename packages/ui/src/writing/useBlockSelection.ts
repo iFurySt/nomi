@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useRef, type RefObject } from "react";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type { Editor } from "@tiptap/core";
@@ -29,6 +29,8 @@ type Options = {
   onError: (message: string) => void;
 };
 export function useBlockSelection(options: Options) {
+  const select = useRef<(id: string) => boolean>(() => false);
+  const selectBlock = useCallback((id: string) => select.current(id), []);
   const latest = useRef(options);
   latest.current = options;
   useEffect(() => {
@@ -156,6 +158,15 @@ export function useBlockSelection(options: Options) {
         } else add(section, { id });
       }
       return result;
+    };
+    select.current = (id) => {
+      const unit = collect().find((unit) => unit.id === id && !unit.editor);
+      if (!unit) return false;
+      clear();
+      document.getSelection()?.removeAllRanges();
+      pane.focus({ preventScroll: true });
+      paint([unit]);
+      return true;
     };
     const tick = () => {
       if (!drag?.started) return;
@@ -295,6 +306,7 @@ export function useBlockSelection(options: Options) {
       } else if (event.key === "Backspace" || event.key === "Delete") {
         event.preventDefault();
         event.stopImmediatePropagation();
+        if (event.repeat) return; // Selecting a block requires a fresh press to delete it.
         try {
           remove();
         } catch (error) {
@@ -333,6 +345,7 @@ export function useBlockSelection(options: Options) {
     document.addEventListener("cut", copy, true);
     window.addEventListener("blur", stop);
     return () => {
+      select.current = () => false;
       clear();
       for (const editor of registered)
         if (!editor.isDestroyed) editor.unregisterPlugin(selectionKey);
@@ -346,4 +359,5 @@ export function useBlockSelection(options: Options) {
       window.removeEventListener("blur", stop);
     };
   }, [options.note?.id, options.document?.revision]);
+  return { selectBlock };
 }

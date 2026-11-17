@@ -83,6 +83,10 @@ export function RichMarkdownEditor(props: WritingEditorProps) {
       onActivate: () => latest.current.onActivate(),
       onBoundary: (...args: Parameters<WritingEditorProps["onBoundary"]>) =>
         latest.current.onBoundary(...args),
+      onDeleteBoundary: (direction: "previous" | "next") =>
+        latest.current.onDeleteBoundary?.(direction),
+      onDeleteEmpty: (direction: "previous" | "next") =>
+        latest.current.onDeleteEmpty?.(direction) ?? false,
       onCanvas: () => latest.current.onCanvas(),
       onAI: (range: NoteAIRange) => latest.current.onAI?.(range),
       onEditor: (...args: Parameters<WritingEditorProps["onEditor"]>) =>
@@ -113,6 +117,8 @@ function RichMarkdownEditorContent({
   onBlur,
   onActivate,
   onBoundary,
+  onDeleteEmpty,
+  onDeleteBoundary,
   onCanvas,
   onEditor,
   onInsert,
@@ -129,6 +135,8 @@ function RichMarkdownEditorContent({
   onBlur: () => void;
   onActivate: () => void;
   onBoundary: (direction: "previous" | "next") => boolean;
+  onDeleteBoundary?: (direction: "previous" | "next") => void;
+  onDeleteEmpty?: (direction: "previous" | "next") => boolean;
   onCanvas: () => void;
   onEditor: (editor: Editor | null) => void;
   onInsert: (
@@ -147,8 +155,22 @@ function RichMarkdownEditorContent({
   placeholder?: string;
   hideBlockTools?: boolean;
 }) {
-  const callbacks = useRef({ onChange, onBlur, onActivate, onBoundary });
-  callbacks.current = { onChange, onBlur, onActivate, onBoundary };
+  const callbacks = useRef({
+    onChange,
+    onBlur,
+    onActivate,
+    onBoundary,
+    onDeleteEmpty,
+    onDeleteBoundary,
+  });
+  callbacks.current = {
+    onChange,
+    onBlur,
+    onActivate,
+    onBoundary,
+    onDeleteEmpty,
+    onDeleteBoundary,
+  };
   const emitted = useRef(source);
   // The document history is shared with attachments and Canvas. Retain the
   // local caret for each source snapshot when that history restores text.
@@ -327,7 +349,39 @@ function RichMarkdownEditorContent({
           !view.state.selection.empty
         )
           return false;
-        const { from } = view.state.selection;
+        const { from, $from } = view.state.selection;
+        const direction =
+          event.key === "Backspace"
+            ? "previous"
+            : event.key === "Delete"
+              ? "next"
+              : undefined;
+        // A separate Markdown editor cannot join across an embedded block.
+        // Remove the empty edge paragraph itself, never the embed beside it.
+        if (
+          direction &&
+          $from.depth === 1 &&
+          $from.parent.type.name === "paragraph" &&
+          $from.parent.content.size === 0 &&
+          (direction === "previous"
+            ? $from.index(0) === 0
+            : $from.index(0) === view.state.doc.childCount - 1)
+        ) {
+          if (view.state.doc.childCount === 1)
+            return callbacks.current.onDeleteEmpty?.(direction) ?? false;
+          const tr = view.state.tr.delete($from.before(), $from.after());
+          tr.setSelection(
+            TextSelection.near(
+              tr.doc.resolve(Math.min($from.before(), tr.doc.content.size)),
+              direction === "previous" ? 1 : -1,
+            ),
+          );
+          view.dispatch(
+            tr.setMeta("writingBoundaryDelete", true).scrollIntoView(),
+          );
+          callbacks.current.onDeleteBoundary?.(direction);
+          return true;
+        }
         if (event.key === "ArrowUp" && from === 1)
           return callbacks.current.onBoundary("previous");
         if (
@@ -358,7 +412,8 @@ function RichMarkdownEditorContent({
       rememberSelection(next, editor.state.selection.toJSON());
       callbacks.current.onChange(
         next,
-        !!transaction.getMeta("paste") ||
+        !!transaction.getMeta("writingBoundaryDelete") ||
+          !!transaction.getMeta("paste") ||
           ["paste", "cut", "drop"].includes(transaction.getMeta("uiEvent")),
       );
     },

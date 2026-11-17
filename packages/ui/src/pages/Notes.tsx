@@ -1,4 +1,9 @@
 import { useBlockSelection } from "../writing/useBlockSelection";
+import { useWorkspace } from "../workspace-context";
+import {
+  readInteractiveClipboard,
+  interactiveErrorMessage,
+} from "../interactive/clipboard";
 import { BLOCK_CLIPBOARD, decodeSelected } from "../writing/blockSelection";
 import { WorkspaceTitle } from "../components/WorkspaceTitle";
 import { NotesLoading } from "../writing/NotesLoading";
@@ -68,6 +73,7 @@ import { Select } from "../components/Select";
 import "../writing/writing.css";
 
 export function Notes({ profile }: { profile: string }) {
+  const { notify } = useWorkspace();
   const data = useCanvasDocument(profile),
     doc = data.document;
   const selectionKey = `nomi:notes:${profile}:selected`;
@@ -121,12 +127,18 @@ export function Notes({ profile }: { profile: string }) {
   const [dropMark, setDropMark] = useState<{ id: string; top: number }>();
   const lastTextEdit = useRef(0);
   const drafts = useRef(new Map<string, string>());
+  const [collapsedGaps, setCollapsedGaps] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [movingNote, setMovingNote] = useState<string>();
   const [deletingNote, setDeletingNote] = useState<string>();
   const scrollPane = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(""),
     [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!error) return;
+    notify(interactiveErrorMessage(new Error(error)));
+    setError("");
+  }, [error, notify]);
   const [experimentOpen, setExperimentOpen] = useState(false);
   const [canvasToOpen, setCanvasToOpen] = useState<string>();
   const [referenceOpen, setReferenceOpen] = useState(false);
@@ -351,6 +363,55 @@ export function Notes({ profile }: { profile: string }) {
     data.edit(commands, `text:${id}`, [], { debounce: true });
     if (isolated) data.endGroup();
   }
+  function deleteEmptyRow(row: WritingRow, direction: "previous" | "next") {
+    const current = data.current.current;
+    const owner = current?.notes.find((n) => n.id === note?.id);
+    const editor = editors.current.get(row.block.id);
+    if (!current || !owner || !editor?.isEmpty) return false;
+    const index = rows.findIndex((r) => r.block.id === row.block.id);
+    const adjacent =
+      rows[index + (direction === "previous" ? -1 : 1)] ??
+      rows[index + (direction === "previous" ? 1 : -1)];
+    if (!adjacent) return false; // Keep the sole input of an empty document.
+    const stored = current.blocks.find((block) => block.id === row.block.id);
+    if (
+      !row.draft &&
+      (stored?.type !== "markdown" ||
+        stored.source.trim() ||
+        !owner.blocks.includes(row.block.id))
+    )
+      return false;
+    const removed = new Set([
+      row.block.id,
+      ...(row.emptyPeers ?? []).filter((id) => {
+        const peer = current.blocks.find((block) => block.id === id);
+        return peer?.type === "markdown" && !peer.source.trim();
+      }),
+    ]);
+    const order = owner.blocks.filter((id) => !removed.has(id));
+    const position = owner.blocks.indexOf(row.block.id);
+    const after = row.draft
+      ? (row.after ?? "")
+      : (order[Math.max(0, position) - 1] ?? "");
+    const key = `${owner.id}:${after}`;
+    if (!drafts.current.has(key)) drafts.current.set(key, newCanvasId("text"));
+    setCollapsedGaps(
+      (previous) => new Set([...previous, drafts.current.get(key)!]),
+    );
+    if (!row.draft) {
+      data.endGroup();
+      data.edit([{ type: "set_note_blocks", id: owner.id, blocks: order }]);
+      data.endGroup();
+    }
+    requestAnimationFrame(() => {
+      const next = editors.current.get(adjacent.block.id);
+      if (next && !next.isDestroyed)
+        next.commands.focus(direction === "previous" ? "end" : "start");
+      else blockSelection.selectBlock(adjacent.block.id);
+    });
+    return true;
+  }
+
   function deleteNote(id: string) {
     const current = data.current.current!;
     const index = current.notes.findIndex((n) => n.id === id);
@@ -726,7 +787,7 @@ export function Notes({ profile }: { profile: string }) {
       setError((e as Error).message);
     }
   }
-  useBlockSelection({
+  const blockSelection = useBlockSelection({
     pane: scrollPane,
     editors,
     document: doc,
@@ -827,12 +888,12 @@ export function Notes({ profile }: { profile: string }) {
             </div>
           </WorkspaceTitle>
         )}
-        {(error || data.saveError || message || data.externalNotice) && (
+        {(data.saveError || message || data.externalNotice) && (
           <div
             className="notes-notice"
-            role={error || data.saveError ? "alert" : "status"}
+            role={data.saveError ? "alert" : "status"}
           >
-            {error || data.saveError || message || data.externalNotice}
+            {data.saveError || message || data.externalNotice}
             {deleted && deleted.revision === doc.revision && (
               <button
                 onClick={() => {
@@ -894,18 +955,19 @@ export function Notes({ profile }: { profile: string }) {
               return;
             }
             const text = event.clipboardData.getData("text/plain");
-            if (
-              text.length > 2_000_000 ||
-              !text.trimStart().startsWith("{") ||
-              !text.includes('"nomi-interactive-ir/')
-            )
-              return;
             let program;
             try {
-              program = parseInteractiveProgram(JSON.parse(text));
-            } catch {
+              program = readInteractiveClipboard(
+                text,
+                event.clipboardData.getData("text/html"),
+              );
+            } catch (error) {
+              event.preventDefault();
+              event.stopPropagation();
+              notify(interactiveErrorMessage(error));
               return;
             }
+            if (!program) return;
             const id = target.closest<HTMLElement>("[data-writing-block]")
               ?.dataset.writingBlock;
             const row = rows.find((r) => r.block.id === id);
@@ -1061,6 +1123,10 @@ export function Notes({ profile }: { profile: string }) {
                     <section
                       className={`writing-block writing-block-${block.type}`}
                       data-writing-block={id}
+                      data-collapsed-gap={
+                        (row.draft && collapsedGaps.has(id)) || undefined
+                      }
+                      tabIndex={-1}
                       key={id}
                     >
                       {dropMark?.id === id && (
@@ -1147,6 +1213,25 @@ export function Notes({ profile }: { profile: string }) {
                             }
                             onBlur={endEditing}
                             onActivate={() => setActiveText(id)}
+                            onDeleteBoundary={(direction) => {
+                              const index = rows.findIndex(
+                                (r) => r.block.id === id,
+                              );
+                              const adjacent =
+                                rows[
+                                  index + (direction === "previous" ? -1 : 1)
+                                ];
+                              if (
+                                adjacent &&
+                                adjacent.block.type !== "markdown"
+                              )
+                                requestAnimationFrame(() =>
+                                  blockSelection.selectBlock(adjacent.block.id),
+                                );
+                            }}
+                            onDeleteEmpty={(direction) =>
+                              deleteEmptyRow(row, direction)
+                            }
                             onBoundary={(direction) => {
                               const textRows = rows.filter(
                                 (r) => r.block.type === "markdown",
@@ -1665,7 +1750,6 @@ export function Notes({ profile }: { profile: string }) {
               </button>
             </>
           )}
-          {error && <p role="alert">{error}</p>}
         </div>
       </Modal>
     </ResizableNotesLayout>

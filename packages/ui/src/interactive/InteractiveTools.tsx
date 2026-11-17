@@ -3,6 +3,7 @@ import { Check, Code2, Copy } from "lucide-react";
 import { parseInteractiveProgram, type InteractiveProgram } from "@nomi/core";
 import { Tooltip } from "../components/Tooltip";
 import { Modal } from "../components/primitives";
+import { interactiveClipboard } from "./clipboard";
 
 /** Authoring edits are separate from the learner's temporary input/progress. */
 export function InteractiveTools({
@@ -36,7 +37,20 @@ export function InteractiveTools({
             onMouseLeave={() => setCopied(false)}
             onClick={async () => {
               try {
-                await navigator.clipboard.writeText(serialized);
+                const { text, html } = interactiveClipboard(program);
+                if (
+                  navigator.clipboard.write &&
+                  typeof ClipboardItem !== "undefined"
+                ) {
+                  await navigator.clipboard.write([
+                    new ClipboardItem({
+                      "text/plain": new Blob([text], { type: "text/plain" }),
+                      "text/html": new Blob([html], { type: "text/html" }),
+                    }),
+                  ]);
+                } else {
+                  await navigator.clipboard.writeText(text);
+                }
                 setCopied(true);
                 setCopyError(false);
               } catch {

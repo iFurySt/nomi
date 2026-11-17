@@ -44,7 +44,7 @@ async function check({ output, program }) {
   const js = (fn, arg) =>
     win.webContents.executeJavaScript(`(${fn})(${JSON.stringify(arg)})`);
   const until = async (fn) => {
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 260; i++) {
       if (await js(fn)) return;
       await new Promise((r) => setTimeout(r, 30));
     }
@@ -55,26 +55,30 @@ async function check({ output, program }) {
     await until(() => !!document.querySelector('[aria-label="新建文稿"]'));
     await js(() => document.querySelector('[aria-label="新建文稿"]').click());
     await until(() => !!document.querySelector(".tiptap"));
-    const paste = async (text) =>
-      js((text) => {
-        const editor = document.querySelector(".tiptap");
-        editor.focus();
-        const selection = getSelection(),
-          range = document.createRange();
-        range.selectNodeContents(editor);
-        range.collapse(false);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        const data = new DataTransfer();
-        data.setData("text/plain", text);
-        editor.dispatchEvent(
-          new ClipboardEvent("paste", {
-            bubbles: true,
-            cancelable: true,
-            clipboardData: data,
-          }),
-        );
-      }, text);
+    const paste = async (text, html = "") =>
+      js(
+        ({ text, html }) => {
+          const editor = document.querySelector(".tiptap");
+          editor.focus();
+          const selection = getSelection(),
+            range = document.createRange();
+          range.selectNodeContents(editor);
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          const data = new DataTransfer();
+          data.setData("text/plain", text);
+          if (html) data.setData("text/html", html);
+          editor.dispatchEvent(
+            new ClipboardEvent("paste", {
+              bubbles: true,
+              cancelable: true,
+              clipboardData: data,
+            }),
+          );
+        },
+        { text, html },
+      );
     await paste(JSON.stringify(program));
     await until(
       () => document.querySelectorAll(".canvas-interactive").length === 1,
@@ -84,6 +88,12 @@ async function check({ output, program }) {
       Object.defineProperty(navigator, "clipboard", {
         configurable: true,
         value: {
+          write: async ([item]) => {
+            window.copiedProgram = await (
+              await item.getType("text/plain")
+            ).text();
+            window.copiedHTML = await (await item.getType("text/html")).text();
+          },
           writeText: async (text) => {
             window.copiedProgram = text;
           },
@@ -96,6 +106,18 @@ async function check({ output, program }) {
         !!document.querySelector('[aria-label="复制交互块"] svg.lucide-check'),
     );
     assert.deepEqual(JSON.parse(await js(() => window.copiedProgram)), program);
+    assert.match(await js(() => window.copiedHTML), /data-nomi-interactive/);
+    // Copy into a different note, using HTML even when another clipboard consumer changed plain text.
+    await js(() => document.querySelector('[aria-label="新建文稿"]').click());
+    await until(
+      () =>
+        !!document.querySelector(".tiptap") &&
+        !document.querySelector(".canvas-interactive"),
+    );
+    await paste("clipboard fallback", await js(() => window.copiedHTML));
+    await until(
+      () => document.querySelectorAll(".canvas-interactive").length === 1,
+    );
     await paste(await js(() => window.copiedProgram));
     await until(
       () => document.querySelectorAll(".canvas-interactive").length === 2,
@@ -148,8 +170,52 @@ async function check({ output, program }) {
       path.join(output, "copied-blocks.png"),
       (await win.webContents.capturePage()).toPNG(),
     );
+    const before = await js(
+      () => document.querySelector(".writing-article").innerHTML,
+    );
+    const unsupported = structuredClone(program);
+    unsupported.requires.components.FutureWidget = 1;
+    await paste(JSON.stringify(unsupported));
+    await until(() =>
+      document
+        .querySelector(".toast.visible")
+        ?.textContent.includes("请更新 Nomi"),
+    );
+    assert.equal(
+      await js(() => !!document.querySelector(".notes-notice")),
+      false,
+    );
+    assert.equal(
+      await js(() => document.querySelector(".writing-article").innerHTML),
+      before,
+    );
+    assert.equal(
+      await js(() => document.activeElement.classList.contains("tiptap")),
+      true,
+    );
+    await new Promise((r) => setTimeout(r, 220));
+    const box = await js(() => {
+      const b = document.querySelector(".toast").getBoundingClientRect();
+      return { top: b.top, center: b.left + b.width / 2, viewport: innerWidth };
+    });
+    assert(box.top >= 48 && box.top < 100);
+    assert(Math.abs(box.center - box.viewport / 2) < 2);
+    require("node:fs").writeFileSync(
+      path.join(output, "paste-toast.png"),
+      (await win.webContents.capturePage()).toPNG(),
+    );
+    win.setSize(420, 800);
+    await js(() => document.documentElement.dataset.theme = "dark");
+    await until(() => innerWidth === 420);
+    await js(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    assert.equal(await js(() => {
+      const b = document.querySelector(".toast").getBoundingClientRect();
+      return b.left >= 10 && b.right <= innerWidth - 10;
+    }), true);
+    require("node:fs").writeFileSync(path.join(output, "paste-toast-dark-narrow.png"), (await win.webContents.capturePage()).toPNG());
+    await until(() => !document.querySelector(".toast.visible"));
     console.log(
-      "Interactive authoring PASS: paste at cursor, clipboard roundtrip, independent copy, DSL apply/undo",
+      "Interactive authoring PASS: cross-note HTML and plain DSL clipboard, unsupported paste toast with unchanged document/focus, auto-dismiss; paste at cursor, clipboard roundtrip, independent copy, DSL apply/undo",
     );
     app.exit(0);
   } catch (e) {
@@ -166,7 +232,7 @@ const program = JSON.parse(
 );
 await writeFile(
   join(output, "main.cjs"),
-  `(${check})(${JSON.stringify({ output, program })});setTimeout(()=>require('electron').app.exit(1),30000)`,
+  `(${check})(${JSON.stringify({ output, program })});setTimeout(()=>require('electron').app.exit(1),45000)`,
 );
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
