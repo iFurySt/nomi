@@ -176,3 +176,9 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、点击下载后自
 从公开地址重新下载的 arm64 / x64 DMG 均通过长度、SHA-256、Sparkle Ed25519 签名及 stapled 公证票据验证；两个 appcast 的签名、0.4.0 版本和地址通过。挂载 arm64 App 后，严格深度签名、公证票据、Gatekeeper 与内嵌版本检查通过，验证卷已卸载。证据位于 ignored `.artifacts/desktop-040-verification/`。
 
 本版本新增可选个人云同步、网页登录与 App 回跳、精简账户菜单和紧凑设置，以及 BPE 分步引导交互。未登录保持本地使用，账号暂为私有分配，手机端尚未推出。开发版此前已重启并确认 0.4.0；发布校验没有启动、替换正式版或执行用户机器上的跨版本安装。
+
+## 0.4.1 发布验收
+
+桌面 0.4.1 于 2026-11-19（台北时间）发布，标签对应 `330c176`。Apple Silicon 和 Intel 均通过 467 项单测、桌面回归、Developer ID 签名、Apple 公证及独立 App 更新初始化检查。[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.4.1) · [发布流水线](https://github.com/iFurySt/nomi/actions/runs/44339613587)
+
+从公开地址下载两个 DMG 和对应的 Sparkle 清单，核验了 SHA-256、文件长度、Ed25519 签名、公证票据、版本和下载地址。本机只读挂载 arm64 安装包，App 通过严格签名、Gatekeeper 和内嵌版本检查后卸载验证卷。记录保存在 ignored `.artifacts/desktop-041-verification/`。
