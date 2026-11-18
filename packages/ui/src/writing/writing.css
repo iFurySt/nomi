@@ -1739,21 +1739,6 @@ body.notes-tree-dragging * {
   margin-bottom: 0;
 }
 
-/* The shared composer floats above the note without moving its text. */
-.note-ai-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.note-ai-layer .canvas-ai-composer {
-  position: fixed;
-  z-index: 80;
-  pointer-events: auto;
-}
-.note-ai-layer .canvas-ai-composer.is-docked {
-  top: 100px;
-  left: calc(100% - 324px);
-}
 .note-ai-preview {
   margin: 20px 0;
   border-left: 2px solid var(--border);
@@ -1763,15 +1748,6 @@ body.notes-tree-dragging * {
 .note-ai-preview-block {
   animation: canvas-ai-appear 0.25s ease-out;
   margin-bottom: 16px;
-}
-@media (max-width: 700px) {
-  .note-ai-layer .canvas-ai-composer.is-docked {
-    left: 16px;
-    top: 76px;
-    bottom: auto;
-    width: calc(100% - 32px);
-    transform: none;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .note-ai-preview-block {

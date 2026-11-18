@@ -129,30 +129,37 @@ async function checkAI({ output, width }) {
     });
     await aiEnter();
     await wait(400);
+    assert.equal(
+      await js(() => document.activeElement?.getAttribute("aria-label")),
+      "批注 1",
+      "Opening the sidebar must keep focus at the inline comment",
+    );
     await shot("composer");
-    const anchor = await js(() => {
-      const editor = document.querySelector(".tiptap").editor;
-      const caret = editor.view.coordsAtPos(22);
-      const popup = document
-        .querySelector('[aria-label="文稿 AI"]')
+    const layout = await js(() => {
+      const panel = document
+        .querySelector(".note-chat-sidebar")
+        .getBoundingClientRect();
+      const main = document
+        .querySelector(".notes-main")
         .getBoundingClientRect();
       return {
-        bottom: caret.bottom,
-        left: caret.left,
-        popupTop: popup.top,
-        popupLeft: popup.left,
-        popupWidth: popup.width,
-        viewportWidth: window.innerWidth,
+        panelLeft: panel.left,
+        panelRight: panel.right,
+        panelWidth: panel.width,
+        mainRight: main.right,
+        viewport: innerWidth,
       };
     });
     assert.ok(
-      Math.abs(anchor.popupTop - anchor.bottom - 10) < 2,
-      "Composer opens below the selection " + JSON.stringify(anchor),
+      layout.panelWidth >= 320 && layout.panelWidth <= 640,
+      JSON.stringify(layout),
     );
     assert.ok(
-      Math.abs(anchor.popupLeft - Math.max(16, Math.min(anchor.left, anchor.viewportWidth - anchor.popupWidth - 16))) < 2,
-      "Composer follows cursor within viewport " + JSON.stringify(anchor),
+      layout.mainRight <= layout.panelLeft + 1,
+      "Sidebar reserves space for the document",
     );
+    if (await js(() => !!document.querySelector('[aria-label="确认批注"]')))
+      await click("确认批注");
     await shot("composer");
     await prompt("Create an interactive temperature experiment");
     await enter();
@@ -160,7 +167,7 @@ async function checkAI({ output, width }) {
     await shot("loading");
     await until(() => !!document.querySelector(".note-ai-preview-block"));
     const payload = await js(() => window.aiFixture.lastRequest());
-    assert.equal(payload.generation, "note");
+    assert.equal(payload.generation, "note-chat");
     assert.equal(payload.noteContext.selected, "selected words");
     assert.equal(payload.noteContext.before, "Before ");
     assert.match(payload.noteContext.after, /after.*Following paragraph/s);
@@ -177,19 +184,9 @@ async function checkAI({ output, width }) {
         document.querySelector('[aria-label="文稿 AI"]')?.dataset.busy ===
         "false",
     );
-    assert.equal(
-      await js(
-        () =>
-          document.querySelector('.canvas-ai-reply [role="status"]')
-            ?.textContent,
-      ),
-      "已生成",
-    );
-    assert.equal(
-      await js(
-        () => document.querySelector('[aria-label="生成需求"]').placeholder,
-      ),
-      "继续调整…",
+    assert.match(
+      await js(() => document.querySelector(".note-chat-messages").textContent),
+      /已按你的要求更新/,
     );
     await wait(900);
     let saved = await doc();
@@ -233,6 +230,376 @@ async function checkAI({ output, width }) {
       /Revised explanation/,
     );
     await shot("continued");
+    // Closing preserves chat; selecting new passages adds editable, view-only annotations.
+    await click("关闭 AI");
+    await until(() => document.querySelector(".note-chat-sidebar").hidden);
+    await click("打开 AI");
+    assert.equal(
+      await js(() => document.querySelectorAll(".note-chat-message").length),
+      4,
+    );
+    await js(() =>
+      document
+        .querySelector('[aria-label="调整 AI 侧栏宽度"]')
+        .dispatchEvent(
+          new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
+        ),
+    );
+    assert.equal(
+      await js(() =>
+        document
+          .querySelector('[aria-label="调整 AI 侧栏宽度"]')
+          .getAttribute("aria-valuenow"),
+      ),
+      "436",
+    );
+    const addReference = async (from, to) => {
+      await js(() => document.querySelector('[aria-label="生成需求"]').focus());
+      await until(() => !document.querySelector(".writing-selection-toolbar"));
+      await js(
+        ({ from, to }) => {
+          const e = document.querySelector(".tiptap").editor;
+          e.commands.focus();
+          e.commands.setTextSelection({ from, to });
+        },
+        { from, to },
+      );
+      await until(
+        () =>
+          !!document.querySelector(
+            '.writing-selection-toolbar [aria-label="AI"]',
+          ),
+      );
+      await click("AI");
+    };
+    const setComment = (value) =>
+      js((v) => {
+        const e = document.querySelector(".note-annotation-editor textarea");
+        Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        ).set.call(e, v);
+        e.dispatchEvent(new Event("input", { bubbles: true }));
+      }, value);
+    const showReferences = async () => {
+      await js(() =>
+        document.querySelector(".note-annotations-trigger").click(),
+      );
+      await until(() => !!document.querySelector(".note-annotations-popover"));
+    };
+    const beforeAnnotations = await doc();
+    await addReference(1, 7);
+    await until(() => !!document.querySelector('[aria-label="批注 1"]'));
+    assert.equal(
+      await js(() => document.activeElement?.getAttribute("aria-label")),
+      "批注 1",
+    );
+    assert.equal(
+      await js(() => !!document.querySelector(".note-annotations-chip")),
+      false,
+      "Unconfirmed draft is not attached",
+    );
+    const inlineGeometry = await js(() => {
+      const p = document
+        .querySelector(".note-annotation-editor")
+        .getBoundingClientRect();
+      const r = document
+        .querySelector(".note-annotation-highlight")
+        .getBoundingClientRect();
+      return {
+        distance: Math.min(
+          Math.abs(p.bottom - r.top),
+          Math.abs(p.top - r.bottom),
+        ),
+        right: p.right,
+        left: p.left,
+        viewport: innerWidth,
+      };
+    });
+    assert.ok(
+      inlineGeometry.distance < 45 &&
+        inlineGeometry.left >= 0 &&
+        inlineGeometry.right <= inlineGeometry.viewport,
+      JSON.stringify(inlineGeometry),
+    );
+    await setComment("解释这句话，不要修改文稿");
+    await shot("annotation-inline");
+    await js(() =>
+      document.querySelector(".note-annotation-editor textarea").dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          isComposing: true,
+          bubbles: true,
+        }),
+      ),
+    );
+    assert.ok(
+      await js(() => !!document.querySelector(".note-annotation-editor")),
+      "IME must not confirm",
+    );
+    await click("确认批注");
+    await until(() => !!document.querySelector('[aria-label="查看 1 条批注"]'));
+    assert.ok(
+      await js(
+        () =>
+          document
+            .querySelector(".note-annotations-chip")
+            .getBoundingClientRect().height < 40,
+      ),
+    );
+    await click("打开批注 1");
+    await until(
+      () => !!document.querySelector(".note-annotation-editor:not(.is-new)"),
+    );
+    await setComment("discarded edit");
+    await js(() =>
+      [...document.querySelectorAll(".annotation-editor-actions button")]
+        .find((e) => e.textContent === "取消")
+        .click(),
+    );
+    await click("打开批注 1");
+    await until(() => !!document.querySelector(".note-annotation-editor"));
+    assert.equal(
+      await js(
+        () => document.querySelector(".note-annotation-editor textarea").value,
+      ),
+      "解释这句话，不要修改文稿",
+    );
+    await shot("annotation-edit");
+    await js(() =>
+      [...document.querySelectorAll(".annotation-editor-actions button")]
+        .find((e) => e.textContent === "保存")
+        .click(),
+    );
+    await addReference(8, 16);
+    await until(() => !!document.querySelector('[aria-label="确认批注"]'));
+    await setComment("第二条说明");
+    await click("确认批注");
+    await showReferences();
+    await until(
+      () => document.querySelectorAll(".note-chat-annotation").length === 2,
+    );
+    assert.equal(
+      await js(
+        () => document.querySelectorAll(".note-annotation-highlight").length,
+      ),
+      2,
+    );
+    const checkAnnotationAlignment = async () => {
+      const geometry = await js(() => {
+        const rect = (selector) =>
+          document.querySelector(selector).getBoundingClientRect();
+        const panel = rect(".note-annotations-popover");
+        const label = rect(".note-annotations-chip");
+        const input = rect(".note-chat-composer > textarea");
+        return {
+          offset: panel.left - label.left,
+          overflow: panel.right - input.right,
+          rows: [...document.querySelectorAll(".note-chat-annotation")].map(
+            (row) =>
+              row
+                .querySelector(".annotation-list-number")
+                .getBoundingClientRect().top -
+              row.querySelector(".annotation-label").getBoundingClientRect()
+                .top,
+          ),
+        };
+      });
+      assert.ok(
+        Math.abs(geometry.offset) <= 1 &&
+          geometry.overflow <= 1 &&
+          geometry.rows.every((offset) => Math.abs(offset) <= 1),
+        JSON.stringify(geometry),
+      );
+    };
+    await checkAnnotationAlignment();
+    await shot("annotations");
+    assert.equal(
+      await js(
+        () =>
+          getComputedStyle(document.querySelector(".note-annotation-badge"))
+            .backgroundColor,
+      ),
+      "rgb(56, 120, 232)",
+    );
+    // Multiple long comments stay in a bounded, hoverable list; keyboard can reopen it too.
+    await prompt("");
+    for (const [from, to] of [
+      [17, 19],
+      [19, 22],
+    ]) {
+      await addReference(from, to);
+      await until(() => !!document.querySelector('[aria-label="确认批注"]'));
+      await setComment("Long comment\n".repeat(20));
+      await click("确认批注");
+    }
+    const chipPoint = await js(() => {
+      const r = document
+        .querySelector(".note-annotations-trigger")
+        .getBoundingClientRect();
+      return { x: Math.round(r.x + 10), y: Math.round(r.y + 10) };
+    });
+    win.webContents.sendInputEvent({ type: "mouseMove", ...chipPoint });
+    await until(() => !!document.querySelector(".note-annotations-popover"));
+    const bounded = await js(() => {
+      const el = document.querySelector(".note-annotations-popover");
+      return {
+        height: el.getBoundingClientRect().height,
+        scroll: el.scrollHeight,
+        client: el.clientHeight,
+      };
+    });
+    assert.ok(
+      bounded.height <= 361 && bounded.scroll > bounded.client,
+      JSON.stringify(bounded),
+    );
+    await shot("annotation-list-scroll");
+    win.setSize(680, 560);
+    await click("Switch to dark theme");
+    await showReferences();
+    await wait(150);
+    const compactPopover = await js(() => {
+      const r = document
+        .querySelector(".note-annotations-popover")
+        .getBoundingClientRect();
+      return {
+        left: r.left,
+        right: r.right,
+        top: r.top,
+        bottom: r.bottom,
+        width: innerWidth,
+        height: innerHeight,
+      };
+    });
+    assert.ok(
+      compactPopover.left >= 0 &&
+        compactPopover.right <= compactPopover.width &&
+        compactPopover.top >= 0 &&
+        compactPopover.bottom <= compactPopover.height,
+      JSON.stringify(compactPopover),
+    );
+    await checkAnnotationAlignment();
+    await shot("annotation-dark-narrow");
+    win.setSize(1120, 820);
+    await click("Switch to light theme");
+    await showReferences();
+    await click("编辑批注 4");
+    await until(() => !!document.querySelector('[aria-label="批注 4"]'));
+    await click("删除批注 4");
+    await showReferences();
+    await click("移除批注 3");
+
+    await click("移除批注 2");
+    await until(
+      () => document.querySelectorAll(".note-chat-annotation").length === 1,
+    );
+    await prompt("");
+    await addReference(8, 16);
+    await until(() => !!document.querySelector('[aria-label="确认批注"]'));
+    for (const type of ["keyDown", "keyUp"])
+      win.webContents.sendInputEvent({ type, keyCode: "Escape" });
+    await until(() => !document.querySelector(".note-annotation-editor"));
+    assert.ok(
+      await js(() => !!document.querySelector('[aria-label="查看 1 条批注"]')),
+    );
+    assert.deepEqual(
+      await doc(),
+      beforeAnnotations,
+      "Annotations never edit the note",
+    );
+    await js(() =>
+      document.querySelector(".notes-writing-area").dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: true,
+          clientX: 400,
+          clientY: 300,
+        }),
+      ),
+    );
+    await until(
+      () =>
+        !!document.querySelector(
+          '.writing-block-interactive [aria-label="交互块属性"]',
+        ),
+    );
+    const blockMenu = await js(() => {
+      const button = document.querySelector(
+        '.writing-block-interactive [aria-label="交互块属性"]',
+      );
+      button.scrollIntoView({ block: "center" });
+      const r = button.getBoundingClientRect();
+      return {
+        x: Math.round(r.x + r.width / 2),
+        y: Math.round(r.y + r.height / 2),
+      };
+    });
+    for (const type of ["mouseMove", "mouseDown", "mouseUp"])
+      win.webContents.sendInputEvent({
+        type,
+        ...blockMenu,
+        button: "left",
+        clickCount: 1,
+      });
+    await until(() =>
+      [...document.querySelectorAll('[role="menuitem"]')].some((e) =>
+        e.textContent.includes("添加到 AI 对话"),
+      ),
+    );
+    await js(() =>
+      [...document.querySelectorAll('[role="menuitem"]')]
+        .find((e) => e.textContent.includes("添加到 AI 对话"))
+        .click(),
+    );
+    await until(() => !!document.querySelector('[aria-label="确认批注"]'));
+    await click("确认批注");
+    await showReferences();
+    await until(
+      () => document.querySelectorAll(".note-chat-annotation").length === 2,
+    );
+    assert.equal(
+      await js(
+        () => document.querySelectorAll('[data-ai-annotated="true"]').length,
+      ),
+      1,
+    );
+    await shot("block-annotation");
+    const beforeChat = await doc();
+    await js(() => window.aiFixture.mode("chat"));
+    await prompt("只解释这条批注");
+    await enter();
+    await until(
+      () =>
+        document.querySelector('[aria-label="文稿 AI"]').dataset.busy ===
+        "false",
+    );
+    const annotatedRequest = await js(() => window.aiFixture.lastRequest());
+    assert.equal(annotatedRequest.noteContext.annotations[0].quote, "Before");
+    assert.equal(
+      annotatedRequest.noteContext.annotations[0].comment,
+      "解释这句话，不要修改文稿",
+    );
+    assert.equal(annotatedRequest.noteContext.annotations[1].kind, "block");
+    assert.ok(annotatedRequest.messages.at(-1).content.includes("解释这句话"));
+    assert.deepEqual(
+      await doc(),
+      beforeChat,
+      "Answer-only turns never edit the document",
+    );
+    assert.equal(
+      await js(
+        () => document.querySelectorAll(".note-annotation-highlight").length,
+      ),
+      0,
+    );
+    assert.equal(
+      await js(() => document.querySelectorAll(".note-chat-annotation").length),
+      0,
+    );
+    assert.match(
+      await js(() => document.querySelector(".note-chat-messages").textContent),
+      /词表记录词元/,
+    );
+    await shot("conversation");
     // A failed or stopped revision leaves the successful result intact.
     await js(() => window.aiFixture.mode("unsupported"));
     await prompt("Unsupported revision");
@@ -439,7 +806,7 @@ async function checkAI({ output, width }) {
     await until(() =>
       document
         .querySelector(".canvas-ai-error")
-        ?.textContent.includes("未生成可操作的交互块"),
+        ?.textContent.includes("回复未完成"),
     );
     await wait(900);
     saved = await doc();
@@ -470,7 +837,7 @@ async function checkAI({ output, width }) {
     await until(() =>
       document
         .querySelector(".canvas-ai-error")
-        ?.textContent.includes("暂不支持这种交互"),
+        ?.textContent.includes("回复未完成"),
     );
     assert.equal(
       await js(() => !!document.querySelector(".note-ai-preview")),
@@ -499,6 +866,8 @@ async function checkAI({ output, width }) {
     );
     await click("AI");
     await until(() => !!document.querySelector('[aria-label="文稿 AI"]'));
+    await until(() => !!document.querySelector('[aria-label="确认批注"]'));
+    await click("确认批注");
     win.setSize(680, 560);
     await click("Switch to dark theme");
     await wait(450);
@@ -515,9 +884,9 @@ async function checkAI({ output, width }) {
         height: innerHeight,
       };
     });
-    assert.ok(narrow.left >= 15 && narrow.right <= narrow.width - 15);
-    assert.ok(narrow.top >= 15 && narrow.bottom <= narrow.height - 15);
-    await shot("anchored-dark-narrow");
+    assert.ok(narrow.left >= 0 && narrow.right <= narrow.width);
+    assert.ok(narrow.top >= 0 && narrow.bottom <= narrow.height);
+    await shot("sidebar-dark-narrow");
     win.setSize(1120, 820);
     await wait(450);
     await prompt("Use the selected context");
@@ -558,8 +927,80 @@ async function checkAI({ output, width }) {
       ),
       "Leaving notes must not insert late content",
     );
+    await js(() => {
+      location.hash = "/notes";
+    });
+    await until(() => !!document.querySelector('[aria-label="打开 AI"]'));
+    await click("打开 AI");
+    await until(
+      () => !!document.querySelector(".note-chat-sidebar:not([hidden])"),
+    );
+    await js(() => window.aiFixture.mode("chat"));
+    await prompt("普通问答");
+    await enter();
+    await until(
+      () =>
+        document.querySelector(".note-chat-sidebar").dataset.busy === "false",
+    );
+    await click("新对话");
+    await until(
+      () => document.querySelectorAll(".note-chat-message").length === 0,
+    );
+    await addReference(1, 9);
+    await until(() => !!document.querySelector('[aria-label="确认批注"]'));
+    await click("确认批注");
+    await until(() => !!document.querySelector(".note-annotation-highlight"));
+    await js(() =>
+      document
+        .querySelector(".tiptap")
+        .editor.commands.insertContentAt(1, "Prefix "),
+    );
+    assert.equal(
+      await js(
+        () => document.querySelector(".note-annotation-highlight")?.textContent,
+      ),
+      "Selected",
+    );
+    await js(() =>
+      document
+        .querySelector(".tiptap")
+        .editor.commands.insertContentAt({ from: 8, to: 16 }, "Changed"),
+    );
+    await until(() => !document.querySelector(".note-annotation-highlight"));
+    await showReferences();
+    assert.match(
+      await js(
+        () =>
+          document.querySelector(".note-chat-annotation blockquote")
+            .textContent,
+      ),
+      /Selected/,
+    );
+    await click("Collapse sidebar");
+    const collapsed = await js(() => {
+      const a = document.querySelector(".notes-main").getBoundingClientRect(),
+        b = document
+          .querySelector(".note-chat-sidebar")
+          .getBoundingClientRect();
+      return { width: a.width, right: a.right, left: b.left };
+    });
+    assert.ok(
+      collapsed.width > 250 && collapsed.right <= collapsed.left + 1,
+      JSON.stringify(collapsed),
+    );
+    await click("Expand sidebar");
+    await prompt("一个全新的问题");
+    await enter();
+    await until(
+      () =>
+        document.querySelector(".note-chat-sidebar").dataset.busy === "false",
+    );
+    assert.equal(
+      (await js(() => window.aiFixture.lastRequest())).messages.length,
+      1,
+    );
     console.log(
-      "Note AI: PASS (anchored composer/dark/narrow, skeleton, persistent chat/revision/history, selection/cursor context, native interactions, live results/persist/reload, atomic undo/redo, stop/late response, stale source/result, diagram rejection, unsupported interaction, URL)",
+      "Note AI: PASS (sidebar/dark/narrow, skeleton, persistent chat/revision/history, answer-only turns, editable annotations and highlights, selection/cursor context, native interactions, live results/persist/reload, atomic undo/redo, stop/late response, stale source/result, raw canvas rejection, unsupported interaction, URL)",
     );
     app.exit(0);
   } catch (e) {

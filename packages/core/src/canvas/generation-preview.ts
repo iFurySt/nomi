@@ -1,3 +1,4 @@
+import { diagramLayers } from "../interactive/diagram";
 import { parseCanvasGeneration, canvasGenerationPrefix } from "./generation";
 import type { InteractiveProgram } from "../interactive";
 
@@ -142,11 +143,23 @@ export function interactiveGenerationPrefix(text: string): string | undefined {
         if (seen.has(id) || depth > 32) throw Error("Invalid preview tree.");
         seen.add(id);
         const n = structuredClone(byId.get(id)!);
-        if (["Panel", "Row"].includes(n.component)) {
+        if (["Panel", "Row", "Diagram"].includes(n.component)) {
           if (!Array.isArray(n.props.children))
             throw Error("Invalid children.");
+          if (n.component === "Diagram")
+            diagramLayers(n.props.children as string[], n.props.edges as any);
           n.props.children = n.props.children.filter(
             (child) => typeof child === "string" && visit(child, depth + 1),
+          );
+        }
+        if (n.component === "Diagram") {
+          const children = n.props.children as string[];
+          if (!children.length) return false;
+          n.props.edges = (
+            n.props.edges as { from: string; to: string }[]
+          ).filter(
+            (edge) =>
+              children.includes(edge.from) && children.includes(edge.to),
           );
         }
         kept.push(n);

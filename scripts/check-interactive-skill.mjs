@@ -21,7 +21,7 @@ function run(file, eventsFile, valid = true) {
   return result;
 }
 try {
-  for (const name of ["bpe-compact", "wave", "temperature"])
+  for (const name of ["bpe-compact", "bpe-guided", "bpe-diagram", "wave", "temperature"])
     run(path.join(skill, `assets/${name}.nomi-ui.json`));
   const file = path.join(skill, "assets/bpe-compact.nomi-ui.json");
   const eventsFile = path.join(scratch, "events.json");

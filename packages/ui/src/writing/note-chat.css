@@ -1,0 +1,506 @@
+.notes-workspace:has(> .note-chat-sidebar:not([hidden])) {
+  grid-template-columns: var(--notes-library-width) minmax(0, 1fr) auto;
+}
+.notes-shell.sidebar-collapsed
+  .notes-workspace:has(> .note-chat-sidebar:not([hidden])) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.note-chat-sidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-width: 48vw;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  z-index: 20;
+}
+.note-chat-sidebar[hidden] {
+  display: none;
+}
+.note-chat-sidebar > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  height: 54px;
+  padding: 0 16px;
+}
+.note-chat-sidebar > header > span,
+.note-chat-sidebar > header > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.note-chat-sidebar button {
+  cursor: pointer;
+}
+.note-chat-sidebar > header button,
+.note-chat-annotation summary button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  background: transparent;
+}
+.note-chat-sidebar > header button:hover,
+.note-chat-annotation summary button:hover {
+  background: var(--interaction-hover);
+  color: var(--text);
+}
+.note-chat-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 1;
+  touch-action: none;
+}
+.note-chat-resizer:hover,
+.note-chat-resizer:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--note-chat-accent, #3878e8) 25%,
+    transparent
+  );
+}
+.note-chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 22px;
+  overscroll-behavior: contain;
+}
+.note-chat-empty {
+  height: 100%;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+}
+.note-chat-empty p {
+  margin: 0;
+  font-size: 15px;
+}
+.note-chat-message {
+  margin: 0 0 28px;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+.note-chat-message.is-user {
+  margin-left: 28px;
+  border-radius: 18px;
+  padding: 10px 14px;
+  background: var(--interaction-hover);
+  width: fit-content;
+  max-width: calc(100% - 28px);
+  justify-self: end;
+}
+.note-chat-message.is-user > p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.note-chat-message .canvas-markdown {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.note-chat-message .canvas-markdown > :first-child {
+  margin-top: 0;
+}
+.note-chat-message .canvas-markdown > :last-child {
+  margin-bottom: 0;
+}
+.note-chat-message small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.note-chat-thinking {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text);
+  animation: note-chat-pulse 1.2s ease-in-out infinite;
+}
+@keyframes note-chat-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.note-chat-bottom {
+  flex: none;
+  padding: 8px 14px 16px;
+  max-height: 65%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.note-chat-composer {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 22px;
+  padding: 14px 14px 10px;
+  box-shadow: 0 2px 10px #00000006;
+}
+.note-chat-composer > textarea {
+  display: block;
+  width: 100%;
+  min-height: 70px;
+  max-height: 160px;
+  resize: vertical;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.6;
+  padding: 0;
+}
+.note-chat-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+.note-chat-controls select {
+  max-width: calc(100% - 48px);
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  padding: 4px 0;
+}
+.note-chat-send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--surface);
+}
+.note-chat-send:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.note-chat-connect {
+  padding: 24px;
+  text-align: center;
+}
+.note-chat-sent-reference blockquote {
+  margin: 6px 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--note-chat-accent, #3878e8);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: pre-wrap;
+  max-height: 70px;
+  overflow: auto;
+}
+.note-annotations-anchor {
+  width: 100%;
+}
+.note-annotations-chip {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  gap: 7px;
+  margin-bottom: 12px;
+  padding: 4px 5px 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+}
+.note-annotations-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 0;
+}
+.annotation-clear,
+.annotation-confirm {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  color: var(--surface);
+  background: var(--text);
+  cursor: pointer;
+}
+.annotation-clear {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+}
+.note-annotations-popover,
+.note-annotation-editor {
+  z-index: 80;
+  box-sizing: border-box;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 18px #00000012;
+  outline: none;
+  font: 14px/1.5 var(--font-sans, system-ui);
+}
+.note-annotations-popover {
+  width: min(380px, var(--radix-popover-trigger-width));
+  max-width: calc(100vw - 24px);
+  max-height: min(360px, var(--radix-popover-content-available-height));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 16px;
+  padding: 4px 12px;
+}
+.note-chat-annotation {
+  display: flex;
+  gap: 9px;
+  padding: 13px 0;
+}
+.note-chat-annotation + .note-chat-annotation {
+  border-top: 1px solid var(--border);
+}
+.annotation-list-number,
+.annotation-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.annotation-label {
+  display: block;
+}
+.annotation-list-number,
+.annotation-label {
+  line-height: 18px;
+}
+.annotation-list-content {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.note-chat-annotation blockquote,
+.note-chat-annotation p {
+  margin: 3px 0 9px;
+  white-space: pre-wrap;
+}
+.note-chat-annotation p:last-child {
+  margin-bottom: 0;
+}
+.annotation-list-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+.annotation-icon {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  padding: 4px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.annotation-icon:hover {
+  background: var(--interaction-hover);
+  color: var(--text);
+}
+.note-annotation-editor {
+  width: 330px;
+  max-width: calc(100vw - 24px);
+  border-radius: 22px;
+  padding: 12px;
+}
+.note-annotation-editor.is-new {
+  border-radius: 28px;
+  padding: 8px 8px 8px 16px;
+}
+.note-annotation-editor.is-new form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.note-annotation-editor textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-height: 160px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  resize: none;
+  padding: 4px 0;
+  field-sizing: content;
+}
+.annotation-confirm {
+  width: 32px;
+  height: 32px;
+}
+.annotation-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.annotation-editor-actions > span {
+  flex: 1;
+}
+.annotation-editor-actions > button:not(.annotation-icon) {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+}
+.annotation-editor-actions > button.annotation-save {
+  background: var(--text);
+  color: var(--surface);
+  border-color: transparent;
+}
+.note-annotations-popover button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.note-chat-sent-reference {
+  margin: 0 0 7px;
+}
+.note-chat-sent-reference summary {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.note-chat-sent-reference p {
+  font-size: 12px;
+  margin: 4px 0;
+}
+.note-chat-launcher {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 3px 12px #0000000c;
+  cursor: pointer;
+  z-index: 10;
+}
+.note-annotation-highlight {
+  background: color-mix(
+    in srgb,
+    var(--note-chat-accent, #3878e8) 19%,
+    transparent
+  );
+  border-bottom: 1px solid var(--note-chat-accent, #3878e8);
+}
+.notes-main .note-annotation-badge,
+.notes-main .note-annotation-badge:hover,
+.notes-main .note-annotation-badge:focus-visible {
+  display: inline-grid;
+  place-items: center;
+  background: var(--note-chat-accent, #3878e8);
+  color: white;
+  font: 600 10px/1 system-ui;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 12px 12px 12px 0;
+  vertical-align: super;
+  user-select: none;
+}
+.note-annotation-anchor {
+  display: inline-block;
+  position: relative;
+  width: 0;
+}
+.note-annotation-anchor > .note-annotation-badge {
+  position: absolute;
+  bottom: 5px;
+  left: -2px;
+}
+.writing-block[data-ai-annotated] {
+  outline: 1px solid var(--note-chat-accent, #3878e8);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.note-annotation-badge.block-badge {
+  position: absolute;
+  top: 0;
+  right: -14px;
+  z-index: 2;
+}
+@media (max-width: 850px) {
+  .notes-workspace:has(> .note-chat-sidebar:not([hidden])) {
+    grid-template-columns: var(--notes-library-width) minmax(0, 1fr);
+  }
+  .notes-shell.sidebar-collapsed
+    .notes-workspace:has(> .note-chat-sidebar:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .note-chat-sidebar {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    max-width: 100%;
+    box-shadow: -8px 0 30px #0000000a;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-chat-thinking {
+    animation: none;
+  }
+}
+
+:root[data-theme="dark"] {
+  --note-chat-accent: #78a6ff;
+}
+
+.writing-selection-toolbar button[aria-label="AI"] {
+  width: auto;
+  display: flex;
+  gap: 5px;
+  padding: 0 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .notes-workspace:has(> .note-chat-sidebar:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.notes-main .note-annotation-badge:focus-visible {
+  outline: 2px solid var(--note-chat-accent, #3878e8);
+  outline-offset: 2px;
+}

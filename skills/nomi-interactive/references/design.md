@@ -1,6 +1,10 @@
 # Compact interactive learning
 
-The accepted BPE design shows the sentence, one main action, current segmentation and candidate frequencies, then merge rules and vocabulary. The user approved its compactness and low prose density. Four tables are appropriate for BPE, not a universal template.
+The accepted BPE design shows the sentence, one main action, current segmentation and candidate frequencies, then merge rules and vocabulary. The user approved its compactness and low prose density. Four tables suit inspecting BPE statistics; an architecture request instead needs connected nodes.
+
+## Architecture diagrams
+
+Use Diagram@1 with explicit directed edges. Match the supplied branch/merge topology; put dynamic results inside the relevant nodes. An editable Corpus can feed BPE Training, split into Vocabulary / Merge Rules, then converge to Tokenizer. The desktop renderer measures nodes and draws arrows; node bodies scroll when long. Preserve all vocabulary entries and rule order. Avoid fake arrow headings, unrelated controls and tables unless requested. A static diagram needs no input. Native mobile rendering remains a separate capability.
 
 ## Composition
 

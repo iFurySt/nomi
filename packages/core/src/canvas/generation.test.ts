@@ -150,7 +150,7 @@ describe("native note interactions", () => {
     ]);
     expect(result.blocks[1]).toMatchObject({ program: temperatureProgram });
   });
-  it("rejects diagrams and inert programs instead of wrapping them in a canvas", () => {
+  it("rejects raw canvas diagrams and inert programs instead of wrapping them in a canvas", () => {
     expect(() =>
       parseNoteGeneration(response([block("a"), block("b"), connection])),
     ).toThrow(NOTE_INTERACTION_REQUIRED);

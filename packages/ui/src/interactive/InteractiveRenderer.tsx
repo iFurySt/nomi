@@ -1,3 +1,4 @@
+import { InteractiveDiagram } from "./InteractiveDiagram";
 import { InteractiveTokenFlow } from "./InteractiveTokenFlow";
 import { InteractiveStepper } from "./InteractiveStepper";
 import { useId, useMemo } from "react";
@@ -345,6 +346,8 @@ export function InteractiveRenderer({
         );
       case "Table":
         return <InteractiveTable key={id} id={id} {...p} />;
+      case "Diagram":
+        return <InteractiveDiagram key={id} id={id} {...p} renderNode={node} />;
       case "Scene": {
         const color = (c: string | undefined, fallback: string) =>
           ({

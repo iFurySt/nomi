@@ -12,3 +12,8 @@ export const waveProgram = parseInteractiveProgram(waveDefinition);
 
 import compactDefinition from "./bpe-compact.json";
 export const compactBpeProgram = parseInteractiveProgram(compactDefinition);
+
+export * from "./diagram";
+
+import diagramDefinition from "./bpe-diagram.json";
+export const bpeDiagramProgram = parseInteractiveProgram(diagramDefinition);

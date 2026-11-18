@@ -1,0 +1,100 @@
+.interactive-diagram-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+.interactive-diagram {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  padding: 2px 16px;
+}
+.interactive-diagram-edges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--muted);
+  overflow: visible;
+}
+.interactive-diagram-layer {
+  display: grid;
+  gap: 24px;
+  position: relative;
+}
+.interactive-diagram-node {
+  min-width: 0;
+  width: 100%;
+  max-width: 480px;
+  max-height: 300px;
+  overflow: auto;
+  scrollbar-width: thin;
+  justify-self: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 14px 16px;
+}
+.interactive-diagram .interactive-diagram-node > .interactive-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.interactive-surface[data-profile]
+  .interactive-diagram
+  .interactive-diagram-node
+  > .interactive-panel
+  > * {
+  margin: 0;
+}
+.interactive-diagram-node h2 {
+  font-size: 14px !important;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0 !important;
+}
+.interactive-diagram-node .interactive-text {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
+.interactive-diagram .interactive-diagram-node .learning-input {
+  margin: 0;
+}
+.interactive-diagram-node input,
+.interactive-diagram-node textarea {
+  font-size: 13px;
+  min-width: 0;
+}
+.interactive-diagram-node .lesson-flow {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .interactive-diagram {
+    padding-inline: 8px;
+  }
+  .interactive-diagram-layer {
+    gap: 12px;
+  }
+  .interactive-diagram-node {
+    padding: 12px 10px;
+  }
+}
+
+.interactive-diagram-node .lesson-tokens {
+  gap: 6px;
+}
+.interactive-diagram-node .lesson-token {
+  font-size: 12px;
+  min-width: 18px;
+  min-height: 22px;
+  padding: 2px 5px;
+}
+.interactive-diagram-node .lesson-token-id {
+  font-size: 10px;
+  animation: none;
+}

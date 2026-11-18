@@ -1,3 +1,4 @@
+import { diagramLayers } from "./diagram";
 import { learningFunctionArity } from "./functions";
 import { InteractiveError, interactiveComponents } from "./types";
 import type { InteractiveNode, InteractiveProgram } from "./types";
@@ -69,6 +70,7 @@ const fields: Record<string, string[]> = {
   Table: ["columns", "rows", "caption"],
   Metric: ["label", "value", "unit"],
   Scene: ["width", "height", "label", "items"],
+  Diagram: ["label", "children", "edges"],
   Row: ["children"],
   Text: ["text", "role"],
   Button: ["label"],
@@ -226,6 +228,10 @@ export function validateResolvedProps(
         else text(v, 2048);
       });
     }
+  }
+  if (component === "Diagram") {
+    text(p.label, 256);
+    diagramLayers(p.children, p.edges);
   }
   if (component === "Scene") {
     integer(p.width, 100, 1200);
@@ -463,6 +469,7 @@ export function parseInteractiveProgram(
           "Table",
           "Metric",
           "Scene",
+          "Diagram",
           "TokenFlow",
           "Stepper",
         ].includes(k))
@@ -704,6 +711,10 @@ export function parseInteractiveProgram(
         )
           fail("Unknown stepper action.", "reference");
     }
+    if (node.component === "Diagram") {
+      // Topology is static, like container children; values inside nodes may change.
+      diagramLayers(node.props.children, node.props.edges);
+    }
     data(node.props);
     if (node.bind) {
       keys(object(node.bind), ["value"]);
@@ -760,7 +771,7 @@ export function parseInteractiveProgram(
     if (!n) fail("Unknown child.", "reference");
     path.add(key);
     visited.add(key);
-    if (["Panel", "Row"].includes(n!.component))
+    if (["Panel", "Row", "Diagram"].includes(n!.component))
       list(n!.props.children).forEach((c) => tree(id(c), depth + 1));
     path.delete(key);
   };

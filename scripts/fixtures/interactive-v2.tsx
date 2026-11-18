@@ -3,6 +3,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import {
   bpeProgram,
+  bpeDiagramProgram,
   compactBpeProgram,
   waveProgram,
   temperatureProgram,
@@ -13,7 +14,10 @@ import "../../packages/ui/src/styles.css";
 import generatedBpe from "../../packages/core/src/interactive/fixtures/generated-bpe.json";
 import generatedWave from "../../packages/core/src/interactive/fixtures/generated-wave.json";
 import generatedSentence from "../../packages/core/src/interactive/fixtures/generated-bpe-sentence.json";
+import generatedDiagram from "../../packages/core/src/interactive/fixtures/generated-bpe-diagram.json";
 const programs = {
+  generatedDiagram,
+  diagram: bpeDiagramProgram,
   compact: compactBpeProgram,
   generatedSentence,
   generatedBpe,

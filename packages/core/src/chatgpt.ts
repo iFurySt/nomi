@@ -32,7 +32,14 @@ export interface ChatGPTModel {
   defaultEffort?: ChatGPTEffort;
   contextWindow?: number;
 }
+export interface NoteAnnotation {
+  id: string;
+  kind: "text" | "block";
+  quote: string;
+  comment: string;
+}
 export interface NoteGenerationContext {
+  annotations?: NoteAnnotation[];
   title: string;
   selected: string;
   before: string;
@@ -44,7 +51,31 @@ export function validNoteGenerationContext(
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const v = value as Record<string, unknown>;
   return (
-    Object.keys(v).length === 4 &&
+    Object.keys(v).every((k) =>
+      ["title", "selected", "before", "after", "annotations"].includes(k),
+    ) &&
+    (v.annotations === undefined ||
+      (Array.isArray(v.annotations) &&
+        v.annotations.length <= 8 &&
+        new Set(v.annotations.map((a) => a?.id)).size ===
+          v.annotations.length &&
+        v.annotations.every(
+          (a) =>
+            a &&
+            typeof a === "object" &&
+            Object.keys(a).length === 4 &&
+            typeof a.id === "string" &&
+            /^[a-zA-Z0-9_-]{1,80}$/.test(a.id) &&
+            ["text", "block"].includes(a.kind) &&
+            typeof a.quote === "string" &&
+            a.quote.length <= 8000 &&
+            typeof a.comment === "string" &&
+            a.comment.length <= 1000,
+        ) &&
+        v.annotations.reduce(
+          (n, a) => n + a.quote.length + a.comment.length,
+          0,
+        ) <= 16000)) &&
     Object.entries({
       title: 256,
       selected: 4000,
@@ -61,7 +92,7 @@ export interface ChatGPTRequest {
   conversationId?: string;
   effort?: ChatGPTEffort;
   webSearch?: boolean;
-  generation?: "canvas" | "note";
+  generation?: "canvas" | "note" | "note-chat";
   noteContext?: NoteGenerationContext;
 }
 export type ChatGPTMethod =
@@ -125,12 +156,13 @@ export function validateChatGPTRequest(
     (v.conversationId !== undefined && !validChatGPTId(v.conversationId)) ||
     (v.effort !== undefined && !chatGPTEfforts.includes(v.effort)) ||
     (v.generation !== undefined &&
-      !["canvas", "note"].includes(v.generation)) ||
+      !["canvas", "note", "note-chat"].includes(v.generation)) ||
     (!!v.generation && v.webSearch === true) ||
     (v.noteContext !== undefined &&
-      (v.generation !== "note" ||
+      (!["note", "note-chat"].includes(v.generation ?? "") ||
         !validNoteGenerationContext(v.noteContext))) ||
-    (v.generation === "note" && !validNoteGenerationContext(v.noteContext)) ||
+    (["note", "note-chat"].includes(v.generation ?? "") &&
+      !validNoteGenerationContext(v.noteContext)) ||
     (v.webSearch !== undefined && typeof v.webSearch !== "boolean") ||
     !validChatGPTId(v.requestId) ||
     !validChatGPTId(v.profileId) ||
@@ -150,7 +182,10 @@ export function validateChatGPTRequest(
         (m.details !== undefined && !validChatReplyDetails(m.details)) ||
         typeof m.content !== "string" ||
         !m.content.trim() ||
-        m.content.length > (m.role === "user" ? 2000 : chatGPTOutputLimit),
+        m.content.length >
+          (m.role === "user" && v.generation !== "note-chat"
+            ? 2000
+            : chatGPTOutputLimit),
     ) ||
     v.messages.at(-1)?.role !== "user" ||
     v.messages.reduce((n, m) => n + m.content.length, 0) > 100000

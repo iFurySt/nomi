@@ -15,7 +15,8 @@ var interactiveComponents = [
   "TextInput",
   "Table",
   "Metric",
-  "Scene"
+  "Scene",
+  "Diagram"
 ];
 var InteractiveError = class extends Error {
   constructor(code, message) {
@@ -25,6 +26,44 @@ var InteractiveError = class extends Error {
   }
   code;
 };
+
+// packages/core/src/interactive/diagram.ts
+function diagramLayers(children, edges) {
+  const fail4 = (message) => {
+    throw new InteractiveError("schema", message);
+  };
+  if (!Array.isArray(children) || !children.length || children.length > 16 || children.some((id2) => typeof id2 !== "string") || new Set(children).size !== children.length)
+    fail4("Diagram needs 1\u201316 unique nodes.");
+  if (!Array.isArray(edges) || edges.length > 24)
+    fail4("Diagram has too many edges.");
+  const incoming = new Map(children.map((id2) => [id2, 0]));
+  const outgoing = new Map(children.map((id2) => [id2, []]));
+  const seen = /* @__PURE__ */ new Set();
+  for (const edge of edges) {
+    if (!edge || Object.keys(edge).some((k) => !["from", "to"].includes(k)) || !incoming.has(edge.from) || !incoming.has(edge.to) || edge.from === edge.to)
+      fail4("Invalid diagram endpoint.");
+    const key = JSON.stringify([edge.from, edge.to]);
+    if (seen.has(key)) fail4("Duplicate diagram edge.");
+    seen.add(key);
+    outgoing.get(edge.from).push(edge.to);
+    incoming.set(edge.to, incoming.get(edge.to) + 1);
+  }
+  const layers = [];
+  let next = children.filter((id2) => incoming.get(id2) === 0), visited = 0;
+  while (next.length) {
+    layers.push(next);
+    visited += next.length;
+    const ready = /* @__PURE__ */ new Set();
+    for (const id2 of next)
+      for (const to of outgoing.get(id2)) {
+        incoming.set(to, incoming.get(to) - 1);
+        if (!incoming.get(to)) ready.add(to);
+      }
+    next = children.filter((id2) => ready.has(id2));
+  }
+  if (visited !== children.length) fail4("Diagram must be acyclic.");
+  return layers;
+}
 
 // packages/core/src/interactive/bpe.ts
 var fail = (message) => {
@@ -568,6 +607,7 @@ var fields = {
   Table: ["columns", "rows", "caption"],
   Metric: ["label", "value", "unit"],
   Scene: ["width", "height", "label", "items"],
+  Diagram: ["label", "children", "edges"],
   Row: ["children"],
   Text: ["text", "role"],
   Button: ["label"],
@@ -694,6 +734,10 @@ function validateResolvedProps(component, p, version = 1) {
         else text(v, 2048);
       });
     }
+  }
+  if (component === "Diagram") {
+    text(p.label, 256);
+    diagramLayers(p.children, p.edges);
   }
   if (component === "Scene") {
     integer(p.width, 100, 1200);
@@ -901,6 +945,7 @@ function parseInteractiveProgram(input) {
       "Table",
       "Metric",
       "Scene",
+      "Diagram",
       "TokenFlow",
       "Stepper"
     ].includes(k))
@@ -1111,6 +1156,9 @@ function parseInteractiveProgram(input) {
         if (typeof node.props[k] !== "string" || !Object.hasOwn(actions, node.props[k]))
           fail3("Unknown stepper action.", "reference");
     }
+    if (node.component === "Diagram") {
+      diagramLayers(node.props.children, node.props.edges);
+    }
     data(node.props);
     if (node.bind) {
       keys(object(node.bind), ["value"]);
@@ -1145,7 +1193,7 @@ function parseInteractiveProgram(input) {
     if (!n) fail3("Unknown child.", "reference");
     path.add(key);
     visited.add(key);
-    if (["Panel", "Row"].includes(n.component))
+    if (["Panel", "Row", "Diagram"].includes(n.component))
       list(n.props.children).forEach((c) => tree(id(c), depth + 1));
     path.delete(key);
   };

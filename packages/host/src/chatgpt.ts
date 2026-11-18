@@ -1,6 +1,7 @@
 import {
   canvasGenerationPrompt,
   noteGenerationPrompt,
+  noteChatPrompt,
 } from "./canvas-generation-prompt";
 import { ChatGPTContent } from "./chatgpt-content";
 import type { AgentRuntime } from "./agent-runtime";
@@ -489,7 +490,9 @@ export class ChatGPTHost {
             store: false,
             stream: true,
             instructions: params.generation
-              ? params.generation === "note"
+              ? params.generation === "note-chat"
+                ? noteChatPrompt
+                : params.generation === "note"
                 ? noteGenerationPrompt
                 : canvasGenerationPrompt
               : "You are Nomi's personal workbench assistant for learning, notes, information, knowledge, health and wealth management, with optional family collaboration. Separate facts, interpretations, risks and open questions. Do not invent current prices, filings, sources or tool access. " +

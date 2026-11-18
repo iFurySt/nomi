@@ -1,0 +1,509 @@
+{
+  "schema": "nomi-interactive-ir/draft-2",
+  "id": "bpe-architecture",
+  "version": 1,
+  "profile": "portable.learning/draft-2",
+  "requires": {
+    "components": {
+      "Diagram": 1,
+      "Panel": 1,
+      "Text": 1,
+      "TextInput": 2,
+      "TokenFlow": 1
+    },
+    "functions": {
+      "learning.bpe": 1,
+      "object.get": 1,
+      "array.at": 1,
+      "number.format": 1,
+      "string.concat": 1
+    },
+    "expressions": [
+      "literal",
+      "state",
+      "derived",
+      "call",
+      "map",
+      "variable",
+      "object"
+    ],
+    "hostEffects": []
+  },
+  "budget": {
+    "maxSamplePointsPerSeries": 128,
+    "maxSeries": 8,
+    "maxStepsPerEvaluation": 100000
+  },
+  "state": {
+    "corpus": {
+      "type": "string",
+      "default": "we learn learning and we learned",
+      "maxLength": 600,
+      "scope": "user"
+    }
+  },
+  "derived": {
+    "training": {
+      "kind": "call",
+      "function": "learning.bpe",
+      "version": 1,
+      "args": [
+        {
+          "kind": "state",
+          "id": "corpus"
+        },
+        {
+          "kind": "literal",
+          "value": 32
+        }
+      ]
+    }
+  },
+  "actions": {},
+  "root": "diagram",
+  "nodes": [
+    {
+      "id": "diagram",
+      "component": "Diagram",
+      "version": 1,
+      "props": {
+        "label": "BPE 架构",
+        "children": [
+          "corpusNode",
+          "trainingNode",
+          "vocabularyNode",
+          "rulesNode",
+          "tokenizerNode"
+        ],
+        "edges": [
+          {
+            "from": "corpusNode",
+            "to": "trainingNode"
+          },
+          {
+            "from": "trainingNode",
+            "to": "vocabularyNode"
+          },
+          {
+            "from": "trainingNode",
+            "to": "rulesNode"
+          },
+          {
+            "from": "vocabularyNode",
+            "to": "tokenizerNode"
+          },
+          {
+            "from": "rulesNode",
+            "to": "tokenizerNode"
+          }
+        ]
+      }
+    },
+    {
+      "id": "corpusNode",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["corpusTitle", "corpusInput"]
+      }
+    },
+    {
+      "id": "trainingNode",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["trainingTitle", "budgetText"]
+      }
+    },
+    {
+      "id": "vocabularyNode",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["vocabularyTitle", "vocabulary"]
+      }
+    },
+    {
+      "id": "rulesNode",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["rulesTitle", "rules"]
+      }
+    },
+    {
+      "id": "tokenizerNode",
+      "component": "Panel",
+      "version": 1,
+      "props": {
+        "children": ["tokenizerTitle"]
+      }
+    },
+    {
+      "id": "corpusTitle",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "Corpus",
+        "role": "heading"
+      }
+    },
+    {
+      "id": "corpusInput",
+      "component": "TextInput",
+      "version": 2,
+      "props": {
+        "label": "修改语料句子",
+        "hideLabel": true
+      },
+      "bind": {
+        "value": "corpus"
+      }
+    },
+    {
+      "id": "trainingTitle",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "BPE Training",
+        "role": "heading"
+      }
+    },
+    {
+      "id": "budgetText",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "字符级教学 BPE · 最多 32 次合并"
+      }
+    },
+    {
+      "id": "vocabularyTitle",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "Vocabulary（词表）",
+        "role": "heading"
+      }
+    },
+    {
+      "id": "vocabulary",
+      "component": "TokenFlow",
+      "version": 1,
+      "props": {
+        "label": "全部已学词元",
+        "layout": "chips",
+        "rows": {
+          "kind": "map",
+          "variable": "v",
+          "items": {
+            "kind": "call",
+            "function": "object.get",
+            "version": 1,
+            "args": [
+              {
+                "kind": "derived",
+                "id": "training"
+              },
+              {
+                "kind": "literal",
+                "value": "learnedVocabulary"
+              }
+            ]
+          },
+          "body": {
+            "kind": "object",
+            "fields": {
+              "id": {
+                "kind": "call",
+                "function": "string.concat",
+                "version": 1,
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "v"
+                  },
+                  {
+                    "kind": "call",
+                    "function": "number.format",
+                    "version": 1,
+                    "args": [
+                      {
+                        "kind": "call",
+                        "function": "array.at",
+                        "version": 1,
+                        "args": [
+                          {
+                            "kind": "variable",
+                            "id": "v"
+                          },
+                          {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              "tokens": {
+                "kind": "map",
+                "variable": "t",
+                "items": {
+                  "kind": "literal",
+                  "value": [0]
+                },
+                "body": {
+                  "kind": "object",
+                  "fields": {
+                    "id": {
+                      "kind": "literal",
+                      "value": "token"
+                    },
+                    "text": {
+                      "kind": "call",
+                      "function": "array.at",
+                      "version": 1,
+                      "args": [
+                        {
+                          "kind": "variable",
+                          "id": "v"
+                        },
+                        {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      ]
+                    },
+                    "tone": {
+                      "kind": "literal",
+                      "value": "normal"
+                    },
+                    "members": {
+                      "kind": "literal",
+                      "value": []
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "rulesTitle",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "Merge Rules（合并规则）",
+        "role": "heading"
+      }
+    },
+    {
+      "id": "rules",
+      "component": "TokenFlow",
+      "version": 1,
+      "props": {
+        "label": "按训练顺序",
+        "layout": "list",
+        "rows": {
+          "kind": "map",
+          "variable": "r",
+          "items": {
+            "kind": "call",
+            "function": "object.get",
+            "version": 1,
+            "args": [
+              {
+                "kind": "derived",
+                "id": "training"
+              },
+              {
+                "kind": "literal",
+                "value": "merges"
+              }
+            ]
+          },
+          "body": {
+            "kind": "object",
+            "fields": {
+              "id": {
+                "kind": "call",
+                "function": "string.concat",
+                "version": 1,
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "r"
+                  },
+                  {
+                    "kind": "call",
+                    "function": "number.format",
+                    "version": 1,
+                    "args": [
+                      {
+                        "kind": "call",
+                        "function": "array.at",
+                        "version": 1,
+                        "args": [
+                          {
+                            "kind": "variable",
+                            "id": "r"
+                          },
+                          {
+                            "kind": "literal",
+                            "value": 0
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "literal",
+                        "value": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              "tokens": {
+                "kind": "map",
+                "variable": "t",
+                "items": {
+                  "kind": "literal",
+                  "value": [0]
+                },
+                "body": {
+                  "kind": "object",
+                  "fields": {
+                    "id": {
+                      "kind": "literal",
+                      "value": "rule"
+                    },
+                    "text": {
+                      "kind": "call",
+                      "function": "string.concat",
+                      "version": 1,
+                      "args": [
+                        {
+                          "kind": "call",
+                          "function": "string.concat",
+                          "version": 1,
+                          "args": [
+                            {
+                              "kind": "call",
+                              "function": "string.concat",
+                              "version": 1,
+                              "args": [
+                                {
+                                  "kind": "call",
+                                  "function": "string.concat",
+                                  "version": 1,
+                                  "args": [
+                                    {
+                                      "kind": "call",
+                                      "function": "array.at",
+                                      "version": 1,
+                                      "args": [
+                                        {
+                                          "kind": "variable",
+                                          "id": "r"
+                                        },
+                                        {
+                                          "kind": "literal",
+                                          "value": 1
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "kind": "literal",
+                                      "value": " + "
+                                    }
+                                  ]
+                                },
+                                {
+                                  "kind": "call",
+                                  "function": "array.at",
+                                  "version": 1,
+                                  "args": [
+                                    {
+                                      "kind": "variable",
+                                      "id": "r"
+                                    },
+                                    {
+                                      "kind": "literal",
+                                      "value": 2
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "kind": "literal",
+                              "value": " → "
+                            }
+                          ]
+                        },
+                        {
+                          "kind": "call",
+                          "function": "array.at",
+                          "version": 1,
+                          "args": [
+                            {
+                              "kind": "variable",
+                              "id": "r"
+                            },
+                            {
+                              "kind": "literal",
+                              "value": 3
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "tone": {
+                      "kind": "literal",
+                      "value": "normal"
+                    },
+                    "members": {
+                      "kind": "literal",
+                      "value": []
+                    },
+                    "number": {
+                      "kind": "call",
+                      "function": "array.at",
+                      "version": 1,
+                      "args": [
+                        {
+                          "kind": "variable",
+                          "id": "r"
+                        },
+                        {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "tokenizerTitle",
+      "component": "Text",
+      "version": 1,
+      "props": {
+        "text": "Tokenizer",
+        "role": "heading"
+      }
+    }
+  ]
+}

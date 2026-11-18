@@ -69,64 +69,74 @@ window.nomiDesktop.requestChatGPT = async (method, params: any) => {
       },
     });
     const commands =
-      output === "diagram"
-        ? [
-            block("Input", 0),
-            block("Output", 350),
-            {
-              type: "connect",
-              connector: {
-                id: "line",
-                from: { placement: "pInput", side: "e" },
-                to: { placement: "pOutput", side: "w" },
-                routing: "rounded",
-                style: "solid",
-                startArrow: false,
-                endArrow: true,
-                label: "",
+      output === "chat"
+        ? []
+        : output === "diagram"
+          ? [
+              block("Input", 0),
+              block("Output", 350),
+              {
+                type: "connect",
+                connector: {
+                  id: "line",
+                  from: { placement: "pInput", side: "e" },
+                  to: { placement: "pOutput", side: "w" },
+                  routing: "rounded",
+                  style: "solid",
+                  startArrow: false,
+                  endArrow: true,
+                  label: "",
+                },
               },
-            },
-          ]
-        : [
-            {
-              type: "add_block",
-              block: {
-                id: "explanation",
-                type: "markdown",
-                source:
-                  params.messages.length > 1
-                    ? "## Revised explanation\n\nAn adjusted example."
-                    : "## Generated explanation\n\nA useful example.",
+            ]
+          : [
+              {
+                type: "add_block",
+                block: {
+                  id: "explanation",
+                  type: "markdown",
+                  source:
+                    params.messages.length > 1
+                      ? "## Revised explanation\n\nAn adjusted example."
+                      : "## Generated explanation\n\nA useful example.",
+                },
+                placement: {
+                  id: "p-explanation",
+                  content: "explanation",
+                  x: 0,
+                  y: 0,
+                  width: 500,
+                  height: 160,
+                },
               },
-              placement: {
-                id: "p-explanation",
-                content: "explanation",
-                x: 0,
-                y: 0,
-                width: 500,
-                height: 160,
+              {
+                type: "add_block",
+                block: {
+                  id: "experiment",
+                  type: "interactive",
+                  program: temperatureProgram,
+                },
+                placement: {
+                  id: "p-experiment",
+                  content: "experiment",
+                  x: 0,
+                  y: 220,
+                  width: 500,
+                  height: 600,
+                },
               },
-            },
-            {
-              type: "add_block",
-              block: {
-                id: "experiment",
-                type: "interactive",
-                program: temperatureProgram,
-              },
-              placement: {
-                id: "p-experiment",
-                content: "experiment",
-                x: 0,
-                y: 220,
-                width: 500,
-                height: 600,
-              },
-            },
-          ];
+            ];
     const emit = (text: string) =>
       listeners.forEach((fn) => fn({ requestId: params.requestId, text }));
-    emit('{"commands":[');
+    const reply =
+      output === "chat"
+        ? "词表记录词元，合并规则记录它们的组合顺序。"
+        : "已按你的要求更新文稿，可以继续调整。";
+    const prefix =
+      params.generation === "note-chat"
+        ? '{"reply":' + JSON.stringify(reply) + ',"commands":['
+        : '{"commands":[';
+    emit(prefix);
     for (let i = 0; i < commands.length; i++) {
       await new Promise((r) => setTimeout(r, output === "slow" ? 650 : 300));
       const encoded = (i ? "," : "") + JSON.stringify(commands[i]);
@@ -139,7 +149,14 @@ window.nomiDesktop.requestChatGPT = async (method, params: any) => {
     return {
       ok: true,
       value: {
-        text: output === "invalid" ? "bad json" : JSON.stringify({ commands }),
+        text:
+          output === "invalid"
+            ? "bad json"
+            : JSON.stringify(
+                params.generation === "note-chat"
+                  ? { reply, commands }
+                  : { commands },
+              ),
       },
     };
   }

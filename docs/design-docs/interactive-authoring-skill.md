@@ -19,7 +19,7 @@
 
 外部 Agent 输出单个 `<subject>.nomi-ui.json`，根对象为 InteractiveProgram，不能包在 Canvas commands 中。用户在文稿目标位置插入「交互块」，选择「导入交互定义（.json）」；代码位于 Notes 的 `importProgram`，校验后走现有文稿事务。
 
-直接在正文粘贴 JSON / HTML 转交互块尚未实现；Skill 不声称该能力已经可用。HTML 仅用于体验预览，当前不执行生成 HTML / JS。支持 draft-2 的开发运行时可导入；0.3.2 发布版缺少该扩展。跨端共享计算与动作语义，不承诺 HTML 自动转原生 UI。
+当前正文可将合法 InteractiveProgram JSON 直接粘贴为交互块，复制块也保留定义；任意 JSON / HTML 不转为可执行块。HTML 仅用于体验预览，当前不执行生成 HTML / JS。支持 draft-2 的开发运行时可导入；0.3.2 发布版缺少该扩展。跨端共享计算与动作语义，不承诺 HTML 自动转原生 UI。
 
 已确认的 BPE HTML 原型已转换为可导入 DSL，包含候选联动高亮、词元 chip、图标按钮、行数折叠和紧凑布局。通过组件 version 2 显式声明增强；不同平台遵循相同交互语义，以各自 renderer 适配布局。
 
@@ -42,3 +42,7 @@ Skill 正式来源在 `skills/nomi-interactive/`，入口为标准 `SKILL.md`；
 Table / Button / TextInput 通过组件 version 2 显式声明增强，其他组件保持 version 1。Table 可配置折叠行数、首尾窗口、绝对高亮行，单元格可含 tokens/emphasis；Button 支持语义图标、主次操作、禁用；TextInput 可重置相关 state。黑白灰为基础，少量蓝色用于关联数据，Row 在窄容器自动堆叠。折叠是本地视图状态，计算、完整数据与进度不被截断。旧组件和旧 DSL 继续兼容；不支持新版本的客户端应明确回退，不能默默丢弃交互。
 
 BPE 保持原算法，新增分组词元行、下一次合并标签、完成状态和高亮索引；输入变化重置 step。这里验证的是已确认原型的 DSL 转换与真实 renderer，不代表每次在线模型生成都能达到相同质量。移动端仍需实现这些版本化语义，HTML/JS 执行边界不变。
+
+## 2026-11-17 架构图
+
+Skill 新增 `assets/bpe-diagram.nomi-ui.json`，由 core 同源构建。选择 Diagram 表达关系、Stepper 表达线性教学、Table 表达比较；架构图不强制有控件。Diagram@1 要求新版能力，移动端尚未实现。包内 parser / evaluator 和 contract 已同步；真实模型生成与作者示例分别在 Electron 检查输入重算、连线及紧凑深浅色布局。

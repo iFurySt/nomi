@@ -141,9 +141,9 @@ export function canvasGenerationCommands(
 
 export const NOTE_INTERACTION_UNSUPPORTED =
   "暂不支持这种交互，请换一种方式描述。";
-export const NOTE_INTERACTION_REQUIRED = "未生成可操作的交互块，请重试。";
+export const NOTE_INTERACTION_REQUIRED = "未生成有效的交互块或架构图，请重试。";
 
-/** Same safe transport, with a separate note result contract. Never fall back to diagrams. */
+/** Same safe transport, with a separate note result contract. Explicit diagrams use the same validated portable block transport. */
 export function parseNoteGeneration(
   text: string,
   partial = false,
@@ -168,9 +168,11 @@ export function parseNoteGeneration(
         (b) =>
           !b.program.nodes.some(
             (n) =>
-              ["Slider", "SegmentedControl", "TextInput"].includes(
+              n.component === "Diagram" ||
+              (["Slider", "SegmentedControl", "TextInput"].includes(
                 n.component,
-              ) && n.bind?.value,
+              ) &&
+                n.bind?.value),
           ),
       ))
   )
@@ -179,3 +181,5 @@ export function parseNoteGeneration(
 }
 
 export { interactiveGenerationPrefix } from "./generation-preview";
+
+export { parseNoteChatReply, noteChatPrefix } from "./note-chat";

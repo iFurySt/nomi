@@ -4,7 +4,7 @@
 
 ## draft-2 当前扩展
 
-新增 TextInput、Metric、Table、Scene 四种组件（共 12 种），string 状态声明 maxLength，`set` 动作计算并校验新值后原子更新。Scene 仅包含 rect / circle / line / text，颜色为语义 token，坐标和项目数有界；不包含原始 SVG / HTML / JS。
+最初新增 TextInput、Metric、Table、Scene 四种组件（后续扩展见下），string 状态声明 maxLength，`set` 动作计算并校验新值后原子更新。Scene 仅包含 rect / circle / line / text，颜色为语义 token，坐标和项目数有界；不包含原始 SVG / HTML / JS。
 
 函数均版本 1：math.add/subtract/multiply/divide/pow/min/max/sin/cos，number.format（0..8 小数位，舍入零不显示负号），string.concat，object.get，array.length，learning.bpe；继承 draft-1 的函数。非有限计算、越界和未知能力拒绝，失败的派生计算不会污染下一次循环检测。
 
@@ -85,3 +85,11 @@ Swift 和 TypeScript 读取同一份 IR 与事件 fixture，对默认状态及�
 新增 `Panel@2.visible` 条件展示、`TokenFlow@1` 稳定词元身份与 `Stepper@1` 前后 / 自动手动播放；需在 requires 中显式声明。`learning.bpeWalkthrough@1` 将真实 BPE 计算映射为有限教学步骤，沿用原 BPE 的排序和替换规则。输入上限 600 字符，最多 128 词 / 32 次合并，位置范围 0..228。原 `learning.bpe@1` 的输出契约不变。
 
 动画只在宿主视图运行，不执行用户脚本，不阻塞动作；减少动态效果时直接显示结果。自动播放在检查点、离屏和后台停止。新组件 / 函数尚无 Swift 或 Android renderer；不支持的客户端按 capability 拒绝执行。完整语义、限制与实例见 [BPE 引导版 DSL 对照](interactive-content-v2.md#2026-11-15-bpe-引导版-dsl-对照)。
+
+## 2026-11-17 Diagram@1
+
+portable draft-2 增加 `Diagram {label, children, edges:[{from,to}]}`。children 为 1–16 个唯一视图子树 ID，边最多 24 条，端点必须属于直接 children，禁止重复 / 自环 / 有向环。拓扑静态，不接受动态边、布局源码或外部资源；节点内继续复用既有声明式组件与有界计算。纯架构图允许没有输入控件，不能据此把实验计算替换为静态图。
+
+React renderer 采用稳定的拓扑分层与节点实际尺寸绘制分叉 / 汇合箭头，节点高度最多 300px，长内容局部滚动；过宽图保留结构并横向滚动。窄屏和其他平台可以按自身 renderer 适配，同一 DSL 不携带像素坐标。Swift / 移动端尚未实现该组件，旧客户端应按未知能力拒绝。
+
+同源范例 `bpe-diagram.json` 与真实合成 fixture `fixtures/generated-bpe-diagram.json` 分别覆盖作者基线和模型输出；测试见 `diagram.test.ts`、`scripts/check-interactive-diagram.mjs`。

@@ -45,6 +45,7 @@ export const interactiveComponents = [
   "Table",
   "Metric",
   "Scene",
+  "Diagram",
 ] as const;
 export type InteractiveComponent = (typeof interactiveComponents)[number];
 export interface InteractiveNode {

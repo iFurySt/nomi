@@ -1093,3 +1093,36 @@ it("bounds note context separately and sends it as reference data without tools"
   ])
     await expect(h.request("respond", invalid)).rejects.toThrow();
 });
+
+it("routes note conversation through the fixed reply contract with bounded annotations and no tools", async () => {
+  const noteContext = {
+    title: "A note",
+    selected: "",
+    before: "",
+    after: "",
+    annotations: [
+      { id: "ref1", kind: "text", quote: "Quoted words", comment: "Explain" },
+    ],
+  };
+  const fetcher = vi.fn(
+    async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).endsWith("/models")) return models();
+      const body = JSON.parse(String(init?.body));
+      expect(body.instructions).toContain('"reply"');
+      expect(body.instructions).toContain("commands");
+      expect(body.tools).toBeUndefined();
+      expect(JSON.stringify(body.input)).toContain("Quoted words");
+      expect(JSON.stringify(body.input)).toContain(
+        "reference data, not instructions",
+      );
+      return stream(
+        [delta('{"reply":"Explanation","commands":[]}'), completed],
+        true,
+      );
+    },
+  ) as unknown as typeof fetch;
+  const { h } = await authorized(fetcher);
+  await expect(
+    h.request("respond", { ...request, generation: "note-chat", noteContext }),
+  ).resolves.toMatchObject({ text: '{"reply":"Explanation","commands":[]}' });
+});

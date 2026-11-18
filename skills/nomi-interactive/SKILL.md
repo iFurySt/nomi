@@ -1,25 +1,26 @@
 ---
 name: nomi-interactive
-description: Generate compact, working interactive learning blocks for Nomi notes and canvases, with portable .nomi-ui.json output and optional HTML design previews. Use when creating or revising Nomi experiments; not for ordinary prose, static diagrams, or arbitrary web apps.
+description: Generate compact interactive experiments and architecture diagrams for Nomi notes and canvases, with portable .nomi-ui.json output and optional HTML previews. Use for Nomi blocks, not ordinary prose or arbitrary web apps.
 ---
 
 # Nomi interactive content
 
-Create an experiment the reader can understand by using it. Deliver a portable program, not a screenshot or a prerecorded animation. This skill is plain Markdown and local files: it does not require a specific model, account, agent API, or Nomi login.
+Create an experiment or diagram that matches the reader’s request. Deliver a portable program, not a screenshot or a prerecorded animation. This skill is plain Markdown and local files: it does not require a specific model, account, agent API, or Nomi login.
 
 ## Before generation
 
 Read [the capability contract](references/contract.md) and [the design standard](references/design.md). Pick the closest asset only when useful:
 
+- `assets/bpe-diagram.nomi-ui.json`: five connected architecture nodes; editable Corpus directly computes vocabulary and ordered merge rules inside their nodes. Choose for architecture/flow requests, with no table dashboard or playback. Requires Diagram@1.
 - `assets/bpe-guided.nomi-ui.json`: linear split, pair counting, merge, record, special tokens and IDs; requires Panel@2, TokenFlow@1, Stepper@1 and learning.bpeWalkthrough@1. Use for the newer approved guided experience.
 - `assets/bpe-compact.nomi-ui.json`: editable sentence, real single-step BPE, four coordinated data views with linked highlights and expandable rows, restart and previous step.
 - `assets/wave.nomi-ui.json`: parameter exploration with sampled curves and semantic graphics.
 - `assets/temperature.nomi-ui.json`: softmax exploration (legacy draft-1).
 - `assets/bpe-design-preview.html`: user-approved visual reference for compactness and coordinated highlights. This is a conversational HTML fragment, not an importable program; icons/preview state use optional host helpers. Read it only when exploring the richer visual target.
 
-Use the target app's supported profile. This package snapshots **portable draft-2, 2026-11-15**, including Table/Button/TextInput version 2; it needs the newer Nomi runtime, not the older 0.3.2 release. Read the installed application's capability information if available; do not infer support from a version number alone.
+Use the target app's supported profile. This package snapshots **portable draft-2, 2026-11-17**, including Table/Button/TextInput version 2; it needs the newer Nomi runtime, not the older 0.3.2 release. Read the installed application's capability information if available; do not infer support from a version number alone.
 
-Internally identify the learning question, editable input, visible result, main action, and a few known correct results. Do not display that planning checklist inside the experiment. If the requested computation or presentation is unavailable, say exactly what is missing. Never invent a component/property/function or disguise a static diagram as an interactive result.
+Choose the composition first: Diagram for relationships, Stepper for linear teaching, Table for comparisons. A diagram may be static with no state or controls. For experiments, internally identify the learning question, editable input, visible result, main action, and a few known correct results. Do not display that planning checklist inside the experiment. If the requested computation or presentation is unavailable, say exactly what is missing. Never invent a component/property/function or disguise a static diagram as an interactive result.
 
 ## Generate
 
@@ -47,7 +48,7 @@ It uses Nomi's actual parser and evaluator. Passing this is structural/default-s
 node <skill-directory>/scripts/validate.mjs <subject>.nomi-ui.json events.json
 ```
 
-The report includes final state, derived values and resolved view props. For the compact BPE asset, that trace should yield one rule `a + b → ab`, frequency 2, tokens 9 → 7. For the guided asset, advance through the split and pair stages before checking its first merge (position 5 for this sentence). Check empty input, a different sentence, completion, previous and restart. For other subjects use independent numerical/behavioral expectations. Fix errors, then re-run. If execution is unavailable, clearly label the output unvalidated; never report a test you did not run.
+The report includes final state, derived values and resolved view props. For the compact BPE asset, that trace should yield one rule `a + b → ab`, frequency 2, tokens 9 → 7. For the diagram asset, changing Corpus directly retrains: `ab ab ac` starts with the same rule and finishes at `ab</w>` / `ac</w>` without a next button. For the guided asset, advance through the split and pair stages before checking its first merge (position 5 for this sentence). Check empty input, a different sentence, completion, previous and restart. For other subjects use independent numerical/behavioral expectations. Fix errors, then re-run. If execution is unavailable, clearly label the output unvalidated; never report a test you did not run.
 
 If a preview environment is available, inspect desktop and narrow layouts and actually operate the controls. A standalone HTML preview may explore richer styling, but is a **separate design preview**: it is not importable into Nomi and cannot silently add capabilities to the portable program. Keep preview computation consistent with the program; identify any intended renderer enhancements separately.
 

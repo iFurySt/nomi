@@ -229,9 +229,10 @@ export function SelectionToolbar({
       onPointerDown={(e) => e.preventDefault()}
     >
       {onAI && (
-        <Tooltip label="AI">
+        <Tooltip label="添加到 AI 对话">
           <button aria-label="AI" onClick={() => onAI(anchor.range)}>
             <Sparkles size={17} />
+            <span>添加到对话</span>
           </button>
         </Tooltip>
       )}

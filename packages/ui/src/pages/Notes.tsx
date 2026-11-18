@@ -23,7 +23,7 @@ import {
   type BlockDrag,
   type TextSnapshot,
 } from "../writing/blockOperations";
-import { FileText } from "lucide-react";
+import { FileText, MessageCircle } from "lucide-react";
 import { WritingOutline } from "../writing/WritingOutline";
 import { Markdown } from "../canvas/Markdown";
 import {
@@ -59,7 +59,12 @@ import { NotesLibrary, noteMoveTargets } from "../writing/NotesLibrary";
 import { ResizableNotesLayout } from "../writing/ResizableNotesLayout";
 import { writingRows, type WritingRow } from "../writing/writingRows";
 import { NoteAIPreview } from "../writing/NoteAIPreview";
-import { GenerateCanvas } from "../canvas/GenerateCanvas";
+import { NoteAnnotationEditor } from "../writing/NoteAnnotations";
+import { NoteChat } from "../writing/NoteChat";
+import {
+  NoteAnnotationHighlight,
+  type AnchoredAnnotation,
+} from "../writing/NoteAnnotationHighlight";
 import { CanvasContent } from "../canvas/CanvasContent";
 import {
   noteAIContext,
@@ -67,7 +72,11 @@ import {
   reviseNoteGeneration,
   type NoteAIRange,
 } from "../writing/noteAI";
-import type { CanvasDocument, NoteGenerationContext } from "@nomi/core";
+import type {
+  CanvasDocument,
+  NoteGenerationContext,
+  NoteAnnotation,
+} from "@nomi/core";
 import { Modal } from "../components/primitives";
 import { Select } from "../components/Select";
 import "../writing/writing.css";
@@ -113,14 +122,23 @@ export function Notes({ profile }: { profile: string }) {
     rowId: string;
     order: string[];
     context: NoteGenerationContext;
-    cursor: { editor: Editor; position: number };
+    cursor?: { editor: Editor; position: number };
     result?: CanvasBlock[];
     anchor: NonNullable<typeof insertion.current>;
+  }>();
+  const [aiOpen, setAIOpen] = useState(false);
+  const [annotations, setAnnotations] = useState<AnchoredAnnotation[]>([]);
+  const [annotationEdit, setAnnotationEdit] = useState<{
+    id: string;
+    isNew: boolean;
   }>();
   const [aiBusy, setAIBusy] = useState(false);
   const [aiPreview, setAIPreview] = useState<CanvasDocument>();
   useEffect(() => {
     setNoteAI(undefined);
+    setAIOpen(false);
+    setAnnotations([]);
+    setAnnotationEdit(undefined);
     setAIBusy(false);
     setAIPreview(undefined);
   }, [selected, profile]);
@@ -498,22 +516,105 @@ export function Notes({ profile }: { profile: string }) {
         : { id: note!.blocks[0], after: false };
     return { id: row.block.id, pos, after, replaceTo, replaceText };
   }
-  function openNoteAI(row: WritingRow, range: NoteAIRange) {
+  function editAnnotation(id: string) {
+    if (aiBusy) return;
+    if (annotationEdit?.isNew && annotationEdit.id !== id)
+      setAnnotations((items) =>
+        items.filter((a) => a.id !== annotationEdit.id),
+      );
+    setAnnotationEdit({
+      id,
+      isNew: (annotationEdit?.id === id && annotationEdit.isNew) || false,
+    });
+  }
+  function addAnnotation(item: AnchoredAnnotation) {
+    if (aiBusy) return;
+    const existing = annotations.find(
+      (a) => a.rowId === item.rowId && a.quote === item.quote,
+    );
+    if (existing) {
+      editAnnotation(existing.id);
+      return;
+    }
+    if (
+      annotations.length >= 8 ||
+      annotations.reduce((n, a) => n + a.quote.length + 1000, 0) +
+        item.quote.length +
+        1000 >
+        16000
+    ) {
+      notify("批注较多，请先发送这一组。");
+      return;
+    }
+    setAnnotations((items) => [
+      ...items.filter(
+        (a) => !(annotationEdit?.isNew && a.id === annotationEdit.id),
+      ),
+      item,
+    ]);
+    setAnnotationEdit({ id: item.id, isNew: true });
+    item.editor?.commands.blur();
+  }
+  function openNoteAI(row: WritingRow, range?: NoteAIRange, fresh = false) {
+    if (aiBusy && !fresh) {
+      setAIOpen(true);
+      return;
+    }
     const current = data.current.current;
     const owner = current?.notes.find((n) => n.id === note?.id);
     const editor = editors.current.get(row.block.id);
-    if (!current || !owner || !editor) return;
-    const point = pointForRow(row, range.to);
+    if (!current || !owner) return;
+    setAIOpen(true);
+    if (fresh) {
+      setAnnotations([]);
+      setAnnotationEdit(undefined);
+    }
+    if (!fresh && range && editor && range.from !== range.to) {
+      addAnnotation({
+        id: newCanvasId("annotation"),
+        kind: "text",
+        rowId: row.block.id,
+        quote: editor.state.doc
+          .textBetween(range.from, range.to, "\n")
+          .slice(0, 4000),
+        comment: "",
+        editor,
+        from: range.from,
+        to: range.to,
+      });
+    } else if (!fresh && !range) {
+      const raw =
+        row.block.type === "markdown"
+          ? row.block.source
+          : JSON.stringify(row.block);
+      addAnnotation({
+        id: newCanvasId("annotation"),
+        kind: "block",
+        rowId: row.block.id,
+        quote:
+          raw.length > 8000 ? raw.slice(0, 7980) + "\n…（引用已截断）" : raw,
+        comment: "",
+      });
+    }
+    if (noteAI && !fresh) return;
+    const point = pointForRow(row, range?.to);
     const source = current.blocks.find((b) => b.id === point.id);
     setAIPreview(undefined);
-    setAIBusy(false);
     setNoteAI({
       id: newCanvasId("generation"),
       noteId: owner.id,
       rowId: row.block.id,
       order: [...owner.blocks],
-      context: noteAIContext(current, owner, row, editor, range),
-      cursor: { editor, position: range.to },
+      context:
+        editor && range
+          ? noteAIContext(current, owner, row, editor, range)
+          : {
+              title: owner.title.slice(0, 256),
+              selected: "",
+              before: "",
+              after: "",
+            },
+      cursor: editor && range ? { editor, position: range.to } : undefined,
       anchor: {
         noteId: owner.id,
         point,
@@ -524,6 +625,33 @@ export function Notes({ profile }: { profile: string }) {
       },
     });
     endEditing();
+  }
+  function openSidebar(fresh = false) {
+    if (noteAI && !fresh) {
+      setAIOpen(true);
+      return;
+    }
+    const row = rows.find((r) => r.block.id === activeText) ?? rows.at(-1);
+    if (!row) return;
+    const editor = editors.current.get(row.block.id);
+    const pos = editor?.state.selection.to ?? 0;
+    openNoteAI(row, { from: pos, to: pos }, fresh);
+  }
+  function cancelAnnotationEdit() {
+    if (annotationEdit?.isNew)
+      setAnnotations((items) =>
+        items.filter((a) => a.id !== annotationEdit.id),
+      );
+    setAnnotationEdit(undefined);
+  }
+  function updateAnnotations(items: NoteAnnotation[]) {
+    setAnnotationEdit(undefined);
+    setAnnotations((previous) =>
+      items.map((item) => ({
+        ...previous.find((a) => a.id === item.id)!,
+        ...item,
+      })),
+    );
   }
   function insertBeside(
     row: WritingRow,
@@ -1123,12 +1251,40 @@ export function Notes({ profile }: { profile: string }) {
                     <section
                       className={`writing-block writing-block-${block.type}`}
                       data-writing-block={id}
+                      data-ai-annotated={
+                        annotations.some(
+                          (a) => a.rowId === id && a.kind === "block",
+                        ) || undefined
+                      }
                       data-collapsed-gap={
                         (row.draft && collapsedGaps.has(id)) || undefined
                       }
                       tabIndex={-1}
                       key={id}
                     >
+                      {annotations
+                        .filter((a) => a.rowId === id)
+                        .map((a) =>
+                          a.editor ? (
+                            <NoteAnnotationHighlight
+                              key={a.id}
+                              annotation={a}
+                              number={annotations.indexOf(a) + 1}
+                              onOpen={() => editAnnotation(a.id)}
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              key={a.id}
+                              data-annotation-id={a.id}
+                              aria-label={`打开批注 ${annotations.indexOf(a) + 1}`}
+                              onClick={() => editAnnotation(a.id)}
+                              className="note-annotation-badge block-badge"
+                            >
+                              {annotations.indexOf(a) + 1}
+                            </button>
+                          ),
+                        )}
                       {dropMark?.id === id && (
                         <div
                           className="writing-drop-line"
@@ -1139,6 +1295,7 @@ export function Notes({ profile }: { profile: string }) {
                         (block.type !== "markdown" || sourceOnly) && (
                           <BlockActions
                             kind={block.type}
+                            onAI={() => openNoteAI(row)}
                             onCanvas={() => attempt(placeOnCanvas)}
                             onRemove={() =>
                               attempt(() =>
@@ -1365,7 +1522,7 @@ export function Notes({ profile }: { profile: string }) {
                           <NoteAIPreview
                             editor={editors.current.get(id)}
                             position={
-                              noteAI.result ? 0 : noteAI.cursor.position
+                              noteAI.result ? 0 : noteAI.cursor?.position
                             }
                           >
                             {!aiPreview && (
@@ -1425,68 +1582,107 @@ export function Notes({ profile }: { profile: string }) {
           </div>
           {note && <WritingOutline scroll={scrollPane} noteId={note.id} />}
         </div>
+        {note && !aiOpen && (
+          <button
+            className="note-chat-launcher"
+            aria-label="打开 AI"
+            title="打开 AI"
+            onClick={() => openSidebar()}
+          >
+            <MessageCircle size={21} />
+          </button>
+        )}
       </div>
-      {noteAI && noteAI.noteId === note?.id && (
-        <div className="note-ai-layer">
-          <GenerateCanvas
-            key={noteAI.id}
-            noteContext={noteAI.context}
-            anchor={noteAI.cursor}
-            onBusyChange={setAIBusy}
-            onClose={() => {
-              setNoteAI(undefined);
-              setAIBusy(false);
-              setAIPreview(undefined);
+      {annotationEdit &&
+        annotations.find((a) => a.id === annotationEdit.id) && (
+          <NoteAnnotationEditor
+            key={annotationEdit.id}
+            annotation={annotations.find((a) => a.id === annotationEdit.id)!}
+            number={
+              annotations.findIndex((a) => a.id === annotationEdit.id) + 1
+            }
+            isNew={annotationEdit.isNew}
+            onCancel={cancelAnnotationEdit}
+            onSave={(comment) => {
+              setAnnotations((items) =>
+                items.map((a) =>
+                  a.id === annotationEdit.id ? { ...a, comment } : a,
+                ),
+              );
+              setAnnotationEdit(undefined);
             }}
-            onStart={() => setAIPreview(undefined)}
-            onPreview={setAIPreview}
-            onInsert={(scene) => {
-              try {
-                const document = data.current.current;
-                if (!document) return false;
-                const blocks = generatedNoteBlocks(scene);
-                const [first, ...rest] = blocks;
-                if (!first) return false;
-                if (noteAI.result) {
-                  const commands = reviseNoteGeneration(
-                    document,
-                    noteAI.noteId,
-                    noteAI.result,
-                    blocks,
-                  );
-                  data.endGroup();
-                  data.edit(commands);
-                  data.endGroup();
-                } else {
-                  const current = document.notes.find(
-                    (n) => n.id === noteAI.noteId,
-                  );
-                  if (
-                    JSON.stringify(current?.blocks) !==
-                    JSON.stringify(noteAI.order)
-                  )
-                    return false;
-                  insertContent(
-                    noteAI.noteId,
-                    first,
-                    undefined,
-                    [],
-                    noteAI.anchor,
-                    [],
-                    rest,
-                  );
-                  data.endGroup();
-                }
-                setNoteAI(
-                  (session) => session && { ...session, result: blocks },
-                );
-                return true;
-              } catch {
-                return false;
-              }
+            onDelete={() => {
+              setAnnotations((items) =>
+                items.filter((a) => a.id !== annotationEdit.id),
+              );
+              setAnnotationEdit(undefined);
             }}
           />
-        </div>
+        )}
+      {noteAI && noteAI.noteId === note?.id && (
+        <NoteChat
+          key={noteAI.id}
+          visible={aiOpen}
+          context={noteAI.context}
+          annotations={annotations.filter(
+            (a) => !(annotationEdit?.isNew && a.id === annotationEdit.id),
+          )}
+          onEditAnnotation={editAnnotation}
+          onAnnotationsChange={updateAnnotations}
+          onNew={() => openSidebar(true)}
+          onBusyChange={setAIBusy}
+          onClose={() => {
+            setAIOpen(false);
+            cancelAnnotationEdit();
+            setAIBusy(false);
+            setAIPreview(undefined);
+          }}
+          onStart={() => setAIPreview(undefined)}
+          onPreview={setAIPreview}
+          onInsert={(scene) => {
+            try {
+              const document = data.current.current;
+              if (!document) return false;
+              const blocks = generatedNoteBlocks(scene);
+              const [first, ...rest] = blocks;
+              if (!first) return false;
+              if (noteAI.result) {
+                const commands = reviseNoteGeneration(
+                  document,
+                  noteAI.noteId,
+                  noteAI.result,
+                  blocks,
+                );
+                data.endGroup();
+                data.edit(commands);
+                data.endGroup();
+              } else {
+                const current = document.notes.find(
+                  (n) => n.id === noteAI.noteId,
+                );
+                if (
+                  JSON.stringify(current?.blocks) !==
+                  JSON.stringify(noteAI.order)
+                )
+                  return false;
+                insertContent(
+                  noteAI.noteId,
+                  first,
+                  undefined,
+                  [],
+                  noteAI.anchor,
+                  [],
+                  rest,
+                );
+                data.endGroup();
+              }
+              setNoteAI((session) => session && { ...session, result: blocks });
+              return true;
+            } catch {
+              return false;
+            }
+          }}
+        />
       )}
       <input
         hidden

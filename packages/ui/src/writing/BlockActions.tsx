@@ -87,6 +87,7 @@ export function BlockActions({
   empty = false,
   onFormat,
   onCanvas,
+  onAI,
   tableActions,
   tableOutput,
   mathAlignment,
@@ -94,6 +95,7 @@ export function BlockActions({
   empty?: boolean;
   onFormat?: (format: TextFormat) => void;
   onCanvas?: () => void;
+  onAI?: () => void;
   tableActions?: { label: string; run: () => void }[];
   tableOutput?: { copy: () => Promise<void>; download: () => void };
   mathAlignment?: {
@@ -451,6 +453,12 @@ export function BlockActions({
                   </DropdownMenu.Portal>
                 </DropdownMenu.Sub>
               </>
+            )}
+            {onAI && (
+              <DropdownMenu.Item className="dropdown-item" onSelect={onAI}>
+                <Quote size={15} />
+                添加到 AI 对话
+              </DropdownMenu.Item>
             )}
             {onCanvas && (
               <>
