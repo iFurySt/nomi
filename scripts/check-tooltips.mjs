@@ -91,8 +91,17 @@ async function check({ output }) {
           y: Math.round(b.y + b.height / 2),
         };
       }, selector);
+    const leaveTools = async () => {
+      win.webContents.sendInputEvent({
+        type: "mouseMove",
+        ...(await run(() => ({
+          x: Math.round(window.innerWidth * 0.75),
+          y: Math.round(window.innerHeight * 0.65),
+        }))),
+      });
+    };
     const move = async (selector) => {
-      win.webContents.sendInputEvent({ type: "mouseMove", x: 1180, y: 880 });
+      await leaveTools();
       await wait(60);
       win.webContents.sendInputEvent({
         type: "mouseMove",
@@ -288,12 +297,8 @@ async function check({ output }) {
       ),
       "Adjacent shape hints overlap",
     );
-    win.webContents.sendInputEvent({ type: "mouseMove", x: 1180, y: 880 });
-    await wait(40);
-    assert(
-      await run(() => !document.querySelector(".nomi-tooltip")),
-      "Hint remains after leaving palette",
-    );
+    await leaveTools();
+    await until(() => run(() => !document.querySelector(".nomi-tooltip")));
     await run(() => window.tooltipObserver.disconnect());
     await key("Escape");
     await run(() => (document.documentElement.dataset.theme = "dark"));
