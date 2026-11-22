@@ -19,6 +19,10 @@ import {
   applyCanvasCommands,
   type CanvasDocument,
 } from "../../core/src/canvas/index";
+import {
+  bpeDiagramProgram,
+  temperatureProgram,
+} from "../../core/src/interactive";
 import { DocumentStore } from "./document-store";
 import { readPackage, readPackageTree, packageHash } from "./nomi-package";
 import { commitTree } from "./note-directory-tree";
@@ -53,6 +57,42 @@ async function fixture(save = true) {
     store.save({ ...input, document: d, baseRevision });
   return { path, root, tree, store, doc, input, load, put, config };
 }
+it("stores each interactive node on one line in notes and embedded canvases and reads legacy JSON", async () => {
+  const f = await fixture(false);
+  const scene = emptyCanvasScene("scene.format");
+  scene.blocks.push({
+    id: "inner.lab",
+    type: "interactive",
+    program: temperatureProgram,
+  });
+  f.doc.blocks.push(
+    { id: "outer.lab", type: "interactive", program: bpeDiagramProgram },
+    { id: "canvas.format", type: "canvas", scene },
+  );
+  f.doc.notes[0].blocks.push("outer.lab", "canvas.format");
+  await f.store.save(f.input);
+  const path = join(f.tree, "A.nomi");
+  const saved = await readPackage(path);
+  for (const [file, program] of [
+    ["interactive/outer.lab.nomi-ui.json", bpeDiagramProgram],
+    [
+      "canvases/canvas.format/interactive/inner.lab.nomi-ui.json",
+      temperatureProgram,
+    ],
+  ] as const) {
+    const source = saved.files.get(file)!.toString();
+    expect(JSON.parse(source)).toEqual(program);
+    const nodeLines = source
+      .split("\n")
+      .filter((line) => line.startsWith("    "));
+    expect(nodeLines.map((line) => JSON.parse(line.replace(/,$/, "")))).toEqual(
+      program.nodes,
+    );
+    await writeFile(join(path, file), JSON.stringify(program, null, 2));
+  }
+  expect((await readPackage(path)).document).toEqual(saved.document);
+});
+
 it("round trips embedded native scenes, nested sources and originals through external edits and import", async () => {
   const f = await fixture();
   const scene = emptyCanvasScene("scene.inline");

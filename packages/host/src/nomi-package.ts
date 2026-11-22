@@ -10,11 +10,26 @@ import {
   type CanvasBlock,
   type CanvasAsset,
 } from "../../core/src/canvas/index";
+import type { InteractiveProgram } from "../../core/src/interactive/types";
 import { regularFile, directory } from "./document-files";
 
 export const packageHash = (v: string | Uint8Array) =>
   createHash("sha256").update(v).digest("hex");
 const json = (v: unknown) => JSON.stringify(v, null, 2) + "\n";
+function formatInteractiveSource(program: InteractiveProgram): string {
+  const fields = Object.entries(program).map(([key, value]) => {
+    let encoded: string;
+    if (key === "nodes") {
+      const lines = program.nodes.map((node) => "    " + JSON.stringify(node));
+      encoded = "[\n" + lines.join(",\n") + "\n  ]";
+    } else {
+      encoded = JSON.stringify(value);
+    }
+    return "  " + JSON.stringify(key) + ": " + encoded;
+  });
+  return "{\n" + fields.join(",\n") + "\n}\n";
+}
+
 export const packageName = (title: string) => {
   let name =
     title
@@ -182,7 +197,7 @@ export function encodePackage(
         b.source = path;
       } else if (b.type === "interactive") {
         const path = `${prefix}interactive/${b.id}.nomi-ui.json`;
-        files.set(path, Buffer.from(json(b.program)));
+        files.set(path, Buffer.from(formatInteractiveSource(b.program)));
         delete b.program;
         b.source = path;
       }

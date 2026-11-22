@@ -67,7 +67,7 @@ Markdown 存储块：
 { "id": "interactive.lab", "type": "interactive", "source": "interactive/interactive.lab.nomi-ui.json" }
 ```
 
-读取时还原为 `program`。图片 / 文件 / 形状、Asset metadata、Placement、Connector 等继续现有 IR 定义，保留图片说明、连线类型 / 端点 / 手动路径及样式。路径拒绝绝对路径、空片段、`..` 和 symlink 逃逸；原件校验字节数与 SHA-256。
+桌面保存 `.nomi-ui.json` 时每个顶层字段占一行，`nodes` 数组中每个节点单独占一行，节点内使用紧凑 JSON。整个文件仍是一个标准 JSON 对象。读取时兼容旧缩进格式并还原为 `program`。同一排版适用于内嵌画布的交互源文件。图片 / 文件 / 形状、Asset metadata、Placement、Connector 等继续现有 IR 定义，保留图片说明、连线类型 / 端点 / 手动路径及样式。路径拒绝绝对路径、空片段、`..` 和 symlink 逃逸；原件校验字节数与 SHA-256。
 
 ## 可选文稿图标（2026-11-01）
 
