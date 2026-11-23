@@ -127,6 +127,24 @@ func (s *Server) authorized(w http.ResponseWriter, r *http.Request) {
 			names = append(names, name)
 		}
 		reply(w, names, rows.Err())
+	case path == "me" && r.Method == "DELETE":
+		var in struct {
+			Confirm string `json:"confirm"`
+		}
+		if !decode(w, r, &in) {
+			return
+		}
+		if in.Confirm != "DELETE" {
+			writeError(w, problem(400, "confirmation_required", "Confirm account deletion"))
+			return
+		}
+		err := s.Store.DeleteAccount(ctx, user)
+		if err == nil {
+			if disk, ok := s.Objects.(*DiskObjects); ok && s.Store.PurgeErasedSpaces(ctx, disk) != nil {
+				slog.Error("object erasure queued for retry")
+			}
+		}
+		reply(w, map[string]bool{"deleted": err == nil}, err)
 	case path == "me" && r.Method == "GET":
 		writeJSON(w, 200, i)
 	case path == "sessions" && r.Method == "GET":

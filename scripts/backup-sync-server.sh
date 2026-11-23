@@ -11,12 +11,44 @@ else
   sync_command=("${NOMI_SYNC_BINARY:?Set NOMI_SYNC_BINARY or NOMI_SYNC_SERVICE_CONTAINER}")
 fi
 if [[ -n "${NOMI_SYNC_PG_CONTAINER:-}" ]]; then
-  docker exec "${NOMI_SYNC_PG_CONTAINER}" pg_dump -U "${NOMI_SYNC_DB_USER:-nomi}" -d "${NOMI_SYNC_DB_NAME:-nomi_sync}" --format=custom --no-owner --no-privileges > "${backup_dir}/database.dump"
+  db_command=(docker exec -i "${NOMI_SYNC_PG_CONTAINER}")
+  db_options=(-U "${NOMI_SYNC_DB_USER:-nomi}" -d "${NOMI_SYNC_DB_NAME:-nomi_sync}")
 else
-  PGDATABASE="${NOMI_SYNC_DATABASE_URL:?Set database URL}" pg_dump --format=custom --no-owner --no-privileges > "${backup_dir}/database.dump"
+  export PGDATABASE="${NOMI_SYNC_DATABASE_URL:?Set database URL}"
+  db_command=()
+  db_options=()
 fi
-# Dump first, then originals: immutable files cannot disappear while physical GC is disabled.
-"${sync_command[@]}" export-objects | gzip > "${backup_dir}/objects.tar.gz"
+# Deletion takes the exclusive form of this lock. Keep originals and their
+# database references available across both phases of the paired backup.
+python3 - "${backup_dir}" "${db_command[@]}" psql "${db_options[@]}" -- \
+  "${db_command[@]}" pg_dump "${db_options[@]}" --format=custom --no-owner --no-privileges -- \
+  "${sync_command[@]}" export-objects <<'BACKUP'
+import gzip, pathlib, shutil, subprocess, sys
+root = pathlib.Path(sys.argv[1])
+commands = [[]]
+for value in sys.argv[2:]:
+    if value == "--":
+        commands.append([])
+    else:
+        commands[-1].append(value)
+psql, dump, export = commands
+with subprocess.Popen(psql + ["-XqAt", "-v", "ON_ERROR_STOP=1"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True) as lock:
+    try:
+        lock.stdin.write("SELECT 'locked' FROM pg_advisory_lock_shared(68410237);\n")
+        lock.stdin.flush()
+        if lock.stdout.readline().strip() != "locked":
+            raise RuntimeError("Could not protect backup against account deletion")
+        with (root / "database.dump").open("wb") as output:
+            subprocess.run(dump, stdout=output, check=True)
+        with gzip.open(root / "objects.tar.gz", "wb") as output, subprocess.Popen(export, stdout=subprocess.PIPE) as objects:
+            shutil.copyfileobj(objects.stdout, output)
+            if objects.wait():
+                raise RuntimeError("Object export failed")
+        if lock.poll() is not None:
+            raise RuntimeError("Backup lock was lost")
+    finally:
+        lock.stdin.close()
+BACKUP
 python3 - "${backup_dir}" <<'PY'
 import hashlib,json,pathlib,sys,datetime
 def digest(f):

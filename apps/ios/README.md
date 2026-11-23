@@ -62,3 +62,7 @@ Apple 已在既有 App ID `com.ifuryst.nomi` 启用 Sign in with Apple，并设�
 [Duo 账号界面截图](../../docs/generated/verification/mobile-account/)包括访客入口、登录页、已登录的设置页和版本菜单。
 
 如要验证官网与 Google 的在线入口，在上述 xcodebuild 命令前设置 `TEST_RUNNER_NOMI_CHECK_GOOGLE_CONSENT=1`，将测试项改为 `NomiMobileUITests/GoogleConsentTests/testAuthorizationPage`。此项在系统认证窗口出现 Google 账号选择或登录表单时完成；个人账号授权由账号持有者操作。
+
+## App Store 首发
+
+发行 Scheme 为 NomiMobile。使用当前工程生成 Release archive，Bundle ID 为 `com.ifuryst.nomi`。首发使用现有 iOS 1.0 商店草稿。登录页与个人设置提供 [隐私政策](https://nomi.ifuryst.com/privacy/) 和 [使用支持](https://nomi.ifuryst.com/support/)。已登录用户可在个人设置确认永久注销账号。账号数据和云库从服务器移除，本机独立文稿保留。应用使用 Apple 的身份令牌核验身份，未持有 Apple 的访问令牌或刷新令牌。Apple 登录用户可从设置或支持页面进入 Apple 账户管理授权。

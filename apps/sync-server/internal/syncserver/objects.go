@@ -162,13 +162,27 @@ func (s *Server) object(w http.ResponseWriter, r *http.Request, user, space, has
 			writeError(w, problem(413, "object_too_large", "Attachment exceeds 20 MiB"))
 			return
 		}
-		// Disk writes finish before the ready marker; a crash between these steps is safely retried.
+		// Hold the space against deletion until the original and its ready marker are durable.
+		tx, err := s.Store.DB.Begin(r.Context())
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		defer tx.Rollback(r.Context())
+		var id string
+		if err = tx.QueryRow(r.Context(), "SELECT id FROM sync_spaces WHERE id=$1 AND owner_id=$2 FOR KEY SHARE", space, user).Scan(&id); err != nil {
+			writeError(w, err)
+			return
+		}
 		n, err := s.Objects.Put(r.Context(), space, hash, http.MaxBytesReader(w, r.Body, MaxObjectBytes+1))
 		if err != nil {
 			writeError(w, err)
 			return
 		}
-		_, err = s.Store.DB.Exec(r.Context(), `INSERT INTO sync_objects(space_id,sha256,bytes) VALUES($1,$2,$3) ON CONFLICT(space_id,sha256) DO NOTHING`, space, hash, n)
+		_, err = tx.Exec(r.Context(), `INSERT INTO sync_objects(space_id,sha256,bytes) VALUES($1,$2,$3) ON CONFLICT(space_id,sha256) DO NOTHING`, space, hash, n)
+		if err == nil {
+			err = tx.Commit(r.Context())
+		}
 		reply(w, map[string]any{"sha256": hash, "bytes": n, "ready": true}, err)
 	case "GET", "HEAD":
 		var ready bool

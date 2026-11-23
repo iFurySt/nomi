@@ -94,8 +94,31 @@ final class MobileCloud {
         message = nil
     }
 
+    func deleteAccount() async throws {
+        guard !busy, let identity = session else { throw CloudFailure("请稍后再试。") }
+        busy = true
+        defer { busy = false }
+        let remote = try await CloudAPI.request(identity.site, "v1/spaces", token: identity.token)
+        guard let libraries = remote as? [CloudJSON] else { throw LibraryError.unsupported }
+        let result = try await CloudAPI.request(identity.site, "v1/me", token: identity.token, method: "DELETE", body: ["confirm": "DELETE"])
+        guard (result as? CloudJSON)?["deleted"] as? Bool == true else { throw LibraryError.unsupported }
+        for library in libraries {
+            if let space = library["id"] as? String {
+                let scope = CloudAPI.identifier("\(identity.site.absoluteString)|\(identity.userID)|\(space)")
+                let file = URL.applicationSupportDirectory.appending(path: "Cloud/\(scope.uuidString).json")
+                if FileManager.default.fileExists(atPath: file.path) { try FileManager.default.removeItem(at: file) }
+            }
+        }
+        try clearSession()
+    }
+
     func signOut() async throws {
         guard !busy, let identity = session else { return }
+        try clearSession()
+        _ = try? await CloudAPI.request(identity.site, "v1/sessions/" + identity.sessionID, token: identity.token, method: "DELETE")
+    }
+
+    private func clearSession() throws {
         try CredentialVault.save(nil)
         wake?.cancel()
         session = nil
@@ -105,7 +128,6 @@ final class MobileCloud {
         spaces = []
         conflict = false
         message = nil
-        _ = try? await CloudAPI.request(identity.site, "v1/sessions/" + identity.sessionID, token: identity.token, method: "DELETE")
     }
 
     @discardableResult func save(_ draft: Manuscript, original: Manuscript?) throws -> UUID {

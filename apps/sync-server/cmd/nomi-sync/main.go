@@ -142,6 +142,9 @@ func root() *cobra.Command {
 		go func() {
 			// Run once at startup and then daily; only aggregate counts are logged.
 			clean := func() {
+				if err := s.PurgeErasedSpaces(ctx, objects); err != nil {
+					fmt.Fprintln(os.Stderr, "object erasure retry failed")
+				}
 				report, err := s.Maintain(ctx, time.Now().UTC(), true)
 				if err != nil {
 					fmt.Fprintln(os.Stderr, "sync maintenance failed")

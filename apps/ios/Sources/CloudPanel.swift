@@ -9,6 +9,8 @@ struct CloudPanel: View {
     @Environment(\.colorScheme) private var scheme
     @State private var email = ""
     @State private var password = ""
+    @State private var confirmDeletion = false
+    @State private var accountDeleted = false
     @State private var working = false
     @State private var problem: String?
     @State private var linked: Set<String> = []
@@ -43,6 +45,17 @@ struct CloudPanel: View {
             }
             .disabled(working)
             .overlay { if working { ProgressView().padding().background(.regularMaterial, in: Capsule()) } }
+        }
+        .alert("永久注销 Nomi 账号？", isPresented: $confirmDeletion) {
+            Button("取消", role: .cancel) {}
+            Button("永久注销", role: .destructive) {
+                perform { try await cloud.deleteAccount(); accountDeleted = true }
+            }
+        } message: {
+            Text("将删除此账号的云端文稿、附件和版本记录，并退出所有设备。本机独立文稿和其他设备已有的本地副本会保留。此操作无法撤销。")
+        }
+        .alert("账号已注销", isPresented: $accountDeleted) {
+            Button("完成") { dismiss() }
         }
         .interactiveDismissDisabled(working)
         .task(id: cloud.session?.sessionID) {
@@ -91,9 +104,17 @@ struct CloudPanel: View {
                         .frame(maxWidth: .infinity, minHeight: 46)
                         .overlay(Capsule().strokeBorder(.secondary.opacity(0.45)))
                 }.buttonStyle(.plain).accessibilityIdentifier("googleSignIn")
+                legalLinks
                 feedback
             }.frame(maxWidth: 370).padding(22).frame(maxWidth: .infinity)
         }.scrollDismissesKeyboard(.interactively)
+    }
+
+    private var legalLinks: some View {
+        HStack(spacing: 20) {
+            Link("隐私政策", destination: URL(string: "https://nomi.ifuryst.com/privacy/")!)
+            Link("联系支持", destination: URL(string: "https://nomi.ifuryst.com/support/")!)
+        }.font(.footnote)
     }
 
     @ViewBuilder private var feedback: some View {
@@ -123,11 +144,16 @@ struct CloudPanel: View {
                     }
                 }
             }
+            Section { legalLinks }
             if problem != nil || cloud.message != nil { Section { feedback } }
             Section {
                 Button(role: .destructive) { perform { try await cloud.signOut(); dismiss() } } label: {
                     Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
                 }.disabled(cloud.busy)
+                Button("永久注销账号", role: .destructive) { confirmDeletion = true }.disabled(cloud.busy)
+                if linked.contains("apple") {
+                    Link("管理 Apple 登录授权", destination: URL(string: "https://account.apple.com/")!)
+                }
             }
         }
     }
