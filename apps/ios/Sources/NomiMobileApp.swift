@@ -39,6 +39,8 @@ struct Workspace: View {
         let format: ManuscriptFormat?
         weak var input: UITextView?
         var canUndo = false
+        weak var richWindow: UIWindow?
+        var richUndo: (() -> Void)?
 
         init(draft: Manuscript, original: Manuscript, caret: ManuscriptCaret? = nil, format: ManuscriptFormat? = nil) {
             self.draft = draft
@@ -83,10 +85,10 @@ struct Workspace: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { event in
             // Commit only a completed dismissal in this editor's window. A cancelled drag
             // or a focus change between text blocks keeps the editing session alive.
-            guard let input = editing?.input, let window = input.window,
+            guard let session = editing, let window = session.richWindow ?? session.input?.window,
                   window.isKeyWindow,
                   (event.object as? UIScreen).map({ $0 == window.windowScene?.screen }) ?? true,
-                  !input.isFirstResponder else { return }
+                  session.richWindow != nil || session.input?.isFirstResponder == false else { return }
             finishEditing()
         }
         .onChange(of: scene) { _, phase in if phase != .active { cloud.pause() } }
@@ -183,7 +185,9 @@ struct Workspace: View {
                         if let editing, wide || !drawer {
                             // UIKit adds the navigation and completion actions here when the rail runs out of room.
                             ToolbarOverflowMenu {
-                                Button("撤销", systemImage: "arrow.uturn.backward") { editing.input?.undoManager?.undo() }
+                                Button("撤销", systemImage: "arrow.uturn.backward") {
+                                    if let undo = editing.richUndo { undo() } else { editing.input?.undoManager?.undo() }
+                                }
                                     .disabled(!editing.canUndo)
                             }
                             ToolbarItem(placement: .topBarPinnedTrailing) {
@@ -641,20 +645,30 @@ struct Workspace: View {
                                  editing: editing != nil, readOnly: isLocked(note), caret: editing?.caret,
                                  children: outline.children[note.id] ?? [], openChild: open,
                                  beginEditing: { caret, format in
-                                     guard !isLocked(note) else { return }
+                                     guard editing == nil, !isLocked(note) else { return }
                                      editing = EditSession(draft: note, original: note, caret: caret, format: format)
                                  }, initialFormat: editing?.format, toggleTask: { key, offset in
-                                     guard editing == nil, !isLocked(note) else { return }
+                                     guard !isLocked(note) else { return }
+                                     if let editing {
+                                         _ = editing.draft.toggleTask(in: key, at: offset)
+                                         return
+                                     }
                                      var updated = note
                                      if updated.toggleTask(in: key, at: offset) {
                                          do { _ = try save(updated, original: note) }
                                          catch { library.problem = error.localizedDescription }
                                      }
-                                 }) { field in
+                                 }, editingChanged: { field in
                     if editing == nil { editing = EditSession(draft: note, original: note) }
                     editing?.input = field
                     editing?.canUndo = field.undoManager?.canUndo == true
-                }
+                }, richUndo: { enabled, window, undo in
+                    editing?.richWindow = window
+                    editing?.richUndo = undo
+                    editing?.canUndo = enabled
+                }, richLayout: note.usesBlockEditor
+                    ? note.parts.contains { $0.editable && ManuscriptPreview.needed(for: $0.text) }
+                    : ManuscriptPreview.needed(for: note.body))
                 .id(note.id)
             } else if syncConnected && !cloud.replica.initialized {
                 VStack(spacing: 12) {

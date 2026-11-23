@@ -16,6 +16,10 @@ struct ManuscriptEditor: View {
     let initialFormat: ManuscriptFormat?
     let toggleTask: (String, Int) -> Void
     let editingChanged: (UITextView) -> Void
+    let richUndo: (Bool, UIWindow?, @escaping () -> Void) -> Void
+    let richLayout: Bool
+    @State private var richFocus: ManuscriptPreview.Focus?
+    @State private var commands = ManuscriptPreview.Commands()
     @State private var previewHeight: CGFloat = 100
     @State private var blockFields = NSMapTable<NSString, UITextView>.strongToWeakObjects()
 
@@ -34,11 +38,10 @@ struct ManuscriptEditor: View {
     }
 
     private var previewBlocks: [ManuscriptPreview.Block] {
-        guard !editing, ManuscriptPreview.script != nil else { return [] }
+        guard richLayout || richFocus != nil, ManuscriptPreview.script != nil else { return [] }
         if !draft.usesBlockEditor {
-            return ManuscriptPreview.needed(for: draft.body) ? [.init(key: "", source: draft.body, editable: true)] : []
+            return [.init(key: "", source: draft.body, editable: true)]
         }
-        guard draft.parts.contains(where: { $0.editable && ManuscriptPreview.needed(for: $0.text) }) else { return [] }
         return draft.parts.enumerated().map { index, part in
             .init(key: index == 0 && part.editable ? "" : part.id, source: part.text, editable: part.editable)
         }
@@ -46,7 +49,16 @@ struct ManuscriptEditor: View {
 
     private func preview(_ blocks: [ManuscriptPreview.Block], scrolls: Bool) -> some View {
         ManuscriptPreview(title: draft.title, blocks: blocks, scrolls: scrolls, readOnly: readOnly,
-                          edit: { beginEditing(.position(block: $0, offset: $1), nil) },
+                          editing: editing, initialFormat: richFocus == nil ? initialFormat : nil, focus: richFocus, commands: commands,
+                          edit: { if !editing { beginEditing(.end, nil) } },
+                          change: { key, source in
+                              if let key {
+                                  if key.isEmpty { firstBody?.wrappedValue = source }
+                                  else if let index = draft.parts.firstIndex(where: { $0.id == key && $0.editable }) {
+                                      draft.parts[index].text = source
+                                  }
+                              } else { draft.title = source }
+                          }, updateUndo: richUndo,
                           toggleTask: toggleTask, height: $previewHeight)
             .frame(height: scrolls ? nil : previewHeight)
             .frame(maxHeight: scrolls ? .infinity : nil)
@@ -67,7 +79,8 @@ struct ManuscriptEditor: View {
                                    register: { blockFields.setObject($0, forKey: "") },
                                    crossBoundary: {
                                        if let next = otherBlocks.first { focusBlock(next, atEnd: false) }
-                                   }, initialFormat: initialFormat)
+                                   }, initialFormat: initialFormat,
+                                   renderMath: { richFocus = .init(key: "", offset: $0) })
         Group {
             if scrollDocument {
                 GeometryReader { geometry in
@@ -87,7 +100,7 @@ struct ManuscriptEditor: View {
                                                            crossBoundary: {
                                                                let previous = otherBlocks.prefix { $0 != part.id }.last
                                                                focusBlock(previous ?? "", atEnd: true)
-                                                           }, initialFormat: initialFormat)
+                                                           }, initialFormat: initialFormat, renderMath: { richFocus = .init(key: part.id, offset: $0) })
                                         } else {
                                             Text(part.text).foregroundStyle(.secondary)
                                         }
@@ -115,7 +128,8 @@ struct ManuscriptEditor: View {
                             }
                             Color.clear.frame(maxWidth: .infinity, minHeight: 52)
                                 .contentShape(Rectangle()).onTapGesture {
-                                    if editing { focusBlock(otherBlocks.last ?? "", atEnd: true) }
+                                    if editing && !rendered.isEmpty { commands.focusEnd() }
+                                    else if editing { focusBlock(otherBlocks.last ?? "", atEnd: true) }
                                     else if !readOnly { beginEditing(.end, nil) }
                                 }.accessibilityHidden(true)
                         }.frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .topLeading)
@@ -126,13 +140,15 @@ struct ManuscriptEditor: View {
             } else if !rendered.isEmpty { preview(rendered, scrolls: true) }
             else { first }
         }
+        .onChange(of: editing) { _, now in if !now { richFocus = nil } }
         .frame(maxWidth: 660)
         .padding(.horizontal, 24).padding(.top, 24)
         .frame(maxWidth: .infinity)
         .safeAreaInset(edge: .bottom, alignment: editing ? .trailing : .leading, spacing: 6) {
             if !readOnly && (firstBody != nil || !otherBlocks.isEmpty) {
                 ManuscriptFormatBar(editing: editing) { format in
-                    if let field = blockFields.objectEnumerator()?.allObjects.compactMap({ $0 as? ManuscriptInput }).first(where: \.isFirstResponder) {
+                    if !rendered.isEmpty && editing { commands.format(format) }
+                    else if let field = blockFields.objectEnumerator()?.allObjects.compactMap({ $0 as? ManuscriptInput }).first(where: \.isFirstResponder) {
                         field.format?(format)
                     } else if !editing {
                         beginEditing(.end, format)
@@ -169,6 +185,7 @@ private struct ManuscriptText: UIViewRepresentable {
     let crossBoundary: () -> Void
 
     var initialFormat: ManuscriptFormat?
+    let renderMath: (Int) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -287,6 +304,15 @@ private struct ManuscriptText: UIViewRepresentable {
             if view.markedTextRange == nil { style(view, changed: changedFence ? nil : replacement) }
             replacement = nil
             editor.editingChanged(view)
+            // Complete the native composition before moving a newly written
+            // formula to the rich surface. Preserve the caret in the Markdown.
+            if view.markedTextRange == nil, let body = editor.bodyText?.wrappedValue,
+               let cursor = view.selectedTextRange, cursor.isEmpty {
+                let offset = view.selectedRange.location - (editor.title.map { $0.wrappedValue.utf16.count + 1 } ?? 0)
+                if ManuscriptPreview.hasCompletedMath(in: body, before: offset) {
+                    editor.renderMath(offset)
+                }
+            }
         }
 
         func textView(_ view: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {

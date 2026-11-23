@@ -650,8 +650,41 @@ final class ManuscriptTests: XCTestCase {
         task.tap()
         capture("duo-body-preview")
         app.webViews.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.65)).tap()
-        XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        XCTAssertEqual(editor.value as? String, "Field guide\n- [x] One task **today**")
+        XCTAssertTrue(app.buttons["finishEditing"].waitForExistence(timeout: 5))
+        XCTAssertTrue(task.exists)
+        app.typeText("!")
+        app.buttons["finishEditing"].tap()
+        app.terminate()
+        app.launch()
+        let savedText = app.webViews.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "!")).firstMatch
+        XCTAssertTrue(savedText.waitForExistence(timeout: 8))
+        XCTAssertTrue(task.exists)
+    }
+
+    @MainActor func testTapRenderedFormulaAndReopen() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
+        app.launch()
+        app.buttons["newRoot"].tap()
+        app.textViews["manuscriptText"].typeText("Observe\n$x+1$")
+        app.buttons["finishEditing"].tap()
+        let web = app.webViews.firstMatch
+        let formula = web.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "编辑公式 ")).firstMatch
+        func tapFormula() {
+            XCTAssertTrue(formula.waitForExistence(timeout: 20))
+            formula.tap()
+        }
+        tapFormula()
+        let source = web.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "LaTeX")).firstMatch
+        XCTAssertTrue(source.waitForExistence(timeout: 5))
+        app.typeText("y")
+        app.buttons["finishEditing"].tap()
+        app.terminate()
+        app.launch()
+        tapFormula()
+        XCTAssertTrue(source.waitForExistence(timeout: 5))
+        XCTAssertTrue((source.value as? String)?.contains("y") == true)
         app.buttons["finishEditing"].tap()
     }
 
