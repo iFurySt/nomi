@@ -46,4 +46,4 @@ Nomi / 知己是个人一站式工作台，覆盖学习、笔记、信息 hub、
 - 复杂任务不要只靠聊天上下文，应该落 execution plan。
 - 完成的代码变更要记到 `docs/histories/`。
 - 用户提到 server 发版时，先检查新的个人同步服务部署说明；旧家庭 server 自动部署与 `server-v*` 流程已退役，不自动操作旧 amoylab 服务。
-- 旧 iOS / TestFlight 工程已退役；未来移动端以文稿同步协议重新设计，历史发布说明不作为现行操作指令。
+- 旧 iOS / TestFlight 工程已退役；当前 SwiftUI 文稿客户端与模拟器验证见 `apps/ios/README.md`，历史发布说明不作为现行操作指令。

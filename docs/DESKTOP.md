@@ -75,7 +75,7 @@ Settings → General 位于 Appearance 上方，也是设置默认页。文稿�
 
 ## Nomi 账号与同步
 
-左下角头像打开 Nomi 账号菜单；未登录点击 Sign in 后用默认浏览器打开网站登录页，通过 App Link 返回，与 ChatGPT 身份独立。设置中不设 Account 分类。Cloud Sync 只配置 Base URL（留空使用 `https://nomi.ifuryst.com`）；账号由服务运维分配，登录自动同步，退出保留本地文稿。账号信息只在菜单顶部展示，Log out 位于底部；账户弹窗和设备管理 UI 已移除，底层设备协议保留。服务 URL、自动连接、备份及历史账号迁移边界见 [同步运行说明](design-docs/cloud-sync-runtime.md)。
+左下角头像打开 Nomi 账号菜单；未登录点击 Sign in 后用默认浏览器打开网站登录页，通过 App Link 返回。官网支持 Nomi 邮箱密码、Google 和 Apple 登录。首次第三方登录按已验证邮箱匹配或创建账号，此后同一身份可跨端使用。两端共用文稿库，各自持有可单独退出的设备会话。ChatGPT 连接独立管理。设置中不设 Account 分类。Cloud Sync 只配置 Base URL（留空使用 `https://nomi.ifuryst.com`）；登录自动同步，退出保留本地文稿。账号信息只在菜单顶部展示，Log out 位于底部；账户弹窗和设备管理 UI 已移除，底层设备协议保留。服务 URL、自动连接、备份及历史账号迁移边界见 [同步运行说明](design-docs/cloud-sync-runtime.md)。
 
 ## ChatGPT 与 AI 路径
 

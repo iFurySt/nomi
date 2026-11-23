@@ -1,6 +1,6 @@
 # 个人文稿同步服务部署
 
-2026-11-15：当前后端为 `apps/sync-server`，独立 Go / PostgreSQL / disk ObjectStore。已在本机新数据库与隔离容器验证，并部署至 amoylab 的独立服务。桌面默认不连接；手机和家庭协作不在 v1 范围内。
+2026-11-15：当前后端为 `apps/sync-server`，独立 Go / PostgreSQL / disk ObjectStore。已在本机新数据库与隔离容器验证，并部署至 amoylab 的独立服务。桌面和移动端使用同一套 v1 API，默认本地使用。
 
 旧家庭服务的 [amoylab 部署档案](references/legacy-family-deployment.md) 仅供追溯。旧 `server-v*` 自动部署工作流已移除，不得用旧 tag / database / volume 发布新同步服务；新服务使用下述独立制品和部署目标。本轮仅切换该域名的入口，旧服务进程、数据库和数据保留。
 
@@ -32,7 +32,7 @@ curl --fail http://127.0.0.1:8089/health
 
 ## 身份与数据
 
-运维 `create-user` 创建私有账号，无公开注册或密码找回 UI。密码 bcrypt；设备会话为 30 天随机 token 的哈希，用户从左下角 Log out 退出本机；单设备撤销 API 保留，当前不提供设备管理 UI。桌面凭据由 safeStorage 加密；不开同步无需登录。不要复用 ChatGPT token。
+运维用 `create-user` 创建密码账号。已配置的 Google / Apple 登录对首次使用的已验证邮箱自动开户；密码找回尚未开放。密码 bcrypt；设备会话为 30 天随机 token 的哈希，用户从左下角 Log out 退出本机；单设备撤销 API 保留，当前不提供设备管理 UI。桌面凭据由 safeStorage 加密；不开同步无需登录。不要复用 ChatGPT token。
 
 PostgreSQL 保存正文 / DSL / 画布、版本、权限、引用和收据；`objects` 卷只保存鉴权不可变原件。disk 是开发阶段 ObjectStore，不具备云 OSS 的跨故障域冗余；实际数据使用前配置异机加密备份。
 
@@ -114,7 +114,7 @@ docker compose --env-file /opt/nomi-sync/.env -f infra/sync/compose.yml -f infra
 docker compose --env-file /opt/nomi-sync/.env -f infra/sync/compose.yml -f infra/sync/amoylab/compose.yml exec -T sync nomi-sync verify
 ```
 
-公网重验使用私有文件（`server` / `email` / `password` 字段），仅接受 `@example.invalid` 专用账号，不读取已有文稿目录；每次创建独立 synthetic 云库，测试成功后撤销会话。失败时运维检查并撤销该测试账号的残留会话。
+公网重验使用私有文件（`server` 填完整 HTTPS API 根地址，包括官网的 `/api` 前缀，另填 `email` / `password`），仅接受 `@example.invalid` 专用账号，不读取已有文稿目录；每次创建独立 synthetic 云库，测试成功后撤销会话。失败时运维检查并撤销该测试账号的残留会话。
 
 ```sh
 node scripts/check-sync-remote.mjs /private/synthetic-account.json .artifacts/sync-remote/NEW_RUN
@@ -133,3 +133,15 @@ node scripts/check-browser-login-remote.mjs /private/synthetic-account.json
 ```
 
 桌面 0.4.0 已于 2026-11-16 发布双架构签名公证 DMG，见 [发布验收](DESKTOP_RELEASE.md#040-发布验收)；周期异机备份的既有限制不变。
+
+### 2026-11-22 移动账号
+
+生产个人同步服务已在校验 PostgreSQL 与原件配对备份后执行迁移 004，并通过服务健康及对象完整性检查。迁移新增第三方身份关联和一次性登录请求表。移动端通过官网 `/api/auth/native/challenge`、`/api/auth/native/exchange` 和 `/api/v1/identities` 访问。Compose 的 `NOMI_GOOGLE_IOS_CLIENT_ID` 对应 Nomi 项目的公开 iOS 客户端 ID。Apple audience 使用原 App 的 Bundle ID。变更后的客户端 ID 需同步更新 iOS 回调 scheme。
+
+### 桌面网页登录
+
+官网 `/login` 通过桌面端短期登录请求提供密码、Google 和 Apple 登录。Google Web 客户端在 Nomi Google Cloud 项目中配置，环境变量为 `NOMI_GOOGLE_WEB_CLIENT_ID`、`NOMI_GOOGLE_WEB_CLIENT_SECRET`。Apple 使用 `NOMI_APPLE_WEB_SERVICE_ID=com.ifuryst.nomi.web`，主 App ID 为 `com.ifuryst.nomi`。官网注册的完整回调分别为 `https://nomi.ifuryst.com/api/auth/web/google` 和 `https://nomi.ifuryst.com/api/auth/web/apple`。Google 回调使用 GET，Apple 使用 POST。两者沿用关闭访问日志的 HTTPS API 代理。服务按已配置的供应商显示按钮。配置保存在主机受限环境文件，轮换后重建同步服务容器。
+
+### 2026-11-22 第三方账号自动登录
+
+个人同步服务已完成配对备份并发布邮箱自动匹配，沿用迁移 004。Google 和 Apple 的网页入口均已通过公网验证会请求邮箱权限。手机使用开发构建 9 或以上，初次授权即可按同一规则找回或创建账号。

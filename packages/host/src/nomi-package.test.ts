@@ -57,6 +57,19 @@ async function fixture(save = true) {
     store.save({ ...input, document: d, baseRevision });
   return { path, root, tree, store, doc, input, load, put, config };
 }
+it("keeps the revision of a synced child when the package reconstructs its parentId", async () => {
+  const f = await fixture(false);
+  const child = f.doc.notes[1];
+  f.doc.notes[1] = {
+    id: child.id,
+    title: child.title,
+    parentId: child.parentId,
+    blocks: child.blocks,
+  };
+  await f.store.save(f.input);
+  expect(await f.load()).toEqual(f.doc);
+});
+
 it("stores each interactive node on one line in notes and embedded canvases and reads legacy JSON", async () => {
   const f = await fixture(false);
   const scene = emptyCanvasScene("scene.format");

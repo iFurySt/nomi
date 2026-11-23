@@ -4,14 +4,14 @@ Nomi 是个人一站式工作台：把学习、笔记、信息 hub、知识、�
 
 ## 当前开发重点
 
-下一阶段优先实现 **DSL 驱动的笔记、无限画布与交互学习 / GenUI**：完整长笔记支持 Markdown / LaTeX，混排图片、文件、手写与交互组件；同一语义协议支持未来的 Apple / Android 原生 renderer。默认桌面入口现在是 **Canvas**：可平移 / 缩放，创建和摆放长笔记、图片、文件与交互学习块，支持本地保存、聚焦编辑和文档 DSL。交互计算已有 TypeScript / Swift 一致性验证。手写、AI 生成、原生移动编辑和跨端同步仍待实现。见 [画布实现](docs/design-docs/canvas-workspace-runtime.md)、[交互运行时](docs/design-docs/interactive-learning-runtime.md)、[整体设计](docs/design-docs/notes-infinite-canvas.md)、[DSL 草案](docs/design-docs/notes-canvas-dsl.md)、[GenUI 修订](docs/design-docs/generative-interactive-content.md) 和 [格式示例](docs/design-docs/notes-canvas-example/README.md)。
+下一阶段优先实现 **DSL 驱动的笔记、无限画布与交互学习 / GenUI**：完整长笔记支持 Markdown / LaTeX，混排图片、文件、手写与交互组件；同一语义协议支持未来的 Apple / Android 原生 renderer。默认桌面入口现在是 **Canvas**：可平移 / 缩放，创建和摆放长笔记、图片、文件与交互学习块，支持本地保存、聚焦编辑和文档 DSL。交互计算已有 TypeScript / Swift 一致性验证。移动端文本编辑与个人同步见 [iOS 客户端](apps/ios/README.md)。见 [画布实现](docs/design-docs/canvas-workspace-runtime.md)、[交互运行时](docs/design-docs/interactive-learning-runtime.md)、[整体设计](docs/design-docs/notes-infinite-canvas.md)、[DSL 草案](docs/design-docs/notes-canvas-dsl.md)、[GenUI 修订](docs/design-docs/generative-interactive-content.md) 和 [格式示例](docs/design-docs/notes-canvas-example/README.md)。
 
 ## 当前状态
 
 - **Electron 桌面 0.1.0**：Canvas 与文稿，支持 Markdown / LaTeX、图片、文件、表格、交互内容与 `.nomi` 文件包。macOS DMG 和 Sparkle 更新见 [发布说明](docs/DESKTOP_RELEASE.md)。保留 ChatGPT 连接以供后续文稿 AI 扩展；已移除金融页面与桌面 Go 服务。
-- **个人云同步**：独立 Go 后端正在开发，保持现有本地优先体验；旧家庭资料 beta 已移除。
+- **个人云同步**：独立 Go 后端已接入桌面和移动文稿，保持现有本地优先体验；旧家庭资料 beta 已移除。
 - **画布与笔记**：默认 Canvas 承载笔记、公式、图片 / 文件和交互块，桌面结构与附件原件保存为本机 `.nomi` 文件包，浏览器预览使用 IndexedDB，摄像机与个人参数单独保存。
-- **交互学习**：声明式 IR 驱动控件、LaTeX、曲线与本地计算，可在 Canvas / 文稿中嵌入；不依赖模型请求。完整笔记产品能力、信息 hub、跨领域知识与完整财富管理仍待扩展。桌面和 server 的身份、数据及 AI 执行路径当前独立，尚无跨端同步。
+- **交互学习**：声明式 IR 驱动控件、LaTeX、曲线与本地计算，可在 Canvas / 文稿中嵌入；不依赖模型请求。完整笔记产品能力、信息 hub、跨领域知识与完整财富管理仍待扩展。个人文稿同步复用独立账号，AI 执行仍在桌面端。
 
 ## macOS 下载
 
@@ -41,7 +41,7 @@ make ci
 
 ## 可选个人云同步
 
-个人 v1 已按 [云同步设计](docs/design-docs/cloud-sync.md) 和 [执行计划](docs/exec-plans/completed/20261115-personal-cloud-sync.md) 实现，并部署至 amoylab；API 为 `https://nomi.ifuryst.com/api`，桌面功能尚未随新的 DMG 发布。后端独立于桌面，位于 `apps/sync-server`；使用 PostgreSQL 保存文稿内容与版本，开发阶段用服务器持久磁盘存附件。不开启同步无需账号。旧家庭资料 server、iOS 和 Swift macOS 工程已退役，历史发布不会被新工程自动覆盖。
+个人 v1 已按 [云同步设计](docs/design-docs/cloud-sync.md) 和 [执行计划](docs/exec-plans/completed/20261115-personal-cloud-sync.md) 实现，并部署至 amoylab；API 为 `https://nomi.ifuryst.com/api`，桌面同步自 0.4.0 提供。后端独立于桌面，位于 `apps/sync-server`；使用 PostgreSQL 保存文稿内容与版本，开发阶段用服务器持久磁盘存附件。不开启同步无需账号。旧家庭资料 server、iOS 和 Swift macOS 工程已退役，历史发布不会被新工程自动覆盖。
 
 ## 文档入口
 

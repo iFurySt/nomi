@@ -28,7 +28,7 @@ quiet、personal、less is more。让用户轻松收集、记录、整理、阅�
 
 ## 移动端
 
-iOS 延续系统控件、Dynamic Type、语义色、标准导航和 sheet。当前资料 / 对话 / 家庭结构仍服务已有 beta；更早的 Today、Log、营养 timeline 设计作为历史参考。
+iOS 延续系统控件、Dynamic Type、语义色、标准导航和 sheet。当前 SwiftUI 客户端以文稿为首页，Duo 展开横屏并排显示目录和正文，竖屏与折叠外屏使用可收起的目录。资料 / 对话 / 家庭、Today、Log 与营养 timeline 为历史探索。
 
 ## 共同原则
 

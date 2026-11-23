@@ -80,3 +80,9 @@ Nomi 处理个人学习、笔记、信息、知识、健康和财富等资料，
 ## Nomi 网站登录交接（2026-11-15）
 
 桌面密码表单已移除，登录通过系统默认浏览器。网站短期请求采用 S256 proof，主进程保存内存 verifier，App Link 只有固定唤醒路径、无 token。服务端批准和领取分别原子化，5 分钟有效、领取一次后删除；会话仍使用既有 token 哈希和设备撤销机制。网页使用 no-store / no-referrer、CSRF、HTTPS Host-only Secure HttpOnly SameSite cookie 和 nonce CSP，不允许任意 redirect URI。原生应用外部浏览器与 proof 的设计参考 [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) / [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636)；当前自有轮询交接不是完整 OAuth2 实现。限流仍按直连 peer，代理后的共享配额仅适合当前私有试用。
+
+## 移动账号身份
+
+iOS 的密码只提交给 Nomi HTTPS 端点。Apple 通过系统授权面板取得身份令牌；Google 通过系统浏览器、随机 state 与 S256 PKCE 授权，请求 openid 和 email。Go 使用固定供应商密钥地址验证签名、签发方、受众、有效期及一次性 nonce。五分钟挑战绑定设备、供应商和发起关联的设备会话。优先按 (provider, subject) 恢复账号。首次登录仅接受已验签的 email 与 email_verified，按完整邮箱去首尾空格、转小写后匹配，找不到时创建无密码账号。Google 首次匹配还要求 Gmail 地址或经签名的 Workspace 托管域 hd，以确认当前邮箱归属。Apple 私有中继地址独立匹配。设备钥匙串只保留 Nomi 会话。
+
+网页授权使用单独的 Google Web Client 和归入原 App ID 的 Apple Services ID。固定 HTTPS 回调通过短期、按桌面请求隔离的 Secure/HttpOnly Cookie 验证 state；nonce 和 PKCE 使用独立用途。Google 在服务端交换授权码，Apple 通过 form_post 返回已签名身份。首次登录的邮箱匹配、开户、绑定与批准桌面请求在同一事务中完成。浏览器不持有 Nomi 设备 token。

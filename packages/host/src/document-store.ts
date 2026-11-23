@@ -1,3 +1,4 @@
+import { stableJSON } from "../../core/src/sync/protocol";
 import { readPackageTree, packageHash } from "./nomi-package";
 import { commitPackages, recoverPackages } from "./package-transaction";
 import {
@@ -231,7 +232,7 @@ export class DocumentStore {
     const tree = await readPackageTree(join(root, folder));
     const external = tree.document;
     const semantic = (d: CanvasDocument) =>
-      JSON.stringify({ ...d, revision: 0 });
+      stableJSON({ ...d, revision: 0 });
     if (semantic(external) !== semantic(saved.document)) {
       const history = join(root, ".nomi-history");
       await mkdir(history, { recursive: true });

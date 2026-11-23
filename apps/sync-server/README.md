@@ -19,6 +19,8 @@ go run ./cmd/nomi-sync serve --addr 127.0.0.1:8089
 
 `serve` requires prior migration; migrations are transactional and checksummed. Remote access requires an HTTPS reverse proxy. The default listener is loopback. No public account registration; provision private users with the CLI. Login passwords are bcrypt-hashed; 30-day opaque device tokens are stored as hashes and can be revoked independently. Login is rate-limited by direct peer address; untrusted forwarding headers are ignored.
 
+Desktop browser sign-in supports password and configured Google / Apple identities. Both platforms use the same provider-subject mappings. Website client credentials and exact callback URLs are documented in [deployment](../../docs/DEPLOYMENT.md).
+
 ## Verification
 
 From repository root:
@@ -38,6 +40,8 @@ Starts a disposable loopback PostgreSQL 18 container, runs Go integration tests 
 Every protected route is under `/v1/` and requires `Authorization: Bearer <device token>`; permission checks use the authenticated owner. URLs identify a space but never confer access. Unsupported routes also require authentication. No browser cookie session or public static file directory.
 
 - `POST /auth/login`: `{email,password,deviceId,deviceName}` → `{user,sessionId,deviceId,token,expiresAt}`.
+- `POST /auth/native/challenge` and `POST /auth/native/exchange` accept Apple or Google identity proofs. A five-minute nonce is bound to the provider, device and optional signed-in session. A returning provider subject restores its original Nomi user. On first sign-in, a verified email from the signed token selects an existing user or creates a passwordless user. The website uses the same lookup. Configure the Google iOS audience with `NOMI_GOOGLE_IOS_CLIENT_ID`.
+- `GET /v1/identities` lists providers linked to the authenticated user.
 - `GET /v1/me`, `GET /v1/sessions`, `DELETE /v1/sessions/{id}`.
 - `GET /v1/spaces`, `POST /v1/spaces`: `{name}` creates a private library.
 - `GET /v1/spaces/{space}/snapshot`: repeatable-read `{protocol,cursor,records}`.

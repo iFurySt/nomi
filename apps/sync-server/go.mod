@@ -2,7 +2,12 @@ module github.com/iFurySt/nomi/apps/sync-server
 
 go 1.26.1
 
-require github.com/jackc/pgx/v5 v5.9.2
+require (
+	github.com/coreos/go-oidc/v3 v3.17.0
+	github.com/go-jose/go-jose/v4 v4.1.3
+	github.com/jackc/pgx/v5 v5.9.2
+	golang.org/x/oauth2 v0.28.0
+)
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

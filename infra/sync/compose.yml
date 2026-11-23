@@ -21,6 +21,10 @@ services:
     environment:
       NOMI_SYNC_DATABASE_URL: postgres://nomi:${NOMI_SYNC_DB_PASSWORD}@postgres:5432/nomi_sync?sslmode=disable
       NOMI_SYNC_OBJECT_DIR: /data/objects
+      NOMI_GOOGLE_WEB_CLIENT_ID: ${NOMI_GOOGLE_WEB_CLIENT_ID:-}
+      NOMI_GOOGLE_WEB_CLIENT_SECRET: ${NOMI_GOOGLE_WEB_CLIENT_SECRET:-}
+      NOMI_APPLE_WEB_SERVICE_ID: ${NOMI_APPLE_WEB_SERVICE_ID:-}
+      NOMI_GOOGLE_IOS_CLIENT_ID: ${NOMI_GOOGLE_IOS_CLIENT_ID:-913223605209-qd24719qdd3c1d2nu8f60ifvt8ljfhmd.apps.googleusercontent.com}
     volumes:
       - objects:/data/objects
     ports:

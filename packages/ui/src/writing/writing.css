@@ -1099,7 +1099,8 @@
   user-select: none;
 }
 .notes-library nav .notes-list-row {
-  padding-left: calc(min(var(--note-depth), 12) * 14px);
+  --notes-tree-inset: 4px;
+  padding-left: calc(var(--notes-tree-inset) + min(var(--note-depth), 12) * 14px);
   min-height: 34px;
 }
 .notes-library nav .notes-list-select {
@@ -1114,6 +1115,7 @@
 .notes-library nav .notes-row-toggle {
   width: 18px;
   min-width: 18px;
+  justify-content: center;
   padding: 0;
   min-height: 28px;
   margin: 0;
@@ -1397,7 +1399,7 @@ body.notes-tree-dragging * {
 .notes-list-row[data-note-drop="after"]::after {
   content: "";
   position: absolute;
-  left: calc(18px + min(var(--note-drop-depth), 12) * 14px);
+  left: calc(var(--notes-tree-inset) + 18px + min(var(--note-drop-depth), 12) * 14px);
   right: 3px;
   height: 2px;
   border-radius: 2px;

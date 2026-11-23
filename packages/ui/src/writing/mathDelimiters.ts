@@ -34,7 +34,14 @@ export function validMath(source: string): boolean {
 
 // Code and existing dollar math are consumed first, so examples and formulas
 // already using Markdown delimiters are never rewritten internally.
-export function normalizeMathMarkdown(source: string): string {
+export function normalizeMathMarkdown(
+  source: string,
+  onReplacement?: (
+    offset: number,
+    original: string,
+    replacement: string,
+  ) => void,
+): string {
   return source.replace(
     /(^[ \t]*(?:`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*(?:`{3,}|~{3,})[^\n]*$|(?![\s\S])))|(`+)[^\n]*?\2|\$\$[\s\S]*?\$\$|(?<![\\$])\$[^\n$]+\$|(?<!\\)\\\(([^\n]*?)\\\)|(?<!\\)\\\[([\s\S]*?)\\\]/gm,
     (match, _fence, _ticks, inline, block, offset: number) => {
@@ -47,9 +54,12 @@ export function normalizeMathMarkdown(source: string): string {
       );
       const rest = source.slice(offset + match.length);
       const after = rest.split("\n", 1)[0];
-      return block !== undefined && !before.trim() && !after.trim()
-        ? `$$\n${body.trim()}\n$$`
-        : `$${body.trim()}$`;
+      const normalized =
+        block !== undefined && !before.trim() && !after.trim()
+          ? `$$\n${body.trim()}\n$$`
+          : `$${body.trim()}$`;
+      onReplacement?.(offset, match, normalized);
+      return normalized;
     },
   );
 }

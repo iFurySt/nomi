@@ -47,6 +47,8 @@ try {
         "exec",
         container,
         "pg_isready",
+        "-h",
+        "127.0.0.1",
         "-U",
         "nomi_test",
         "-d",
@@ -99,12 +101,20 @@ try {
   }
   if (!ready) throw Error("Sync server readiness timeout");
   const desktop = process.argv.includes("--desktop");
+  const mobile = process.argv.includes("--mobile");
   const fixture = desktop
     ? join(root, "scripts/check-sync-desktop.mjs")
     : join(output, "fixture.mjs");
   if (!desktop)
     await build({
-      entryPoints: [join(root, "scripts/fixtures/sync-package.ts")],
+      entryPoints: [
+        join(
+          root,
+          mobile
+            ? "scripts/fixtures/sync-mobile.ts"
+            : "scripts/fixtures/sync-package.ts",
+        ),
+      ],
       outfile: fixture,
       bundle: true,
       platform: "node",
@@ -225,7 +235,7 @@ try {
     );
   }
   console.log(
-    `Report: ${join(output, desktop ? "desktop-report.json" : "report.json")}`,
+    `Report: ${join(output, desktop ? "desktop-report.json" : mobile ? "mobile.xcresult" : "report.json")}`,
   );
 } finally {
   if (service && service.exitCode === null) {

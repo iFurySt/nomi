@@ -71,9 +71,13 @@ func (s *Store) Login(ctx context.Context, in Login) (LoginResult, error) {
 	if err != nil {
 		return LoginResult{}, err
 	}
+	return s.issueSession(ctx, u, in.DeviceID, in.DeviceName)
+}
+
+func (s *Store) issueSession(ctx context.Context, u User, deviceID, deviceName string) (LoginResult, error) {
 	token := randomID("token")
-	out := LoginResult{Identity: Identity{User: u, SessionID: randomID("session"), DeviceID: in.DeviceID}, Token: token, ExpiresAt: time.Now().UTC().Add(30 * 24 * time.Hour)}
-	_, err = s.DB.Exec(ctx, `INSERT INTO sync_sessions(id,token_hash,user_id,device_id,device_name,expires_at) VALUES($1,$2,$3,$4,$5,$6)`, out.SessionID, digest([]byte(token)), u.ID, in.DeviceID, in.DeviceName, out.ExpiresAt)
+	out := LoginResult{Identity: Identity{User: u, SessionID: randomID("session"), DeviceID: deviceID}, Token: token, ExpiresAt: time.Now().UTC().Add(30 * 24 * time.Hour)}
+	_, err := s.DB.Exec(ctx, `INSERT INTO sync_sessions(id,token_hash,user_id,device_id,device_name,expires_at) VALUES($1,$2,$3,$4,$5,$6)`, out.SessionID, digest([]byte(token)), u.ID, deviceID, deviceName, out.ExpiresAt)
 	return out, err
 }
 func (s *Store) Authenticate(ctx context.Context, token string) (Identity, error) {
@@ -115,11 +119,15 @@ func (s *Store) passwordUser(ctx context.Context, email, password string) (User,
 	var u User
 	hash := string(dummyHash)
 	err := s.DB.QueryRow(ctx, `SELECT id,email,password_hash FROM sync_users WHERE email=$1`, strings.ToLower(strings.TrimSpace(email))).Scan(&u.ID, &u.Email, &hash)
+	providerOnly := hash == "!"
+	if providerOnly {
+		hash = string(dummyHash)
+	}
 	compareErr := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return User{}, err
 	}
-	if err != nil || compareErr != nil {
+	if err != nil || compareErr != nil || providerOnly {
 		return User{}, problem(401, "invalid_credentials", "Email or password is incorrect")
 	}
 	return u, nil

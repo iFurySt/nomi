@@ -51,6 +51,7 @@ func (l *loginLimiter) allowLimit(key string, limit int) bool {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	s.browserRoutes(mux)
+	s.nativeIdentityRoutes(mux, nativeProviders())
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.Store.DB.Ping(r.Context()); err != nil {
 			writeError(w, err)
@@ -109,6 +110,23 @@ func (s *Server) authorized(w http.ResponseWriter, r *http.Request) {
 	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/"), "/")
 	parts := strings.Split(path, "/")
 	switch {
+	case path == "identities" && r.Method == "GET":
+		rows, err := s.Store.DB.Query(ctx, `SELECT provider FROM sync_external_identities WHERE user_id=$1 ORDER BY provider`, user)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		defer rows.Close()
+		names := []string{}
+		for rows.Next() {
+			var name string
+			if err = rows.Scan(&name); err != nil {
+				writeError(w, err)
+				return
+			}
+			names = append(names, name)
+		}
+		reply(w, names, rows.Err())
 	case path == "me" && r.Method == "GET":
 		writeJSON(w, 200, i)
 	case path == "sessions" && r.Method == "GET":

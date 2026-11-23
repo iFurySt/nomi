@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
+	"embed"
 	"encoding/base64"
 	"errors"
 	"html/template"
@@ -45,8 +46,12 @@ func (s *Store) ApproveBrowserLogin(ctx context.Context, id, email, password str
 	if err != nil {
 		return "", err
 	}
+	return s.approveUser(ctx, id, u.ID)
+}
+
+func (s *Store) approveUser(ctx context.Context, id, user string) (string, error) {
 	var scheme string
-	err = s.DB.QueryRow(ctx, `UPDATE sync_browser_logins SET user_id=$2 WHERE id=$1 AND user_id IS NULL AND expires_at>now() RETURNING scheme`, id, u.ID).Scan(&scheme)
+	err := s.DB.QueryRow(ctx, `UPDATE sync_browser_logins SET user_id=$2 WHERE id=$1 AND user_id IS NULL AND expires_at>now() RETURNING scheme`, id, user).Scan(&scheme)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = problem(410, "login_expired", "This sign-in request has expired. Start again in Nomi.")
 	}
@@ -131,31 +136,53 @@ func (s *Server) browserRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, 200, out)
 	})
-	mux.HandleFunc("GET /login", s.browserPage)
-	mux.HandleFunc("POST /login", s.browserPage)
+	web := s.websiteLogin()
+	mux.HandleFunc("GET /auth/web/google", web.callback)
+	mux.HandleFunc("POST /auth/web/apple", web.callback)
+	mux.HandleFunc("GET /login", web.browserPage)
+	mux.HandleFunc("POST /login", web.browserPage)
 }
-func (s *Server) browserPage(w http.ResponseWriter, r *http.Request) {
+
+type browserView struct {
+	Nonce, Request, CSRF, Error string
+	Google, Apple               bool
+	Return                      template.URL
+}
+
+func newBrowserView(w http.ResponseWriter) browserView {
 	nonce := randomID("nonce")[6:]
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'nonce-"+nonce+"'; script-src 'nonce-"+nonce+"'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; img-src data:; style-src 'nonce-"+nonce+"'; script-src 'nonce-"+nonce+"'; form-action 'self' https://accounts.google.com https://appleid.apple.com; base-uri 'none'; frame-ancestors 'none'")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	return browserView{Nonce: nonce}
+}
+func csrfCookie(r *http.Request) (string, bool) {
 	host, _, _ := net.SplitHostPort(r.Host)
 	if host == "" {
 		host = r.Host
 	}
 	local := host == "localhost" || host == "127.0.0.1" || host == "::1"
-	cookieName := "__Host-nomi_login_csrf"
 	if local {
-		cookieName = "nomi_login_csrf"
+		return "nomi_login_csrf", false
 	}
-	data := struct {
-		Nonce, Request, CSRF, Error, Device string
-		Return                              template.URL
-	}{Nonce: nonce}
+	return "__Host-nomi_login_csrf", true
+}
+func (data *browserView) render(w http.ResponseWriter, r *http.Request) {
+	name, secure := csrfCookie(r)
+	data.CSRF = randomID("csrf")
+	http.SetCookie(w, &http.Cookie{Name: name, Value: data.CSRF, Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, MaxAge: 300})
+	browserTemplate.Execute(w, data)
+}
+func (s *webLogin) browserPage(w http.ResponseWriter, r *http.Request) {
+	data := newBrowserView(w)
+	_, data.Google = s.providers["google"]
+	_, data.Apple = s.providers["apple"]
+	cookieName, _ := csrfCookie(r)
 	id := r.URL.Query().Get("request")
 	if r.Method == "POST" {
-		r.Body = http.MaxBytesReader(w, r.Body, 8192)
+		r.Body = http.MaxBytesReader(w, r.Body, 32768)
 		if r.ParseForm() != nil {
 			http.Error(w, "Invalid form", 400)
 			return
@@ -168,7 +195,7 @@ func (s *Server) browserPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var scheme string
-	err := s.Store.DB.QueryRow(r.Context(), `SELECT scheme,device_name FROM sync_browser_logins WHERE id=$1 AND expires_at>now() AND user_id IS NULL`, id).Scan(&scheme, &data.Device)
+	err := s.Store.DB.QueryRow(r.Context(), `SELECT scheme FROM sync_browser_logins WHERE id=$1 AND expires_at>now() AND user_id IS NULL`, id).Scan(&scheme)
 	if err != nil {
 		data.Error = "This sign-in request has expired. Start again in Nomi."
 		w.WriteHeader(410)
@@ -185,6 +212,9 @@ func (s *Server) browserPage(w http.ResponseWriter, r *http.Request) {
 		peer, _, _ := net.SplitHostPort(r.RemoteAddr)
 		if !s.limiter.allow(peer) {
 			data.Error = "Too many attempts. Try again in a minute."
+		} else if provider := r.PostForm.Get("provider"); provider != "" {
+			s.begin(w, r, id, provider)
+			return
 		} else {
 			scheme, err = s.Store.ApproveBrowserLogin(r.Context(), id, r.PostForm.Get("email"), r.PostForm.Get("password"))
 			if err == nil {
@@ -195,11 +225,19 @@ func (s *Server) browserPage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	data.CSRF = randomID("csrf")
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: data.CSRF, Path: "/", HttpOnly: true, Secure: !local, SameSite: http.SameSiteStrictMode, MaxAge: 300})
-	browserTemplate.Execute(w, data)
+	data.render(w, r)
 }
 
-var browserTemplate = template.Must(template.New("login").Parse(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · Nomi</title>
-<style nonce="{{.Nonce}}">:root{color-scheme:light dark;--bg:#fff;--ink:#202020;--muted:#737373;--fill:#f5f5f5;--line:#e5e5e5}@media(prefers-color-scheme:dark){:root{--bg:#171717;--ink:#eee;--muted:#a0a0a0;--fill:#252525;--line:#393939}}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100svh;display:grid;place-items:center;padding:28px}main{width:100%;max-width:340px}.brand{font-weight:600;font-size:18px;margin-bottom:36px}h1{font-size:26px;font-weight:550;letter-spacing:-.5px;margin:0 0 24px}label{display:grid;gap:7px;font-size:13px;margin-top:18px}input{width:100%;padding:11px 12px;background:var(--fill);border:1px solid var(--line);border-radius:9px;color:var(--ink);font:inherit}input:focus{outline:2px solid var(--muted);outline-offset:2px}button,.button{display:block;width:100%;padding:11px 16px;margin-top:24px;border:0;border-radius:999px;background:var(--ink);color:var(--bg);font:inherit;text-align:center;text-decoration:none;cursor:pointer}button:hover,.button:hover{opacity:.85}p{color:var(--muted);font-size:13px}footer{margin-top:28px} .error{margin-bottom:20px}</style>
-<main><div class="brand">Nomi</div>{{if .Return}}<h1>You’re signed in.</h1><p>Continue in the Nomi app.</p><a class="button" href="{{.Return}}">Open Nomi</a><script nonce="{{.Nonce}}">location.href={{.Return}};</script>{{else}}<h1>Sign in to Nomi</h1>{{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}{{if .Request}}<form method="post"><input type="hidden" name="request" value="{{.Request}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>Email<input type="email" name="email" autocomplete="username" required autofocus maxlength="254"></label><label>Password<input type="password" name="password" autocomplete="current-password" required maxlength="72"></label><button type="submit">Sign in</button></form><footer><p>Sign in to sync your documents on {{.Device}}.</p></footer>{{end}}{{end}}</main></html>`))
+//go:embed login.html
+var loginPage embed.FS
+
+// The Google branding asset is bundled so opening the form makes no third-party requests.
+//
+//go:embed google-g.png
+var googleMark []byte
+
+var browserTemplate = template.Must(template.New("login.html").Funcs(template.FuncMap{
+	"googleLogo": func() template.URL { return googleLogoURL },
+}).ParseFS(loginPage, "login.html"))
+
+var googleLogoURL = template.URL("data:image/png;base64," + base64.StdEncoding.EncodeToString(googleMark))

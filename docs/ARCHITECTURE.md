@@ -9,6 +9,7 @@ Nomi / 知己是个人一站式工作台，覆盖学习、笔记、信息 hub、
 ## 代码结构
 
 - `apps/desktop/`：Electron main、sandboxed preload 与本地工作台入口。
+- `apps/ios/`：SwiftUI 移动文稿客户端，Duo 自适应目录、本机文稿包和个人同步 v1；见 [移动文稿](../apps/ios/README.md)。
 - `apps/web/`：Vite / React renderer，也可提供本地浏览器预览。
 - `packages/ui/`：共享界面、桌面外壳、导航、主题、设置与页面。
 - `packages/core/`：与 UI / host 无关的领域契约，以及平台中立的交互 IR 校验、求值与状态动作。
@@ -31,9 +32,11 @@ Node host 管理 `.nomi` 包、原件、目录切换、保存事务和 ChatGPT �
 
 笔记与无限画布以平台中立 DSL / 语义模型为契约：Note / Block 表达长文、图片、文件、手写及 InteractiveBlock，Placement 独立表达空间展示。交互块包含状态、类型化计算、组件视图与动作；Electron 可先用 React / TypeScript，未来 SwiftUI / UIKit、Compose renderer 可独立实现，不要求移动端必须运行 WebView 或 JavaScript。DSL 快照、协作历史、个人学习状态有明确边界，不设两份可相互覆盖的主状态。
 
-交互 IR、React 温度探索器、本机独立进度与 Swift 计算参考已实现，见 [运行时说明](design-docs/interactive-learning-runtime.md)。新增 Document / Note / Block / Placement / Connector 本地内核和画布编辑器，支持基础 shape、对齐吸附与摆放端点绑定，桌面结构与附件原件在可配置目录内以 `.nomi` 文件包保存（Markdown / GenUI 源、原件及 children 子包），完整工作区投影用于恢复；浏览器使用 IndexedDB；桌面文稿层级与实际文件夹双向联动，camera / study state 单独保存，见 [画布实现](design-docs/canvas-workspace-runtime.md)。个人同步 v1 已接入，原生手机同步适配、笔迹与对外 DSL 包规范仍待开发，不能混同金融 SQLite 或家庭 workspace。推荐的存储、鉴权、同步房间和手写实验见 [整体设计](design-docs/notes-infinite-canvas.md)；文档语法与往返约束见 [DSL 草案](design-docs/notes-canvas-dsl.md)。GenUI、OpenUI 复用评估、跨语言测试与温度探索器的实施顺序以 [交互内容修订](design-docs/generative-interactive-content.md) 为准。
+交互 IR、React 温度探索器、本机独立进度与 Swift 计算参考已实现，见 [运行时说明](design-docs/interactive-learning-runtime.md)。新增 Document / Note / Block / Placement / Connector 本地内核和画布编辑器，支持基础 shape、对齐吸附与摆放端点绑定，桌面结构与附件原件在可配置目录内以 `.nomi` 文件包保存（Markdown / GenUI 源、原件及 children 子包），完整工作区投影用于恢复；浏览器使用 IndexedDB；桌面文稿层级与实际文件夹双向联动，camera / study state 单独保存，见 [画布实现](design-docs/canvas-workspace-runtime.md)。个人同步 v1 已接入，原生手机已支持文本块同步，笔迹与对外 DSL 包规范仍待开发，不能混同金融 SQLite 或家庭 workspace。推荐的存储、鉴权、同步房间和手写实验见 [整体设计](design-docs/notes-infinite-canvas.md)；文档语法与往返约束见 [DSL 草案](design-docs/notes-canvas-dsl.md)。GenUI、OpenUI 复用评估、跨语言测试与温度探索器的实施顺序以 [交互内容修订](design-docs/generative-interactive-content.md) 为准。
 
 2026-11-09 的 [交互块 v2 提案](design-docs/interactive-content-v2.md) 明确同一 DSL 共享状态、计算和交互语义，各平台分别适配布局、控件与动效。portable draft-2 已实现文本输入、数据表格、纯计算、语义图形与流式节点预览；Web 扩展及安全回退仍在设计中；HTML / JS、anime.js / Three.js 隔离执行尚未实现，不改变当前禁止执行生成代码的边界。
+
+2026-11-15 的 [HTML 交互块隔离提案](design-docs/html-interactive-isolation.md) 建议保留 DSL，增加可选离线 Web 程序，分别由 Electron 专用容器、iOS WKWebView 和 Android WebView 承载。HTML 不要求转译为 DSL，也不承诺原生控件或像素完全一致；各端须独立通过权限、外联、停止恢复与无损回退验收后才能启用，当前没有新增执行能力。
 
 ## 个人同步后端
 

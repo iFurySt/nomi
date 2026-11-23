@@ -1,0 +1,68 @@
+name: NomiMobile
+options:
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    GENERATE_INFOPLIST_FILE: YES
+targets:
+  NomiMobile:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - Assets.xcassets
+    postCompileScripts:
+      - name: Bundle offline Markdown reader
+        inputFiles:
+          - $(SRCROOT)/Reader/reader.jsx
+          - $(SRCROOT)/Reader/build.mjs
+          - $(SRCROOT)/../../packages/ui/src/writing/mathDelimiters.ts
+          - $(SRCROOT)/../../packages/ui/src/writing/mathSource.ts
+          - $(SRCROOT)/../../packages/ui/src/writing/tableMarkdown.ts
+          - $(SRCROOT)/../../pnpm-lock.yaml
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/manuscript-reader.js
+        script: |
+          export PATH="$PATH:/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:/usr/local/bin"
+          node "$SRCROOT/Reader/build.mjs" "$SCRIPT_OUTPUT_FILE_0"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ifuryst.nomi
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: 37
+        DEVELOPMENT_TEAM: J9P29FA5BX
+        INFOPLIST_FILE: NomiMobile-Info.plist
+        CODE_SIGN_ENTITLEMENTS: NomiMobile.entitlements
+        INFOPLIST_KEY_CFBundleDisplayName: Nomi
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  NomiMobileTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: NomiMobile
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ifuryst.nomi.mobile.tests
+  NomiMobileUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: NomiMobile
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ifuryst.nomi.mobile.uitests
+schemes:
+  NomiMobile:
+    build:
+      targets:
+        NomiMobile: all
+    test:
+      targets: [NomiMobileTests, NomiMobileUITests]
