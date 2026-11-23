@@ -78,6 +78,8 @@ flowchart TD
 
 ### Web 扩展：表达能力的出口
 
+2026-11-15 的 [HTML 隔离与跨端方案](html-interactive-isolation.md) 细化了双模式选择、Electron / WKWebView / Android WebView 宿主、离线资源、最小桥接、资源终止与发行门槛；仍是未实施提案。
+
 允许两种明确的用途：
 
 1. **Portable 的可选 Web 视图。** 程序仍有完整 portable 视图、计算和动作；Web 视图只接收结果快照、发送已声明动作。例如 Electron 用 anime.js 增强矩阵变换演示，手机使用原生图形动画。切实现不改变程序或个人状态。
