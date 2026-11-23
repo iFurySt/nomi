@@ -122,7 +122,7 @@ struct Workspace: View {
                     ForEach(outline.rows.filter { destinations.contains($0.id) }) { row in
                         Button { move(note, to: row.id) } label: {
                             Label(row.note.title, systemImage: "doc.text")
-                                .padding(.leading, CGFloat(min(row.depth, 6)) * 12)
+                                .padding(.leading, row.leadingIndent)
                         }
                     }
                 }
@@ -538,9 +538,9 @@ struct Workspace: View {
                                 open(note)
                             }
                         } label: {
-                            Label(note.title, systemImage: "doc.text")
+                            Label(note.title, systemImage: hasChildren ? "doc.on.doc" : "doc.text")
                                 .lineLimit(1)
-                                .padding(.leading, 12)
+                                .padding(.leading, 12 + row.leadingIndent)
                                 .padding(.trailing, 8)
                                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                 .contentShape(Rectangle())

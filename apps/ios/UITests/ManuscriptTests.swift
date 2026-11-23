@@ -142,6 +142,7 @@ final class ManuscriptTests: XCTestCase {
         func showDirectory() {
             if !app.buttons["noteRow"].firstMatch.isHittable && app.buttons["打开目录"].isHittable {
                 app.buttons["打开目录"].tap()
+                XCTAssertTrue(app.buttons["noteRow"].firstMatch.waitForExistence(timeout: 5))
             }
         }
         func checkCorner() {

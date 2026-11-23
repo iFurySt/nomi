@@ -5,6 +5,7 @@ struct ManuscriptOutline {
         let note: Manuscript
         let depth: Int
         var id: UUID { note.id }
+        var leadingIndent: CGFloat { CGFloat(min(depth, 6)) * 12 }
     }
 
     private(set) var rows: [Row] = []

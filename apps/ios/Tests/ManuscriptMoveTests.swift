@@ -2,6 +2,19 @@ import XCTest
 @testable import NomiMobile
 
 final class ManuscriptMoveTests: XCTestCase {
+    func testNestedSidebarDepthSurvivesClosingAndReopeningParent() {
+        let root = Manuscript(), sibling = Manuscript()
+        var child = Manuscript(), grandchild = Manuscript()
+        child.parentID = root.id
+        grandchild.parentID = child.id
+        let outline = ManuscriptOutline([root, child, grandchild, sibling])
+        let closed = outline.visibleRows(expanded: [child.id])
+        XCTAssertEqual(closed.map(\.id), [root.id, sibling.id])
+        let open = outline.visibleRows(expanded: [root.id, child.id])
+        XCTAssertEqual(open.map(\.id), [root.id, child.id, grandchild.id, sibling.id])
+        XCTAssertEqual(open.map(\.leadingIndent), [0, 12, 24, 0])
+    }
+
     func testOutlineUsesPackageOrderAndRetainsOrphanedBranches() {
         var root = Manuscript(), first = Manuscript(), second = Manuscript(), orphan = Manuscript()
         first.parentID = root.id
