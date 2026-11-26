@@ -3,6 +3,18 @@ import XCTest
 @testable import NomiMobile
 
 final class ManuscriptTypographyTests: XCTestCase {
+    func testBodyUsesSystemReadingSize() {
+        for category: UIContentSizeCategory in [.small, .large, .extraExtraLarge, .accessibilityExtraLarge] {
+            let traits = UITraitCollection(preferredContentSizeCategory: category)
+            let body = ManuscriptTypography.Size.body.font(traits).pointSize
+            XCTAssertEqual(body, UIFont.preferredFont(forTextStyle: .body, compatibleWith: traits).pointSize)
+            if category == .large {
+                XCTAssertEqual(body * ManuscriptTypography.bodyLineHeight, 26, accuracy: 0.01)
+                XCTAssertEqual(ManuscriptTypography.Size.title.font(traits).pointSize, 23)
+            }
+        }
+    }
+
     func testMixedScriptMarkdownKeepsSourceAndStylesAcrossEdits() throws {
         let source = "散步 Walk 🌱\n## 第一段\n这是 **粗体** 和 *italic*。\n末段"
         let traits = UITraitCollection(preferredContentSizeCategory: .extraLarge)
@@ -17,6 +29,9 @@ final class ManuscriptTypographyTests: XCTestCase {
         XCTAssertTrue(try font("粗体").fontDescriptor.symbolicTraits.contains(.traitBold))
         XCTAssertTrue(try font("italic").fontDescriptor.symbolicTraits.contains(.traitItalic))
         XCTAssertGreaterThan(try font("第一段").pointSize, try font("末段").pointSize)
+        let bodyRange = (storage.string as NSString).range(of: "末段")
+        let paragraph = try XCTUnwrap(storage.attribute(.paragraphStyle, at: bodyRange.location, effectiveRange: nil) as? NSParagraphStyle)
+        XCTAssertEqual(paragraph.minimumLineHeight, try font("末段").pointSize * ManuscriptTypography.bodyLineHeight, accuracy: 0.01)
         let range = (storage.string as NSString).range(of: "粗体")
         storage.replaceCharacters(in: range, with: "新内容")
         ManuscriptTypography.apply(to: storage, hasTitle: true, changed: NSRange(location: range.location, length: 3), traits: traits)

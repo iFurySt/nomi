@@ -3,12 +3,43 @@ import UIKit
 enum ManuscriptTypography {
     typealias Attributes = [NSAttributedString.Key: Any]
 
-    static func attributes(title: Bool, traits: UITraitCollection) -> Attributes {
+    static let columnWidth: CGFloat = 620
+    static let gutter: CGFloat = 24
+    static let railGutter: CGFloat = 12
+    static let topInset: CGFloat = 8
+    static let bottomInset: CGFloat = 24
+
+    // Line heights are relative to the run's font; block gaps scale with the body font.
+    static let bodyLineHeight: CGFloat = 26 / Size.body.rawValue
+    static let headingLineHeight: CGFloat = 1.35
+    static let paragraphGap: CGFloat = 12 / Size.body.rawValue
+    static let titleGap: CGFloat = 18 / Size.body.rawValue
+    static let sectionGap: CGFloat = 24 / Size.body.rawValue
+
+    // Relative to the standard 17 pt body, including accessibility sizes.
+    enum Size: CGFloat {
+        case title = 23, heading = 20, subheading = 18, minorHeading = 16, body = 17
+
+        var scale: CGFloat { rawValue / Size.body.rawValue }
+
+        func font(_ traits: UITraitCollection) -> UIFont {
+            let body = UIFont.preferredFont(forTextStyle: .body, compatibleWith: traits)
+            if self == .body { return body }
+            return UIFont.systemFont(ofSize: body.pointSize * scale, weight: self == .title ? .bold : .semibold)
+        }
+    }
+
+    static func attributes(size: Size, traits: UITraitCollection, separatesParagraphs: Bool = true) -> Attributes {
+        let font = size.font(traits)
+        let bodySize = font.pointSize / size.scale
         let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 3
-        paragraph.paragraphSpacing = title ? 8 : 3
-        let base = UIFont.preferredFont(forTextStyle: title ? .title1 : .body, compatibleWith: traits)
-        let font = title ? weighted(base, .traitBold) : base
+        paragraph.minimumLineHeight = font.pointSize * (size == .body ? bodyLineHeight : headingLineHeight)
+        if separatesParagraphs {
+            paragraph.paragraphSpacing = bodySize * (size == .title ? titleGap : paragraphGap)
+        }
+        if size != .title && size != .body {
+            paragraph.paragraphSpacingBefore = bodySize * (sectionGap - paragraphGap)
+        }
         return [.font: font, .foregroundColor: UIColor.label, .paragraphStyle: paragraph]
     }
 
@@ -47,7 +78,15 @@ enum ManuscriptTypography {
                 }
             }
             if end > range.location {
-                var base = attributes(title: title, traits: traits)
+                let prefix = title || literal ? nil : ["###### ", "##### ", "#### ", "### ", "## ", "# ", "> "]
+                    .first(where: line.hasPrefix)
+                let size: Size = switch prefix {
+                case "# ": .heading
+                case "## ": .subheading
+                case "### ", "#### ", "##### ", "###### ": .minorHeading
+                default: title ? .title : .body
+                }
+                var base = attributes(size: size, traits: traits, separatesParagraphs: !literal && !line.isEmpty)
                 if literal {
                     let size = (base[.font] as! UIFont).pointSize
                     base[.font] = UIFont.monospacedSystemFont(ofSize: size, weight: .regular)
@@ -55,7 +94,7 @@ enum ManuscriptTypography {
                 }
                 storage.setAttributes(base, range: NSRange(location: start, length: end - start))
                 if !title && !literal && contentEnd > start {
-                    styleMarkdown(storage, text: line, start: start, base: base, traits: traits, editingSource: editingSource)
+                    styleMarkdown(storage, text: line, prefix: prefix, start: start, base: base, editingSource: editingSource)
                 }
             }
             start = end
@@ -64,14 +103,13 @@ enum ManuscriptTypography {
 
     // Keep the original Markdown and UTF-16 offsets for native input, selection,
     // undo and sync. Presentation attributes are identical before and after focus.
-    private static func styleMarkdown(_ storage: NSTextStorage, text: String, start: Int, base: Attributes, traits: UITraitCollection, editingSource: Bool) {
+    private static func styleMarkdown(_ storage: NSTextStorage, text: String, prefix: String?, start: Int, base: Attributes, editingSource: Bool) {
         var content = text[...]
-        var font = base[.font] as! UIFont
+        let font = base[.font] as! UIFont
         var color = UIColor.label
-        if let prefix = ["###### ", "##### ", "#### ", "### ", "## ", "# ", "> "].first(where: { content.hasPrefix($0) }) {
+        if let prefix {
             content = content.dropFirst(prefix.count)
             if prefix == "> " { color = .secondaryLabel }
-            else { font = weighted(UIFont.preferredFont(forTextStyle: prefix.count >= 4 ? .headline : (prefix == "# " ? .title1 : .title2), compatibleWith: traits), .traitBold) }
             conceal(storage, NSRange(location: start, length: prefix.count))
         }
         let offset = start + text[..<content.startIndex].utf16.count

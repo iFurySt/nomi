@@ -5,8 +5,15 @@ struct NomiMobileApp: App {
     @State private var library = Library()
     @State private var cloud = MobileCloud()
 
+    @AppStorage(AppAppearance.key) private var appearance = AppAppearance.system
+
     var body: some Scene {
-        WindowGroup { Workspace(library: library, cloud: cloud).tint(.primary) }
+        WindowGroup {
+            Workspace(library: library, cloud: cloud)
+                .tint(.primary)
+                .background(WindowAppearance(appearance: appearance))
+                .environment(\.locale, AppLanguage.current.locale)
+        }
     }
 }
 
@@ -173,6 +180,8 @@ struct Workspace: View {
             NavigationStack {
                 workspaceContent(wide: wide, rail: rail, nativeToolbar: true, sideWidth: sideWidth, inset: inset)
                     .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackgroundVisibility(portraitDrawer ? .hidden : .automatic, for: .navigationBar)
+                    .scrollEdgeEffectHidden(portraitDrawer, for: .vertical)
                     .toolbar {
                         if !portraitDrawer || !drawer {
                             ToolbarItem(placement: .cancellationAction) {
@@ -208,7 +217,7 @@ struct Workspace: View {
                                 Menu("更多操作", systemImage: "ellipsis") {
                                     if let note = current { documentActions(note) }
                                     if needsSyncAttention {
-                                        Button(cloud.message ?? "待同步", systemImage: "icloud") { accountPanel = true }
+                                        Button(cloud.message ?? AppLanguage.text("待同步"), systemImage: "icloud") { accountPanel = true }
                                     }
                                 }
                                 .disabled(current == nil && !needsSyncAttention)
@@ -245,6 +254,9 @@ struct Workspace: View {
         let leading = rail == .leading
         let railEdges: Edge.Set = usesRail ? (leading ? .leading : .trailing) : []
         let visibleWidth = min(sideWidth, max(0, (pinned ? sideWidth : 0) + (dragDistance ?? 0)))
+        let sidebarInset = leading ? min(visibleWidth, inset) : 0
+        let textRail = EdgeInsets(top: 0, leading: leading ? inset - sidebarInset : 0,
+                                  bottom: 0, trailing: rail == .trailing ? inset : 0)
         return ZStack(alignment: .leading) {
             HStack(spacing: 0) {
                 if wide {
@@ -261,10 +273,10 @@ struct Workspace: View {
                         .allowsHitTesting(pinned)
                         .accessibilityHidden(!pinned)
                 }
-                detail(wide: wide, nativeToolbar: nativeToolbar).frame(maxWidth: .infinity)
+                detail(wide: wide, nativeToolbar: nativeToolbar, textRail: textRail).frame(maxWidth: .infinity)
                     .accessibilityHidden(!wide && drawer)
             }
-            .padding(railEdges, inset)
+            .padding(.leading, sidebarInset)
             if !wide && (usesRail || !nativeToolbar) {
                 drawerLayer(sideWidth: sideWidth, rail: rail, nativeToolbar: nativeToolbar)
             }
@@ -273,7 +285,7 @@ struct Workspace: View {
                     accountAndSearch(vertical: true)
                 }
                 if editing == nil && (nativeToolbar || wide || !drawer) {
-                    composeButton
+                    composeButton(horizontalToolbar: nativeToolbar && !wide && !usesRail)
                 }
             }
             .padding(leading ? .leading : .trailing, 24)
@@ -281,7 +293,7 @@ struct Workspace: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: leading ? .bottomLeading : .bottomTrailing)
             .ignoresSafeArea(wide ? .all : .container, edges: .bottom)
         }
-        // Duo reserves a side rail for system controls. The floating controls use the rail while the reader respects its inset.
+        // Duo reserves a side rail for system controls. Only prose and controls reserve its width; the document scrolls behind it.
         .ignoresSafeArea(.container, edges: railEdges)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: drawer)
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: pinned)
@@ -416,13 +428,21 @@ struct Workspace: View {
         .accessibilityIdentifier("finishEditing")
     }
 
-    private var composeButton: some View {
-        Button { create() } label: {
-            Image(systemName: "square.and.pencil").font(.system(size: 22, weight: .regular))
-                .frame(width: 48, height: 48).contentShape(Circle())
+    private func composeButton(horizontalToolbar: Bool) -> some View {
+        let button = Button { create() } label: {
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 22))
+                .frame(width: horizontalToolbar ? nil : 48, height: horizontalToolbar ? nil : 48)
+                .contentShape(Circle())
         }
-        .buttonStyle(.plain)
-        .modifier(CircularGlass())
+        return Group {
+            if #available(iOS 26, *), horizontalToolbar {
+                button.controlSize(.extraLarge).buttonBorderShape(.circle).buttonStyle(.glass)
+            } else {
+                button.buttonStyle(.plain)
+                    .modifier(CircularGlass())
+            }
+        }
         .accessibilityLabel("新建文稿")
         .accessibilityHint("在根目录下创建")
         .accessibilityIdentifier("newRoot")
@@ -459,13 +479,28 @@ struct Workspace: View {
 
     @ScaledMetric(relativeTo: .title2) private var brandScale: CGFloat = 1
 
-    private func brand(coverRail: Bool) -> some View {
-        Image("SidebarWordmark")
+    private func brand(coverRail: Bool, surface: Color) -> some View {
+        let wordmark = Image("SidebarWordmark")
             .resizable()
             .scaledToFit()
             .frame(height: (coverRail ? 40 : 29) * brandScale)
+        return wordmark
             .foregroundStyle(.primary)
+            .background {
+                // Grow the asset’s alpha silhouette, then soften its edge over passing rows.
+                Canvas { context, size in
+                    guard let mark = context.resolveSymbol(id: 0) else { return }
+                    context.addFilter(.alphaThreshold(min: 0.06, color: surface))
+                    context.draw(mark, at: CGPoint(x: size.width / 2, y: size.height / 2))
+                } symbols: {
+                    wordmark.padding(12).blur(radius: 4).tag(0)
+                }
+                .padding(-12)
+                .blur(radius: 3)
+                .accessibilityHidden(true)
+            }
             .accessibilityLabel("Nomi")
+            .allowsHitTesting(false)
     }
 
     private var accountButton: some View {
@@ -504,20 +539,10 @@ struct Workspace: View {
     private func sidebar(compact: Bool, usesRail: Bool, nativeToolbar: Bool) -> some View {
         let coverRail = compact && usesRail
         let gutter: CGFloat = compact ? (coverRail ? 28 : 20) : 32
+        let headerHeight: CGFloat = coverRail ? 62 : 50
+        let headerTop: CGFloat = compact && !nativeToolbar ? 0 : (coverRail ? 20 : 24)
+        let surface = coverRail ? Color(white: scheme == .dark ? 0.10 : 252 / 255) : Color(uiColor: .secondarySystemBackground)
         return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                brand(coverRail: coverRail)
-                Spacer()
-                if coverRail && needsSyncAttention {
-                    iconButton(cloud.message ?? "待同步", cloud.message == nil ? "icloud.and.arrow.up" : "exclamationmark.icloud") { accountPanel = true }
-                }
-                if !nativeToolbar || (compact && !usesRail) {
-                    directoryButton(expanded: true) {
-                        if compact { drawer = false } else { pinned = false }
-                    }
-                }
-            }.padding(.leading, gutter).padding(.trailing, compact ? 8 : 24).frame(height: coverRail ? 62 : 50)
-                .padding(.top, compact && !nativeToolbar ? 0 : (coverRail ? 20 : 24))
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     let tree = outline
@@ -558,8 +583,25 @@ struct Workspace: View {
                                     in: RoundedRectangle(cornerRadius: 8))
                     }
                 }.scrollTargetLayout().padding(.horizontal, gutter - 12)
-            }.scrollPosition(id: $sidebarScrollRow, anchor: .top)
+            }
+            .contentMargins(.top, headerTop + headerHeight, for: .scrollContent)
+            .scrollPosition(id: $sidebarScrollRow, anchor: .top)
             .accessibilityIdentifier("sidebarResults").scrollDismissesKeyboard(.interactively)
+            .overlay(alignment: .top) {
+                HStack(spacing: 8) {
+                    brand(coverRail: coverRail, surface: surface)
+                    Spacer()
+                    if coverRail && needsSyncAttention {
+                        iconButton(cloud.message ?? AppLanguage.text("待同步"), cloud.message == nil ? "icloud.and.arrow.up" : "exclamationmark.icloud") { accountPanel = true }
+                    }
+                    if !nativeToolbar || (compact && !usesRail) {
+                        directoryButton(expanded: true) {
+                            if compact { drawer = false } else { pinned = false }
+                        }
+                    }
+                }.padding(.leading, gutter).padding(.trailing, compact ? 8 : 24).frame(height: headerHeight)
+                    .padding(.top, headerTop)
+            }
             if !coverRail {
                 HStack { Spacer(); accountAndSearch(vertical: false) }
                     .padding(.horizontal, compact ? 16 : 24)
@@ -568,7 +610,7 @@ struct Workspace: View {
             }
         }
         .frame(maxHeight: .infinity)
-        .background((coverRail ? Color(white: scheme == .dark ? 0.10 : 252 / 255) : Color(uiColor: .secondarySystemBackground)).ignoresSafeArea())
+        .background(surface.ignoresSafeArea())
     }
 
     private var editLocks: Set<String> {
@@ -610,7 +652,7 @@ struct Workspace: View {
         Button("删除文稿", systemImage: "trash", role: .destructive) { deleting = note }
     }
 
-    private func detail(wide: Bool, nativeToolbar: Bool) -> some View {
+    private func detail(wide: Bool, nativeToolbar: Bool, textRail: EdgeInsets) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             if !nativeToolbar {
                 HStack(spacing: 2) {
@@ -624,10 +666,10 @@ struct Workspace: View {
                         finishButton
                     } else {
                         if needsSyncAttention {
-                            iconButton(cloud.message ?? "待同步", cloud.message == nil ? "icloud.and.arrow.up" : "exclamationmark.icloud") { accountPanel = true }
+                            iconButton(cloud.message ?? AppLanguage.text("待同步"), cloud.message == nil ? "icloud.and.arrow.up" : "exclamationmark.icloud") { accountPanel = true }
                         }
                         if let note = current {
-                            iconButton("编辑文稿", "pencil") { editing = EditSession(draft: note, original: note, caret: .end) }
+                            iconButton(AppLanguage.text("编辑文稿"), "pencil") { editing = EditSession(draft: note, original: note, caret: .end) }
                                 .disabled(isLocked(note))
                             Menu {
                                 documentActions(note)
@@ -641,7 +683,8 @@ struct Workspace: View {
             }
             if let note = editing?.original ?? current {
                 ManuscriptEditor(draft: Binding(get: { editing?.draft ?? note },
-                                                set: { editing?.draft = $0 }),
+                                                set: { editing?.draft = $0 }), textRail: textRail,
+                                 horizontalToolbar: nativeToolbar && !wide && toolbarEdge == nil,
                                  editing: editing != nil, readOnly: isLocked(note), caret: editing?.caret,
                                  children: outline.children[note.id] ?? [], openChild: open,
                                  beginEditing: { caret, format in
@@ -673,7 +716,7 @@ struct Workspace: View {
             } else if syncConnected && !cloud.replica.initialized {
                 VStack(spacing: 12) {
                     if cloud.busy { ProgressView("正在读取文稿") }
-                    else { Button(cloud.message ?? "读取文稿") { accountPanel = true } }
+                    else { Button(cloud.message ?? AppLanguage.text("读取文稿")) { accountPanel = true } }
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Button { create() } label: {

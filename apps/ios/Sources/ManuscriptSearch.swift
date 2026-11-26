@@ -31,7 +31,7 @@ struct ManuscriptSearch: View {
                     } else {
                         HStack(spacing: 4) {
                             ForEach(Scope.allCases, id: \.self) { item in
-                                Button(item.rawValue) { scope = item }
+                                Button(LocalizedStringKey(item.rawValue)) { scope = item }
                                     .font(.subheadline.weight(.medium))
                                     .padding(.horizontal, 16).frame(minHeight: 44)
                                     .background(scope == item ? Color.primary.opacity(0.065) : .clear, in: Capsule())
@@ -96,7 +96,7 @@ struct ManuscriptSearch: View {
         .onAppear { focused = true }
     }
 
-    private func placeholder(_ label: String) -> some View {
+    private func placeholder(_ label: LocalizedStringKey) -> some View {
         VStack(spacing: 20) {
             Image(systemName: "magnifyingglass").font(.title).foregroundStyle(.secondary)
             Text(label).font(.body)

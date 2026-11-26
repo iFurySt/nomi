@@ -329,6 +329,41 @@ final class ManuscriptTests: XCTestCase {
         XCTAssertTrue(app.buttons["移动文稿"].isHittable)
     }
 
+    @MainActor func testInnerDisplayScrollsBehindHorizontalButtons() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
+        app.launch()
+        let window = app.windows.firstMatch.frame
+        guard window.width >= 600, window.height > window.width else {
+            throw XCTSkip("需要带横向工具栏的 Duo 内屏")
+        }
+        let compose = app.buttons["newRoot"]
+        compose.tap()
+        let field = app.textViews["manuscriptText"]
+        field.typeText("Reading layout\nA paragraph")
+        app.buttons["finishEditing"].tap()
+        func checkViewport(_ surface: XCUIElement) {
+            XCTAssertTrue(surface.waitForExistence(timeout: 5))
+            XCTAssertLessThan(surface.frame.minY, app.buttons["打开目录"].frame.midY)
+            XCTAssertGreaterThan(surface.frame.maxY, compose.frame.midY)
+        }
+        checkViewport(app.textViews["manuscriptReader"])
+        compose.tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        if keyboard.frame.width >= window.width - 1 && keyboard.frame.maxY >= window.maxY - 1 {
+            XCTAssertLessThanOrEqual(field.frame.maxY, keyboard.frame.minY + 1)
+        }
+        field.typeText("Checklist\n" + String(repeating: "- [ ] Read\n", count: 32))
+        app.buttons["finishEditing"].tap()
+        let web = app.webViews.firstMatch
+        checkViewport(web)
+        web.swipeUp()
+        checkViewport(web)
+        XCTAssertTrue(compose.isHittable)
+    }
+
     @MainActor func testWideSidebarFooterDuringEditing() throws {
         let app = XCUIApplication()
         app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
@@ -626,8 +661,65 @@ final class ManuscriptTests: XCTestCase {
         XCTAssertEqual(reader.value as? String, draft + "\n")
     }
 
+    @MainActor func testFoldedManuscriptScrollsBehindRightRail() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)"]
+        app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
+        app.launch()
+        let window = app.windows.firstMatch.frame
+        let directory = app.buttons["打开目录"]
+        guard window.width == 466, directory.frame.midX > window.midX else {
+            throw XCTSkip("需要操作栏在右侧的 Duo 折叠竖屏")
+        }
+        app.buttons["newRoot"].tap()
+        let native = app.textViews["manuscriptText"]
+        XCTAssertEqual(native.frame.maxX, window.maxX, accuracy: 2)
+        native.typeText("文稿")
+        app.buttons["format-table"].tap()
+        let web = app.webViews.firstMatch
+        XCTAssertTrue(web.waitForExistence(timeout: 8))
+        XCTAssertEqual(web.frame.maxX, window.maxX, accuracy: 2)
+        app.buttons["finishEditing"].tap()
+        XCTAssertGreaterThan(web.frame.maxX, directory.frame.maxX)
+        XCTAssertTrue(directory.isHittable)
+    }
+
+    @MainActor func testTableShortcutFocusesFirstCellAndSaves() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)"]
+        app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
+        app.launch()
+        app.buttons["newRoot"].tap()
+        app.textViews["manuscriptText"].typeText("Coffee")
+        app.buttons["format-table"].tap()
+        let web = app.webViews.firstMatch
+        XCTAssertTrue(web.buttons["列操作"].waitForExistence(timeout: 10))
+        app.typeText("Dose")
+        XCTAssertEqual(web.textViews["正文"].value as? String, "Dose")
+        web.buttons["列操作"].tap()
+        capture("duo-table-actions")
+        web.buttons["右侧插入列"].tap()
+        let nextCell = web.textViews["正文"]
+        let emptyCell = NSPredicate(format: "exists == true AND (value == nil OR value == %@)", "")
+        expectation(for: emptyCell, evaluatedWith: nextCell)
+        waitForExpectations(timeout: 5)
+        app.typeText("Water")
+        app.buttons["finishEditing"].tap()
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(web.staticTexts["Dose"].waitForExistence(timeout: 8))
+        XCTAssertTrue(web.staticTexts["Water"].exists)
+        app.buttons["format-numbers"].tap()
+        app.typeText("Weigh beans")
+        app.buttons["finishEditing"].tap()
+        let listItem = web.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Weigh beans")).firstMatch
+        XCTAssertTrue(listItem.waitForExistence(timeout: 5))
+    }
+
     @MainActor func testRichBodyToolbarAndPreview() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)"]
         app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
         app.launch()
         app.buttons["newRoot"].tap()
@@ -638,6 +730,8 @@ final class ManuscriptTests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         XCTAssertEqual(editor.value as? String, "Field guide\n- [ ] One task")
         editor.typeText(" ")
+        app.buttons["paragraphStyles"].tap()
+        capture("duo-format-palette")
         app.buttons["format-bold"].tap()
         editor.typeText("today")
         XCTAssertEqual(editor.value as? String, "Field guide\n- [ ] One task **today**")
@@ -689,6 +783,33 @@ final class ManuscriptTests: XCTestCase {
         app.buttons["finishEditing"].tap()
     }
 
+    @MainActor func testTappingBodyAndTableKeepsReadingScale() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)"]
+        app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        app.buttons["newRoot"].tap()
+        app.textViews["manuscriptText"].typeText("Reading scale\nTap this paragraph.\n\n| Cell one | Cell two |\n| --- | --- |\n| First | Second |")
+        app.buttons["finishEditing"].tap()
+        let web = app.webViews.firstMatch
+        let title = web.staticTexts["Reading scale"]
+        XCTAssertTrue(title.waitForExistence(timeout: 8))
+        let readingWidth = title.frame.width
+        XCTAssertGreaterThan(readingWidth, 0)
+        for label in ["Tap this paragraph.", "First"] {
+            web.staticTexts[label].tap()
+            let field = web.textViews["Body"]
+            XCTAssertTrue(field.waitForExistence(timeout: 5))
+            app.typeText("!")
+            XCTAssertTrue((field.value as? String)?.contains("!") == true)
+            XCTAssertEqual(title.frame.width, readingWidth, accuracy: 1, "Focus changed page scale for \(label)")
+            app.buttons["finishEditing"].tap()
+        }
+        web.pinch(withScale: 1.6, velocity: 1)
+        XCTAssertGreaterThan(title.frame.width, readingWidth + 5)
+    }
+
     @MainActor func testTypographyOnFocus() throws {
         let app = XCUIApplication()
         app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
@@ -703,10 +824,13 @@ final class ManuscriptTests: XCTestCase {
         // Crop upstream of the insertion point, excluding the system rail and keyboard.
         func glyphs(_ field: XCUIElement) throws -> Data {
             let screenshot = field.screenshot().image
-            let scale = CGFloat(try XCTUnwrap(screenshot.cgImage).width) / field.frame.width
-            let bounds = CGRect(x: 0, y: 0, width: min(270, field.frame.width), height: 108)
-            let image = try XCTUnwrap(screenshot.cgImage?.cropping(to: bounds.applying(.init(scaleX: scale, y: scale))))
-            return try XCTUnwrap(UIImage(cgImage: image).pngData())
+            let bounds = CGRect(x: 0, y: 0, width: min(270, field.frame.width), height: 94)
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = screenshot.scale
+            let crop = UIGraphicsImageRenderer(bounds: bounds, format: format).image { _ in
+                screenshot.draw(at: .zero)
+            }
+            return try XCTUnwrap(crop.pngData())
         }
         let before = try glyphs(reader)
         let origin = reader.frame.origin
@@ -731,16 +855,103 @@ final class ManuscriptTests: XCTestCase {
         }
     }
 
+    @MainActor func testAppLanguageFallback() {
+        let app = XCUIApplication()
+        app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
+        for (preferences, signIn, language) in [
+            ("(zh-Hans)", "登录", "简体中文"),
+            ("(zh-Hant-TW,en)", "登录", "简体中文"),
+            ("(ja,zh-Hans)", "Sign in", "English"),
+            ("(en,zh-Hans)", "Sign in", "English")
+        ] {
+            app.launchArguments = ["-AppleLanguages", preferences]
+            app.launch()
+            if !app.buttons["sidebarAccount"].isHittable { app.buttons["打开目录"].tap() }
+            app.buttons["sidebarAccount"].tap()
+            XCTAssertEqual(app.buttons["passwordSignIn"].label, signIn, preferences)
+            let general = app.buttons["generalSettings"]
+            app.scrollViews.containing(.button, identifier: "generalSettings").firstMatch.swipeUp()
+            XCTAssertTrue(general.isHittable)
+            general.tap()
+            XCTAssertTrue(app.buttons["appLanguage"].label.contains(language), preferences)
+            app.terminate()
+        }
+    }
+
+    @MainActor func testGeneralSettings() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
+        app.launchArguments = ["-AppleLanguages", "(en)"]
+        func openGeneral() {
+            if !app.buttons["sidebarAccount"].isHittable { app.buttons["打开目录"].tap() }
+            app.buttons["sidebarAccount"].tap()
+            app.buttons["generalSettings"].tap()
+        }
+        app.launch()
+        openGeneral()
+        let picker = app.buttons["appearancePicker"]
+        picker.tap()
+        app.buttons["Dark"].tap()
+        XCTAssertTrue(picker.label.contains("Dark") || (picker.value as? String) == "Dark")
+        capture("duo-general-dark")
+        app.terminate()
+        app.launch()
+        openGeneral()
+        XCTAssertTrue(picker.label.contains("Dark") || (picker.value as? String) == "Dark")
+        picker.tap()
+        app.buttons["Light"].tap()
+        capture("duo-general-light")
+        picker.tap()
+        app.buttons["System"].tap()
+        app.buttons["appLanguage"].tap()
+        XCTAssertTrue(XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+            .wait(for: .runningForeground, timeout: 8))
+    }
+
+    @MainActor func testDeleteDisposableAppleAccount() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let site = env["NOMI_SYNC_TEST_URL"], URL(string: site)?.host == "127.0.0.1",
+              let email = env["NOMI_DISPOSABLE_APPLE_EMAIL"],
+              let password = env["NOMI_SYNC_TEST_PASSWORD"] else { throw XCTSkip("需要可注销的本地 Apple 测试账号") }
+        let app = XCUIApplication()
+        app.launchEnvironment["NOMI_TEST_SITE"] = site
+        app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
+        app.launch()
+        if !app.buttons["sidebarAccount"].isHittable { app.buttons["打开目录"].tap() }
+        app.buttons["sidebarAccount"].tap()
+        app.textFields["loginEmail"].tap()
+        app.textFields["loginEmail"].typeText(email)
+        app.secureTextFields["loginPassword"].tap()
+        app.secureTextFields["loginPassword"].typeText(password + "\n")
+        XCTAssertTrue(app.textFields["loginEmail"].waitForNonExistence(timeout: 15))
+        app.buttons["sidebarAccount"].tap()
+        app.buttons["dataControls"].tap()
+        app.buttons["deleteAccount"].tap()
+        app.alerts.buttons["永久注销"].tap()
+        let confirmation = app.alerts["账号已注销"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 8))
+        XCTAssertTrue(confirmation.buttons["查看 Apple 指引"].exists)
+        confirmation.buttons["完成"].tap()
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 5))
+        app.terminate()
+        app.launch()
+        if !app.buttons["sidebarAccount"].isHittable { app.buttons["打开目录"].tap() }
+        app.buttons["sidebarAccount"].tap()
+        XCTAssertTrue(app.textFields["loginEmail"].waitForExistence(timeout: 5))
+    }
+
     @MainActor func testNativeAccount() throws {
         let env = ProcessInfo.processInfo.environment
         guard let url = env["NOMI_SYNC_TEST_URL"], URL(string: url)?.host == "127.0.0.1",
               let password = env["NOMI_SYNC_TEST_PASSWORD"] else { throw XCTSkip("需要隔离的同步服务") }
         let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)"]
         app.launchEnvironment["NOMI_TEST_SITE"] = url
         app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
         app.launch()
         app.buttons["newRoot"].tap()
-        app.textViews["manuscriptText"].typeText("Guest draft")
+        app.textViews["manuscriptText"].tap()
+        app.textViews["manuscriptText"].typeText("Guest draft\nLocal body")
         app.buttons["finishEditing"].tap()
         func row(_ title: String) -> XCUIElement {
             app.buttons.matching(identifier: "noteRow").matching(NSPredicate(format: "label == %@", title)).firstMatch
@@ -768,7 +979,8 @@ final class ManuscriptTests: XCTestCase {
         XCTAssertFalse(app.staticTexts["本机文稿"].exists)
         row("Guest draft").press(forDuration: 0.8)
         app.buttons["新建子文稿"].tap()
-        app.textViews["manuscriptText"].typeText("Child of guest draft")
+        app.textViews["manuscriptText"].tap()
+        app.textViews["manuscriptText"].typeText("Child of guest draft\nChild body")
         app.buttons["finishEditing"].tap()
         if !app.buttons["sidebarAccount"].isHittable { app.buttons["打开目录"].tap() }
         XCTAssertEqual(row("Child of guest draft").value as? String, "第2层")
@@ -776,13 +988,41 @@ final class ManuscriptTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["test@example.invalid"].waitForExistence(timeout: 8))
         XCTAssertFalse(app.buttons["立即同步"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["当前资料库"].exists)
+        XCTAssertFalse(app.buttons["deleteAccount"].exists)
+        func checkSettings(logoutLabel: String, linkedLabel: String) {
+            let controls = app.buttons["dataControls"].frame
+            let logout = app.buttons[logoutLabel]
+            XCTAssertTrue(logout.isHittable)
+            let spacing = logout.frame.minY - controls.maxY
+            XCTAssertGreaterThanOrEqual(spacing, 0)
+            XCTAssertLessThan(spacing, controls.height)
+            for label in ["Apple", "Google", linkedLabel] {
+                XCTAssertFalse(app.staticTexts[label].exists)
+            }
+        }
+        checkSettings(logoutLabel: "退出登录", linkedLabel: "已关联")
+        app.buttons["dataControls"].tap()
+        XCTAssertGreaterThan(app.buttons["deleteAccount"].frame.midY, app.frame.midY)
+        capture("duo-data-controls")
+        app.buttons["deleteAccount"].tap()
+        XCTAssertTrue(app.alerts["永久注销 Nomi 账号？"].exists)
+        app.alerts.buttons["取消"].tap()
+        app.buttons["BackButton"].tap()
         capture("duo-personal-settings")
         app.buttons["versionInfo"].tap()
         let version = app.buttons.matching(NSPredicate(format: "label MATCHES %@", #"Nomi v[0-9.]+ \([0-9]+\)"#)).firstMatch
         XCTAssertTrue(version.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["隐私政策"].exists)
+        XCTAssertTrue(app.buttons["联系支持"].exists)
         capture("duo-version-info")
         version.tap()
-        app.buttons["退出登录"].tap()
+        app.terminate()
+        app.launchArguments = ["-AppleLanguages", "(en)"]
+        app.launch()
+        account()
+        XCTAssertTrue(app.staticTexts["test@example.invalid"].waitForExistence(timeout: 8))
+        checkSettings(logoutLabel: "Log out", linkedLabel: "Linked")
+        app.buttons["Log out"].tap()
         XCTAssertTrue(app.buttons["sidebarAccount"].waitForExistence(timeout: 8))
         XCTAssertTrue(row("Guest draft").exists)
         XCTAssertTrue(row("Child of guest draft").exists)

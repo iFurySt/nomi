@@ -63,8 +63,9 @@ struct CloudReplica {
                 let block = map["block:" + blockID]?["data"] as? CloudJSON
                 if block?["type"] as? String == "markdown", let source = block?["source"] as? String { return CloudPart(id: blockID, editable: true, text: source) }
                 note.usesBlockEditor = true
-                let labels = ["interactive": "交互块", "canvas": "画布", "image": "图片", "file": "附件", "note-reference": "文稿引用"]
-                return CloudPart(id: blockID, editable: false, text: "［\(labels[block?["type"] as? String ?? ""] ?? "内容块")］")
+                let labels: [String: String.LocalizationValue] = ["interactive": "交互块", "canvas": "画布", "image": "图片", "file": "附件", "note-reference": "文稿引用"]
+                let label = labels[block?["type"] as? String ?? ""] ?? "内容块"
+                return CloudPart(id: blockID, editable: false, text: "［\(AppLanguage.text(label))］")
             }
             note.body = note.parts.map(\.text).joined(separator: "\n\n")
             return note
@@ -86,7 +87,7 @@ struct CloudReplica {
     mutating func edit(_ draft: Manuscript, original: Manuscript?) throws -> String {
         guard initialized else { throw CloudFailure("文稿同步尚未就绪。") }
         let trimmed = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let title = trimmed.isEmpty ? "无标题" : trimmed
+        let title = trimmed.isEmpty ? AppLanguage.text("无标题") : trimmed
         guard title.utf16.count <= 200, draft.usesBlockEditor || draft.body.utf16.count <= 200_000,
               draft.parts.allSatisfy({ $0.text.utf16.count <= 200_000 }) else { throw LibraryError.tooLong }
         let map = visible
@@ -135,7 +136,7 @@ struct CloudReplica {
         if let row = map.values.first(where: { $0["kind"] as? String == "document" }), let data = row["data"] as? CloudJSON {
             header = data
         } else {
-            header = ["id": "document.home", "schema": "nomi-document-ir/draft-1", "title": "文稿", "noteOrder": []]
+            header = ["id": "document.home", "schema": "nomi-document-ir/draft-1", "title": AppLanguage.text("文稿"), "noteOrder": []]
             changes.append(mutation("board", "board.home", ["id": "board.home", "placements": [], "connectors": []], in: map))
         }
         guard let documentID = header["id"] as? String, var order = header["noteOrder"] as? [String] else { throw LibraryError.unsupported }

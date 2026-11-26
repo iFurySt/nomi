@@ -78,9 +78,10 @@ final class MobileCloud {
             return (id, name)
         }
         if spaces.isEmpty {
-            let created = try await CloudAPI.request(session.site, "v1/spaces", token: session.token, method: "POST", body: ["name": "我的文稿"]) as? CloudJSON
+            let name = AppLanguage.text("我的文稿")
+            let created = try await CloudAPI.request(session.site, "v1/spaces", token: session.token, method: "POST", body: ["name": name]) as? CloudJSON
             guard let id = created?["id"] as? String else { throw LibraryError.unsupported }
-            spaces = [(id, "我的文稿")]
+            spaces = [(id, name)]
         }
         if spaces.count == 1 { try bind(spaces[0].id) }
     }
@@ -217,7 +218,7 @@ final class MobileCloud {
             message = nil
         } catch LibraryError.conflict {
             conflict = true
-            message = "另一台设备也修改了文稿，你的修改已保留。"
+            message = AppLanguage.text("另一台设备也修改了文稿，你的修改已保留。")
         } catch { message = error.localizedDescription }
     }
 

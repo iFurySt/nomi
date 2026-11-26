@@ -12,7 +12,7 @@ enum ManuscriptFormat: String, CaseIterable {
         case .code: ("行内代码", "chevron.left.forwardslash.chevron.right")
         case .link: ("链接", "link")
         case .clear: ("清除格式", "eraser")
-        case .math: ("行内公式", "sum")
+        case .math: ("行内公式", "function")
         case .paragraph: ("正文", "textformat")
         case .heading1: ("标题 1", "textformat.size")
         case .heading2: ("标题 2", "textformat.size")
@@ -95,7 +95,7 @@ enum ManuscriptFormat: String, CaseIterable {
         case .link:
             let url = URL(string: selected)
             let hasURL = ["http", "https", "mailto"].contains(url?.scheme?.lowercased() ?? "")
-            let label = selected.isEmpty || hasURL ? "链接" : selected
+            let label = selected.isEmpty || hasURL ? AppLanguage.text("链接") : selected
             let escapedLabel = label.replacingOccurrences(of: "]", with: "\\]")
             let target = hasURL ? selected : "https://"
             return Change(range: selection, text: "[\(escapedLabel)](\(target))",
@@ -132,15 +132,15 @@ enum ManuscriptFormat: String, CaseIterable {
                 content = delimiter + "\n" + value + "\n" + delimiter
                 offset = delimiter.utf16.count + 1; length = value.utf16.count
             case .table:
-                let value = selected.isEmpty ? "列 1" : selected.replacingOccurrences(of: "|", with: "\\|").replacingOccurrences(of: "\n", with: "<br>")
-                content = "| \(value) | 列 2 |\n| --- | --- |\n|  |  |"; offset = 2; length = value.utf16.count
+                let value = selected.replacingOccurrences(of: "|", with: "\\|").replacingOccurrences(of: "\n", with: "<br>")
+                content = "| \(value) |  |\n| --- | --- |\n|  |  |"; offset = 2; length = value.utf16.count
             default: content = "---"; offset = 3; length = 0
             }
             // A rule without a blank line can turn the preceding paragraph into a heading.
             let before = selection.location == 0 ? "" : "\n\n"
             let after = NSMaxRange(selection) == body.length ? "\n" : "\n\n"
             return Change(range: selection, text: before + content + after,
-                          selection: NSRange(location: before.utf16.count + offset, length: length))
+                          selection: NSRange(location: before.utf16.count + offset + (self == .divider ? 1 : 0), length: length))
         default:
             let line = body.lineRange(for: selection)
             var value = body.substring(with: line)
@@ -165,39 +165,80 @@ enum ManuscriptFormat: String, CaseIterable {
 
 struct ManuscriptFormatBar: View {
     let editing: Bool
+    let inTable: Bool
     let perform: (ManuscriptFormat) -> Void
-    private func item(_ format: ManuscriptFormat) -> some View {
-        Button { perform(format) } label: { Label(format.presentation.label, systemImage: format.presentation.symbol) }
-            .accessibilityIdentifier("format-" + format.rawValue)
+    @State private var showsFormat = false
+
+    private func action(_ format: ManuscriptFormat, text: Bool = false) -> some View {
+        Button {
+            showsFormat = false
+            perform(format)
+        } label: {
+            Group {
+                if text {
+                    Text(LocalizedStringKey(format.presentation.label))
+                        .font(.subheadline.weight(format == .paragraph ? .regular : .semibold))
+                        .padding(.horizontal, 9)
+                } else {
+                    Image(systemName: format.presentation.symbol)
+                }
+            }
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .disabled(inTable && format != .table)
+        .accessibilityLabel(Text(LocalizedStringKey(format.presentation.label)))
+        .accessibilityIdentifier("format-" + format.rawValue)
     }
-    private var paragraphMenu: some View {
-        Menu {
-            ForEach(ManuscriptFormat.allCases.drop(while: { $0 != .paragraph }), id: \.self) { item($0) }
-        } label: { Image(systemName: "textformat").frame(width: 44, height: 44) }
-        .accessibilityLabel("段落样式").accessibilityIdentifier("paragraphStyles")
+
+    private var palette: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("文字格式").font(.headline)
+                Spacer()
+                Button { showsFormat = false } label: {
+                    Image(systemName: "xmark").frame(width: 44, height: 44)
+                }.accessibilityLabel("关闭")
+            }
+            formatRow([.paragraph, .heading1, .heading2, .heading3], text: true)
+            formatRow([.bold, .italic, .strike, .code, .link, .clear])
+            formatRow([.quote, .fence, .divider, .math, .equation])
+        }
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22))
     }
-    var body: some View {
-        let inline: [ManuscriptFormat] = [.bold, .italic, .strike, .code, .link, .clear, .math]
+
+    private func formatRow(_ formats: [ManuscriptFormat], text: Bool = false) -> some View {
         ScrollView(.horizontal) {
             HStack(spacing: 0) {
-                paragraphMenu
-                if editing {
-                    ForEach(inline, id: \.self) { format in
-                        Button { perform(format) } label: { Image(systemName: format.presentation.symbol).frame(width: 44, height: 44) }
-                            .accessibilityLabel(format.presentation.label).accessibilityIdentifier("format-" + format.rawValue)
-                    }
-                } else {
-                    Button { perform(.task) } label: { Image(systemName: "checklist").frame(width: 44, height: 44) }
-                        .accessibilityLabel("待办事项").accessibilityIdentifier("format-task")
-                    Menu { ForEach(inline, id: \.self) { item($0) } } label: {
-                        Image(systemName: "bold.italic.underline").frame(width: 44, height: 44)
-                    }.accessibilityLabel("文字格式")
-                }
-            }.padding(.horizontal, 4)
+                ForEach(formats, id: \.self) { action($0, text: text) }
+            }
         }
         .scrollIndicators(.hidden)
-        .frame(maxWidth: editing ? 360 : 140, minHeight: 44, maxHeight: 44)
-        .modifier(CapsuleGlass())
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if showsFormat { palette }
+            HStack(spacing: 0) {
+                Button { showsFormat.toggle() } label: {
+                    Text(verbatim: "Aa")
+                        .font(.body.weight(.medium))
+                        .frame(width: 44, height: 44)
+                        .background(showsFormat ? Color.primary.opacity(0.10) : .clear, in: Circle())
+                        .contentShape(Rectangle())
+                }
+                .disabled(inTable)
+                .accessibilityLabel("文字格式").accessibilityIdentifier("paragraphStyles")
+                ForEach([ManuscriptFormat.task, .table, .numbers, .bullets], id: \.self) { action($0) }
+            }
+            .padding(.horizontal, 4)
+            .modifier(CapsuleGlass())
+        }
+        .frame(maxWidth: showsFormat ? 360 : 228, alignment: .leading)
+        .buttonStyle(.plain)
         .foregroundStyle(.primary)
+        .onChange(of: editing) { _, _ in showsFormat = false }
     }
 }

@@ -7,7 +7,7 @@ typealias CloudJSON = [String: Any]
 struct CloudFailure: LocalizedError {
     let message: String
     var errorDescription: String? { message }
-    init(_ message: String) { self.message = message }
+    init(_ message: String.LocalizationValue) { self.message = AppLanguage.text(message) }
 }
 
 struct CloudSession: Codable {
@@ -64,7 +64,7 @@ private final class RejectRedirects: NSObject, URLSessionTaskDelegate {
 
 enum CloudHTTP: LocalizedError {
     case staleCursor
-    var errorDescription: String? { "请求已过期，请重试。" }
+    var errorDescription: String? { AppLanguage.text("请求已过期，请重试。") }
 }
 
 enum CloudAPI {

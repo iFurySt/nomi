@@ -11,9 +11,11 @@ struct CloudPanel: View {
     @State private var password = ""
     @State private var confirmDeletion = false
     @State private var accountDeleted = false
+    @State private var showAppleInstructions = false
+    @Environment(\.openURL) private var openURL
     @State private var working = false
     @State private var problem: String?
-    @State private var linked: Set<String> = []
+    @State private var linked: Set<String>?
     @FocusState private var passwordFocused: Bool
 
     var body: some View {
@@ -25,44 +27,66 @@ struct CloudPanel: View {
             .navigationTitle(cloud.session == nil ? "" : "个人设置")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if cloud.session != nil {
-                    ToolbarItem(placement: .primaryAction) {
-                        Menu {
-                            Button {
-                                UIPasteboard.general.string = versionDescription
-                            } label: {
-                                Label(versionDescription, systemImage: "document.on.document")
-                            }
-                        } label: {
-                            Label("版本信息", systemImage: "info.circle")
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Link(destination: URL(string: "https://nomi.ifuryst.com/support/")!) {
+                            Label("联系支持", systemImage: "questionmark.circle")
                         }
-                        .accessibilityIdentifier("versionInfo")
+                        Link(destination: URL(string: "https://nomi.ifuryst.com/privacy/")!) {
+                            Label("隐私政策", systemImage: "lock")
+                        }
+                        Divider()
+                        Button {
+                            UIPasteboard.general.string = versionDescription
+                        } label: {
+                            Label(versionDescription, systemImage: "document.on.document")
+                        }
+                    } label: {
+                        Label("帮助与信息", systemImage: "info.circle")
                     }
+                    .accessibilityIdentifier("versionInfo")
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: { Image(systemName: "xmark") }.accessibilityLabel("关闭")
                 }
             }
-            .disabled(working)
-            .overlay { if working { ProgressView().padding().background(.regularMaterial, in: Capsule()) } }
         }
+        .disabled(working)
+        .overlay { if working { ProgressView().padding().background(.regularMaterial, in: Capsule()) } }
         .alert("永久注销 Nomi 账号？", isPresented: $confirmDeletion) {
             Button("取消", role: .cancel) {}
             Button("永久注销", role: .destructive) {
-                perform { try await cloud.deleteAccount(); accountDeleted = true }
+                let needsInstructions = linked?.contains("apple") ?? true
+                perform {
+                    try await cloud.deleteAccount()
+                    showAppleInstructions = needsInstructions
+                    accountDeleted = true
+                }
             }
         } message: {
             Text("将删除此账号的云端文稿、附件和版本记录，并退出所有设备。本机独立文稿和其他设备已有的本地副本会保留。此操作无法撤销。")
         }
         .alert("账号已注销", isPresented: $accountDeleted) {
+            if showAppleInstructions {
+                Button("查看 Apple 指引") {
+                    openURL(URL(string: "https://support.apple.com/102571")!)
+                    dismiss()
+                }
+            }
             Button("完成") { dismiss() }
+        } message: {
+            if showAppleInstructions {
+                Text("如果曾使用 Apple 登录，可在 Apple 账户中停止使用 Nomi。")
+            }
         }
         .interactiveDismissDisabled(working)
         .task(id: cloud.session?.sessionID) {
-            linked = []
+            linked = nil
             if let session = cloud.session,
                let result = try? await CloudAPI.request(session.site, "v1/identities", token: session.token) as? [String],
-               cloud.session?.sessionID == session.sessionID { linked = Set(result) }
+               cloud.session?.sessionID == session.sessionID {
+                linked = Set(result)
+            }
         }
     }
 
@@ -104,17 +128,19 @@ struct CloudPanel: View {
                         .frame(maxWidth: .infinity, minHeight: 46)
                         .overlay(Capsule().strokeBorder(.secondary.opacity(0.45)))
                 }.buttonStyle(.plain).accessibilityIdentifier("googleSignIn")
-                legalLinks
+                generalLink.font(.footnote)
                 feedback
             }.frame(maxWidth: 370).padding(22).frame(maxWidth: .infinity)
         }.scrollDismissesKeyboard(.interactively)
     }
 
-    private var legalLinks: some View {
-        HStack(spacing: 20) {
-            Link("隐私政策", destination: URL(string: "https://nomi.ifuryst.com/privacy/")!)
-            Link("联系支持", destination: URL(string: "https://nomi.ifuryst.com/support/")!)
-        }.font(.footnote)
+    private var generalLink: some View {
+        NavigationLink {
+            GeneralSettings()
+        } label: {
+            Label("通用", systemImage: "gearshape")
+        }
+        .accessibilityIdentifier("generalSettings")
     }
 
     @ViewBuilder private var feedback: some View {
@@ -125,9 +151,6 @@ struct CloudPanel: View {
         List {
             Section {
                 LabeledContent { Text(session.email).textSelection(.enabled) } label: { Label("账号", systemImage: "person.crop.circle") }
-                ForEach(linked.sorted(), id: \.self) { name in
-                    LabeledContent(name == "apple" ? "Apple" : "Google", value: "已关联")
-                }
             }
             if session.spaceID == nil || !cloud.replica.pending.isEmpty || cloud.conflict {
                 Section("文稿同步") {
@@ -144,18 +167,60 @@ struct CloudPanel: View {
                     }
                 }
             }
-            Section { legalLinks }
-            if problem != nil || cloud.message != nil { Section { feedback } }
             Section {
-                Button(role: .destructive) { perform { try await cloud.signOut(); dismiss() } } label: {
-                    Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
-                }.disabled(cloud.busy)
-                Button("永久注销账号", role: .destructive) { confirmDeletion = true }.disabled(cloud.busy)
-                if linked.contains("apple") {
-                    Link("管理 Apple 登录授权", destination: URL(string: "https://account.apple.com/")!)
+                generalLink
+                NavigationLink {
+                    List {
+                        if let problem {
+                            Section { Text(problem).foregroundStyle(.secondary) }
+                        }
+                    }
+                    .scrollContentBackground(.hidden)
+                    .background(Color(uiColor: .systemGroupedBackground))
+                    .safeAreaInset(edge: .bottom) {
+                        accountAction {
+                            confirmDeletion = true
+                        } label: {
+                            Text("永久注销账号")
+                        }
+                        .accessibilityIdentifier("deleteAccount")
+                    }
+                    .navigationTitle("数据管理")
+                    .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    Label("数据管理", systemImage: "archivebox")
                 }
+                .accessibilityIdentifier("dataControls")
             }
+            Section {
+                Button(role: .destructive) {
+                    perform { try await cloud.signOut(); dismiss() }
+                } label: {
+                    Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+                .disabled(cloud.busy)
+            }
+            if problem != nil || cloud.message != nil { Section { feedback } }
         }
+    }
+
+    private func accountAction<Content: View>(
+        action: @escaping () -> Void, @ViewBuilder label: () -> Content
+    ) -> some View {
+        Button(role: .destructive, action: action) {
+            label()
+                .foregroundStyle(.red)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule())
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(cloud.busy)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
     private func submitPassword() {

@@ -7,6 +7,8 @@ enum ManuscriptCaret: Equatable {
 
 struct ManuscriptEditor: View {
     @Binding var draft: Manuscript
+    let textRail: EdgeInsets
+    let horizontalToolbar: Bool
     let editing: Bool
     let readOnly: Bool
     let caret: ManuscriptCaret?
@@ -18,6 +20,7 @@ struct ManuscriptEditor: View {
     let editingChanged: (UITextView) -> Void
     let richUndo: (Bool, UIWindow?, @escaping () -> Void) -> Void
     let richLayout: Bool
+    @State private var inTable = false
     @State private var richFocus: ManuscriptPreview.Focus?
     @State private var commands = ManuscriptPreview.Commands()
     @State private var previewHeight: CGFloat = 100
@@ -47,8 +50,8 @@ struct ManuscriptEditor: View {
         }
     }
 
-    private func preview(_ blocks: [ManuscriptPreview.Block], scrolls: Bool) -> some View {
-        ManuscriptPreview(title: draft.title, blocks: blocks, scrolls: scrolls, readOnly: readOnly,
+    private func preview(_ blocks: [ManuscriptPreview.Block], scrolls: Bool, margins: EdgeInsets) -> some View {
+        ManuscriptPreview(title: draft.title, blocks: blocks, scrolls: scrolls, margins: margins, readOnly: readOnly,
                           editing: editing, initialFormat: richFocus == nil ? initialFormat : nil, focus: richFocus, commands: commands,
                           edit: { if !editing { beginEditing(.end, nil) } },
                           change: { key, source in
@@ -59,12 +62,20 @@ struct ManuscriptEditor: View {
                                   }
                               } else { draft.title = source }
                           }, updateUndo: richUndo,
-                          toggleTask: toggleTask, height: $previewHeight)
+                          toggleTask: toggleTask, inTable: $inTable, height: $previewHeight)
             .frame(height: scrolls ? nil : previewHeight)
             .frame(maxHeight: scrolls ? .infinity : nil)
     }
 
-    var body: some View {
+    private func document(in geometry: GeometryProxy, topOverlap: CGFloat = 0, bottomOverlap: CGFloat = 0) -> some View {
+        // The inset rail already includes space between its edge and the floating buttons.
+        let leading = textRail.leading + (textRail.leading > 0 ? ManuscriptTypography.railGutter : ManuscriptTypography.gutter)
+        let trailing = textRail.trailing + (textRail.trailing > 0 ? ManuscriptTypography.railGutter : ManuscriptTypography.gutter)
+        let extra = max(0, (geometry.size.width - leading - trailing - ManuscriptTypography.columnWidth) / 2)
+        let margins = EdgeInsets(top: 0, leading: leading + extra, bottom: 0, trailing: trailing + extra)
+        var scrollMargins = margins
+        scrollMargins.top = topOverlap
+        scrollMargins.bottom = bottomOverlap
         let firstID = draft.parts.first?.editable == true ? draft.parts.first?.id : nil
         let targetPart = caret == .end ? draft.parts.last(where: \.editable)?.id : nil
         let targetKey = if case let .position(block, _) = caret { block }
@@ -75,87 +86,102 @@ struct ManuscriptEditor: View {
         let rendered = previewBlocks
         let first = ManuscriptText(title: $draft.title, bodyText: firstBody,
                                    editing: editing, readOnly: readOnly, caret: firstFocused ? caret : nil,
-                                   editingChanged: editingChanged, scrolls: !scrollDocument,
+                                   editingChanged: editingChanged, scrolls: !scrollDocument, margins: scrollMargins,
                                    register: { blockFields.setObject($0, forKey: "") },
                                    crossBoundary: {
                                        if let next = otherBlocks.first { focusBlock(next, atEnd: false) }
                                    }, initialFormat: initialFormat,
-                                   renderMath: { richFocus = .init(key: "", offset: $0) })
-        Group {
+                                   renderRichContent: { richFocus = .init(key: "", offset: $0) })
+        return Group {
             if scrollDocument {
-                GeometryReader { geometry in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            if !rendered.isEmpty {
-                                preview(rendered, scrolls: false)
-                            } else {
-                                first
-                                ForEach($draft.parts) { $part in
-                                    if part.id != firstID {
-                                        if part.editable {
-                                            ManuscriptText(title: nil, bodyText: $part.text,
-                                                           editing: editing, readOnly: readOnly, caret: part.id == targetKey ? caret : nil,
-                                                           editingChanged: editingChanged, scrolls: false,
-                                                           register: { blockFields.setObject($0, forKey: part.id as NSString) },
-                                                           crossBoundary: {
-                                                               let previous = otherBlocks.prefix { $0 != part.id }.last
-                                                               focusBlock(previous ?? "", atEnd: true)
-                                                           }, initialFormat: initialFormat, renderMath: { richFocus = .init(key: part.id, offset: $0) })
-                                        } else {
-                                            Text(part.text).foregroundStyle(.secondary)
-                                        }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if !rendered.isEmpty {
+                            preview(rendered, scrolls: false, margins: margins)
+                        } else {
+                            first
+                            ForEach($draft.parts) { $part in
+                                if part.id != firstID {
+                                    if part.editable {
+                                        ManuscriptText(title: nil, bodyText: $part.text,
+                                                       editing: editing, readOnly: readOnly, caret: part.id == targetKey ? caret : nil,
+                                                       editingChanged: editingChanged, scrolls: false, margins: margins,
+                                                       register: { blockFields.setObject($0, forKey: part.id as NSString) },
+                                                       crossBoundary: {
+                                                           let previous = otherBlocks.prefix { $0 != part.id }.last
+                                                           focusBlock(previous ?? "", atEnd: true)
+                                                       }, initialFormat: initialFormat, renderRichContent: { richFocus = .init(key: part.id, offset: $0) })
+                                    } else {
+                                        Text(part.text).foregroundStyle(.secondary).padding(margins)
                                     }
                                 }
                             }
-                            if !children.isEmpty {
-                                VStack(alignment: .leading, spacing: 0) {
-                                    Text("子文稿")
-                                        .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                                        .accessibilityAddTraits(.isHeader)
-                                    ForEach(children) { child in
-                                        Button { openChild(child) } label: {
-                                            HStack {
-                                                Label(child.title, systemImage: "doc.text")
-                                                Spacer()
-                                                Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                                            }
-                                            .frame(minHeight: 44).contentShape(Rectangle())
+                        }
+                        if !children.isEmpty {
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text("子文稿")
+                                    .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                                    .accessibilityAddTraits(.isHeader)
+                                ForEach(children) { child in
+                                    Button { openChild(child) } label: {
+                                        HStack {
+                                            Label(child.title, systemImage: "doc.text")
+                                            Spacer()
+                                            Image(systemName: "chevron.right").foregroundStyle(.secondary)
                                         }
-                                        .buttonStyle(.plain)
-                                        .accessibilityIdentifier("childDocument")
+                                        .frame(minHeight: 44).contentShape(Rectangle())
                                     }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("childDocument")
                                 }
                             }
-                            Color.clear.frame(maxWidth: .infinity, minHeight: 52)
-                                .contentShape(Rectangle()).onTapGesture {
-                                    if editing && !rendered.isEmpty { commands.focusEnd() }
-                                    else if editing { focusBlock(otherBlocks.last ?? "", atEnd: true) }
-                                    else if !readOnly { beginEditing(.end, nil) }
-                                }.accessibilityHidden(true)
-                        }.frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .topLeading)
+                            .padding(margins)
+                        }
+                        Color.clear.frame(maxWidth: .infinity, minHeight: 52)
+                            .contentShape(Rectangle()).onTapGesture {
+                                if editing && !rendered.isEmpty { commands.beginEditing(at: nil, with: nil) }
+                                else if editing { focusBlock(otherBlocks.last ?? "", atEnd: true) }
+                                else if !readOnly { beginEditing(.end, nil) }
+                            }.accessibilityHidden(true)
                     }
-                    .scrollDismissesKeyboard(.interactively)
-                    .scrollBounceBehavior(.always, axes: .vertical)
+                    .padding(.top, ManuscriptTypography.topInset + topOverlap)
+                    .padding(.bottom, bottomOverlap)
+                    .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)
                 }
-            } else if !rendered.isEmpty { preview(rendered, scrolls: true) }
+                .contentMargins(.horizontal, 0, for: .scrollContent)
+                .scrollDismissesKeyboard(.interactively)
+                .scrollBounceBehavior(.always, axes: .vertical)
+            } else if !rendered.isEmpty { preview(rendered, scrolls: true, margins: scrollMargins) }
             else { first }
         }
-        .onChange(of: editing) { _, now in if !now { richFocus = nil } }
-        .frame(maxWidth: 660)
-        .padding(.horizontal, 24).padding(.top, 24)
+    }
+
+    var body: some View {
+        GeometryReader { safeArea in
+            GeometryReader { viewport in
+                let safe = safeArea.frame(in: .global)
+                let full = viewport.frame(in: .global)
+                document(in: viewport, topOverlap: max(0, safe.minY - full.minY),
+                         bottomOverlap: max(horizontalToolbar && !editing ? 72 : 0, full.maxY - safe.maxY))
+            }
+            .ignoresSafeArea(.container, edges: horizontalToolbar ? (editing ? .top : .vertical) : [])
+        }
+        .onChange(of: editing) { _, now in if !now { richFocus = nil; inTable = false } }
         .frame(maxWidth: .infinity)
         .safeAreaInset(edge: .bottom, alignment: editing ? .trailing : .leading, spacing: 6) {
-            if !readOnly && (firstBody != nil || !otherBlocks.isEmpty) {
-                ManuscriptFormatBar(editing: editing) { format in
-                    if !rendered.isEmpty && editing { commands.format(format) }
+            if !readOnly && (firstBody != nil || draft.parts.contains(where: \.editable)) {
+                ManuscriptFormatBar(editing: editing, inTable: inTable && editing) { format in
+                    if editing && !previewBlocks.isEmpty { commands.format(format) }
                     else if let field = blockFields.objectEnumerator()?.allObjects.compactMap({ $0 as? ManuscriptInput }).first(where: \.isFirstResponder) {
                         field.format?(format)
                     } else if !editing {
                         beginEditing(.end, format)
                     }
                 }
-                .padding(.leading, 16).padding(.trailing, editing ? 16 : 72)
+                .padding(.leading, 16)
+                .padding(.trailing, editing || textRail.trailing > 0 || textRail.leading > 0 ? 16 : 72)
                 .padding(.bottom, editing ? 6 : 26)
+                .padding(textRail)
             }
         }
         .ignoresSafeArea(.container, edges: editing ? [] : .bottom)
@@ -181,11 +207,12 @@ private struct ManuscriptText: UIViewRepresentable {
     let caret: ManuscriptCaret?
     let editingChanged: (UITextView) -> Void
     let scrolls: Bool
+    let margins: EdgeInsets
     let register: (UITextView) -> Void
     let crossBoundary: () -> Void
 
     var initialFormat: ManuscriptFormat?
-    let renderMath: (Int) -> Void
+    let renderRichContent: (Int) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -193,6 +220,7 @@ private struct ManuscriptText: UIViewRepresentable {
         let view = ManuscriptInput()
         register(view)
         view.backgroundColor = .clear
+        view.contentInsetAdjustmentBehavior = .never
         view.textContainerInset = .zero
         view.textContainer.lineFragmentPadding = 0
         view.isScrollEnabled = scrolls
@@ -202,8 +230,8 @@ private struct ManuscriptText: UIViewRepresentable {
         }
         view.adjustsFontForContentSizeCategory = true
         view.textColor = .label
-        view.font = UIFont.preferredFont(forTextStyle: .body)
-        view.accessibilityLabel = title == nil ? "正文块" : "文稿"
+        view.font = ManuscriptTypography.Size.body.font(view.traitCollection)
+        view.accessibilityLabel = title == nil ? AppLanguage.text("正文块") : AppLanguage.text("文稿")
         view.delegate = context.coordinator
         view.format = { [weak view, weak coordinator = context.coordinator] format in
             if let view { coordinator?.apply(format, to: view) }
@@ -212,6 +240,9 @@ private struct ManuscriptText: UIViewRepresentable {
     }
 
     func updateUIView(_ view: UITextView, context: Context) {
+        let insets = UIEdgeInsets(top: scrolls ? ManuscriptTypography.topInset + margins.top : 0, left: margins.leading,
+                                  bottom: scrolls ? ManuscriptTypography.bottomInset + margins.bottom : 0, right: margins.trailing)
+        if view.textContainerInset != insets { view.textContainerInset = insets }
         let coordinator = context.coordinator
         coordinator.editor = self
         view.isEditable = !readOnly
@@ -277,8 +308,16 @@ private struct ManuscriptText: UIViewRepresentable {
             let selection = view.selectedRange
             let from = max(start, selection.location)
             let bodyRange = NSRange(location: from - start, length: max(0, NSMaxRange(selection) - from))
-            guard let change = format.change(in: source.substring(from: start) as NSString, selection: bodyRange),
-                  let lower = view.position(from: view.beginningOfDocument, offset: start + change.range.location),
+            let body = source.substring(from: start) as NSString
+            guard let change = format.change(in: body, selection: bodyRange) else { return }
+            if format == .table || format == .divider {
+                // The rich surface takes ownership immediately. A keyboard
+                // replacement here can smart-substitute the GFM separator.
+                editor.bodyText?.wrappedValue = body.replacingCharacters(in: change.range, with: change.text)
+                editor.renderRichContent(change.range.location + change.selection.location)
+                return
+            }
+            guard let lower = view.position(from: view.beginningOfDocument, offset: start + change.range.location),
                   let upper = view.position(from: lower, offset: change.range.length),
                   let range = view.textRange(from: lower, to: upper) else { return }
             let prefix = needsSeparator ? "\n" : ""
@@ -310,7 +349,7 @@ private struct ManuscriptText: UIViewRepresentable {
                let cursor = view.selectedTextRange, cursor.isEmpty {
                 let offset = view.selectedRange.location - (editor.title.map { $0.wrappedValue.utf16.count + 1 } ?? 0)
                 if ManuscriptPreview.hasCompletedMath(in: body, before: offset) {
-                    editor.renderMath(offset)
+                    editor.renderRichContent(offset)
                 }
             }
         }
@@ -336,7 +375,7 @@ private struct ManuscriptText: UIViewRepresentable {
             guard view.markedTextRange == nil else { return }
             let source = view.textStorage.string as NSString
             let inTitle = editor.title != nil && view.selectedRange.location <= source.range(of: "\n").location
-            view.typingAttributes = ManuscriptTypography.attributes(title: inTitle, traits: view.traitCollection)
+            view.typingAttributes = ManuscriptTypography.attributes(size: inTitle ? .title : .body, traits: view.traitCollection)
         }
     }
 }

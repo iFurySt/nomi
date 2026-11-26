@@ -1,5 +1,6 @@
 // Map rendered text and formulas back to their original Markdown source ranges.
 import React from "react";
+import { readTable, adjustTable, tableControls } from "./tableEditing";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import Markdown from "react-markdown";
@@ -10,6 +11,8 @@ import { normalizeMathMarkdown } from "../../../packages/ui/src/writing/mathDeli
 import { remarkMathAlignment } from "../../../packages/ui/src/writing/mathSource";
 import { remarkTableBreaks } from "../../../packages/ui/src/writing/tableMarkdown";
 
+const english = document.documentElement.lang === "en";
+
 function sourcePositions({ readOnly }) {
   function formulaControl(code) {
     return readOnly
@@ -17,7 +20,9 @@ function sourcePositions({ readOnly }) {
       : {
           role: "button",
           tabIndex: 0,
-          "aria-label": "编辑公式 " + code?.children?.[0]?.value,
+          "aria-label":
+            (english ? "Edit equation " : "编辑公式 ") +
+            code?.children?.[0]?.value,
         };
   }
   return (tree) => {
@@ -130,14 +135,31 @@ window.showManuscript = (title, blocks, readOnly) => {
                   ],
                 ]}
                 components={{
-                  img: ({ alt }) => <span>{alt || "图片"}</span>,
+                  table: ({ node, ...props }) => (
+                    <div className="table-scroll">
+                      <table {...props} />
+                    </div>
+                  ),
+                  th: ({ node, children, ...props }) => (
+                    <th {...props}>
+                      <span className="cell-content">{children}</span>
+                    </th>
+                  ),
+                  td: ({ node, children, ...props }) => (
+                    <td {...props}>
+                      <span className="cell-content">{children}</span>
+                    </td>
+                  ),
+                  img: ({ alt }) => (
+                    <span>{alt || (english ? "Image" : "图片")}</span>
+                  ),
                   input: ({ checked }) => (
                     <input
                       type="checkbox"
                       checked={checked}
                       disabled={readOnly}
                       readOnly
-                      aria-label="待办事项"
+                      aria-label={english ? "Checklist item" : "待办事项"}
                     />
                   ),
                 }}
@@ -167,14 +189,22 @@ const page = document.getElementById("page");
 function removeField() {
   if (!active) return;
   const { host, field } = active;
+  active.cleanup?.();
+  if (active.tableCell) notify("tableCell", false);
   active = null;
   field.remove();
   if (host) host.hidden = false;
 }
 function valueOf(a) {
-  return a.dirty
-    ? a.field.innerText.replace(/\r\n?/g, "\n")
-    : a.base.slice(a.start, a.end);
+  if (!a.dirty) return a.base.slice(a.start, a.end);
+  const value = a.field.innerText.replace(/\r\n?/g, "\n");
+  return a.tableCell
+    ? value
+        .replace(/(\\*)\|/g, (match, slashes) =>
+          slashes.length % 2 ? match : "\\" + match,
+        )
+        .replace(/\n/g, "<br>")
+    : value;
 }
 function sourceOf(a) {
   return a.base.slice(0, a.start) + valueOf(a) + a.base.slice(a.end);
@@ -230,7 +260,15 @@ function openField(
   field.setAttribute("role", "textbox");
   field.setAttribute(
     "aria-label",
-    formula ? "LaTeX" : section ? "正文" : "标题",
+    formula
+      ? "LaTeX"
+      : section
+        ? english
+          ? "Body"
+          : "正文"
+        : english
+          ? "Title"
+          : "标题",
   );
   if (formula) {
     field.spellcheck = false;
@@ -324,11 +362,125 @@ function leafAt(section, from, to = from) {
     return a <= from && b >= to;
   });
 }
+function cellModel(cell, section) {
+  const table = cell.closest("table");
+  if (!table.parentElement.parentElement.matches("article")) return null;
+  const [start, end] = rangeOf(table, section);
+  return readTable(section.source, start, end);
+}
+
+function openCell(cell, section, position, selectionEnd = position) {
+  const model = cellModel(cell, section);
+  if (!model) return false;
+  const row = cell.parentElement.rowIndex;
+  const column = cell.cellIndex;
+  const value = model.rows[row]?.[column];
+  // GFM may synthesize empty trailing cells. Materialize their delimiters
+  // before editing so typing cannot spill into the following row.
+  if (!value) {
+    const cells = model.rows[row];
+    if (!cells) return false;
+    const lines = section.source.slice(model.start, model.end).split("\n");
+    const index = row === 0 ? 0 : row + 1;
+    lines[index] =
+      "| " +
+      model.divider.map((_, i) => cells[i]?.value ?? "").join(" | ") +
+      " |";
+    replaceTable(section, model, { text: lines.join("\n"), row, column });
+    return true;
+  }
+  openField(
+    cell.querySelector(".cell-content"),
+    section,
+    value.from,
+    value.to,
+    position ?? value.to,
+    selectionEnd ?? value.to,
+  );
+  active.tableCell = true;
+  notify("tableCell", true);
+  active.cleanup = tableControls(cell, model, english, (axis, operation) => {
+    const latest = sourceOf(active);
+    const updated = readTable(
+      latest,
+      model.start,
+      model.end + latest.length - active.base.length,
+    );
+    if (!updated) return;
+    const change = adjustTable(updated, row, column, axis, operation);
+    if (change) {
+      section.source = latest;
+      replaceTable(section, updated, change);
+    }
+  });
+  return true;
+}
+
+function replaceTable(section, model, change) {
+  section.source =
+    section.source.slice(0, model.start) +
+    change.text +
+    section.source.slice(model.end);
+  notify("body", section.source, section.key);
+  window.showManuscript(currentTitle, sections, locked);
+  section = sections.find((s) => s.key === section.key);
+  const table = Array.from(articleFor(section).querySelectorAll("table")).find(
+    (el) => rangeOf(el, section)[0] === model.start,
+  );
+  const cell = table?.rows[change.row]?.cells[change.column];
+  if (cell) openCell(cell, section);
+}
+
+// Empty GFM items have no rendered text node. Keep the caret after the
+// marker inside the item so typing immediately fills the new list entry.
+function focusEmptyItem(section, position) {
+  const lineStart = section.source.lastIndexOf("\n", position - 1) + 1;
+  const marker = section.source.slice(lineStart, position);
+  if (
+    !/^\s*(?:[-+*](?: \[[ xX]\])?|\d+[.)]) $/.test(marker) ||
+    !["", "\n", "\r"].includes(section.source.charAt(position))
+  )
+    return false;
+  const item = Array.from(
+    articleFor(section).querySelectorAll("li[data-start]"),
+  ).find((el) => {
+    const [start] = rangeOf(el, section);
+    return start >= lineStart && start < position;
+  });
+  if (!item) return false;
+  const host = document.createElement("span");
+  while (item.firstChild) host.append(item.firstChild);
+  item.append(host);
+  let box;
+  const hadTaskStyle = item.classList.contains("task-list-item");
+  if (/\[[ xX]\]/.test(marker)) {
+    item.classList.add("task-list-item");
+    box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = /\[[xX]\]/.test(marker);
+    box.setAttribute("aria-label", english ? "Checklist item" : "待办事项");
+    item.prepend(box);
+  }
+  openField(host, section, position, position, position);
+  active.cleanup = () => {
+    box?.remove();
+    if (!hadTaskStyle) item.classList.remove("task-list-item");
+    host.replaceWith(...host.childNodes);
+  };
+  return true;
+}
+
+function focusTableCell(section, from, to = from) {
+  const cell = leafAt(section, from, to)?.closest("th,td");
+  return cell && openCell(cell, section, from, to);
+}
 window.focusManuscriptAt = (key, offset) => {
   if (active || locked) return;
   const section = sections.find((s) => s.key === key && s.editable);
   if (!section) return;
   const position = Math.min(Math.max(0, offset), section.source.length);
+  if (focusTableCell(section, position) || focusEmptyItem(section, position))
+    return;
   const texts = Array.from(
     articleFor(section).querySelectorAll("span[data-start]"),
   );
@@ -381,6 +533,17 @@ window.manuscriptSelection = () => {
     length: to - from,
   };
 };
+window.manuscriptBodySelection = (format) => {
+  if (active?.tableCell) {
+    if (format === "table") page.querySelector(".table-handle.column")?.click();
+    return null;
+  }
+  if (!active?.section) {
+    commitField();
+    window.focusManuscriptEnd();
+  }
+  return window.manuscriptSelection();
+};
 window.applyManuscriptFormat = (base, source, from, to) => {
   if (locked || !active?.section || sourceOf(active) !== base) return;
   const key = active.section.key;
@@ -388,6 +551,13 @@ window.applyManuscriptFormat = (base, source, from, to) => {
   removeField();
   window.showManuscript(currentTitle, sections, locked);
   const section = sections.find((s) => s.key === key);
+  if (
+    focusTableCell(section, from, to) ||
+    (from === to && focusEmptyItem(section, from))
+  ) {
+    notify("body", source, key);
+    return;
+  }
   const node = leafAt(section, from, to);
   const [start, end] = node ? rangeOf(node, section) : [from, to];
   openField(
@@ -430,6 +600,39 @@ document.addEventListener("click", (event) => {
     (!active && getSelection()?.toString())
   )
     return;
+  const cell = event.target.closest("th,td");
+  if (
+    cell &&
+    section &&
+    !event.target.closest("[data-formula],.nomi-math-block") &&
+    cellModel(cell, section)
+  ) {
+    const row = cell.parentElement.rowIndex,
+      column = cell.cellIndex;
+    const tables = Array.from(article.querySelectorAll("table"));
+    const index = tables.indexOf(cell.closest("table"));
+    const hit = document.caretRangeFromPoint(event.clientX, event.clientY);
+    const leaf = hit?.startContainer.parentElement.closest("span[data-start]");
+    const cursor =
+      leaf && cell.contains(leaf)
+        ? rangeOf(leaf, section)[0] + hit.startOffset
+        : undefined;
+    const delta =
+      active?.section === section && cursor >= active.end
+        ? valueOf(active).length - (active.end - active.start)
+        : 0;
+    commitField();
+    section = sections.find((s) => s.key === sectionKey);
+    const next =
+      articleFor(section).querySelectorAll("table")[index]?.rows[row]?.cells[
+        column
+      ];
+    if (
+      next &&
+      openCell(next, section, cursor == null ? undefined : cursor + delta)
+    )
+      return;
+  }
   const title = event.target.closest("#title");
   const math = event.target.closest("[data-formula],.nomi-math-block");
   const range = document.caretRangeFromPoint(event.clientX, event.clientY);

@@ -110,10 +110,10 @@ enum LibraryError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unsupported: "这篇文稿需要用支持其内容的客户端打开。"
-        case .tooLong: "标题或正文过长，请缩短后再保存。"
-        case .conflict: "文稿已更改，请重新打开。"
-        case .hasChildren: "请先移除子文稿，再删除这篇文稿。"
+        case .unsupported: AppLanguage.text("这篇文稿需要用支持其内容的客户端打开。")
+        case .tooLong: AppLanguage.text("标题或正文过长，请缩短后再保存。")
+        case .conflict: AppLanguage.text("文稿已更改，请重新打开。")
+        case .hasChildren: AppLanguage.text("请先移除子文稿，再删除这篇文稿。")
         }
     }
 }
@@ -166,7 +166,7 @@ final class Library {
                    try children.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true {
                     try load(children, parent: note.id)
                 }
-            } catch { problem = "部分文稿无法读取，原文件已保留。" }
+            } catch { problem = AppLanguage.text("部分文稿无法读取，原文件已保留。") }
         }
     }
 
@@ -207,7 +207,7 @@ final class Library {
     func save(_ draft: Manuscript) throws {
         var note = draft
         note.title = note.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if note.title.isEmpty { note.title = "无标题" }
+        if note.title.isEmpty { note.title = AppLanguage.text("无标题") }
         guard note.title.utf16.count <= 200, note.body.utf16.count <= 200_000 else { throw LibraryError.tooLong }
         let existing = notes.first { $0.id == draft.id }
         guard (existing?.revision ?? 0) == draft.revision else { throw LibraryError.conflict }
