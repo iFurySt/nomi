@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 enum ManuscriptCaret: Equatable {
     case title, end
@@ -14,12 +15,14 @@ struct ManuscriptEditor: View {
     let caret: ManuscriptCaret?
     let children: [Manuscript]
     let openChild: (Manuscript) -> Void
-    let beginEditing: (ManuscriptCaret, ManuscriptFormat?) -> Void
-    let initialFormat: ManuscriptFormat?
+    let beginEditing: (ManuscriptCaret) -> Void
+    let finishEditing: () -> Void
     let toggleTask: (String, Int) -> Void
-    let editingChanged: (UITextView) -> Void
-    let richUndo: (Bool, UIWindow?, @escaping () -> Void) -> Void
+    let editingChanged: (_ input: UITextView, _ began: Bool) -> Void
+    let richUndo: (Bool, UIView, @escaping () -> Void) -> Void
     let richLayout: Bool
+    @State private var keyboardVisible = false
+    @State private var formatBarHeight: CGFloat = 0
     @State private var inTable = false
     @State private var richFocus: ManuscriptPreview.Focus?
     @State private var commands = ManuscriptPreview.Commands()
@@ -50,18 +53,20 @@ struct ManuscriptEditor: View {
         }
     }
 
+    private func change(_ key: String?, _ source: String) {
+        if let key {
+            if key.isEmpty { firstBody?.wrappedValue = source }
+            else if let index = draft.parts.firstIndex(where: { $0.id == key && $0.editable }) {
+                draft.parts[index].text = source
+            }
+        } else { draft.title = source }
+    }
+
     private func preview(_ blocks: [ManuscriptPreview.Block], scrolls: Bool, margins: EdgeInsets) -> some View {
         ManuscriptPreview(title: draft.title, blocks: blocks, scrolls: scrolls, margins: margins, readOnly: readOnly,
-                          editing: editing, initialFormat: richFocus == nil ? initialFormat : nil, focus: richFocus, commands: commands,
-                          edit: { if !editing { beginEditing(.end, nil) } },
-                          change: { key, source in
-                              if let key {
-                                  if key.isEmpty { firstBody?.wrappedValue = source }
-                                  else if let index = draft.parts.firstIndex(where: { $0.id == key && $0.editable }) {
-                                      draft.parts[index].text = source
-                                  }
-                              } else { draft.title = source }
-                          }, updateUndo: richUndo,
+                          editing: editing, focus: richFocus, commands: commands,
+                          edit: { if !editing { beginEditing(.end) } },
+                          change: change, updateUndo: richUndo,
                           toggleTask: toggleTask, inTable: $inTable, height: $previewHeight)
             .frame(height: scrolls ? nil : previewHeight)
             .frame(maxHeight: scrolls ? .infinity : nil)
@@ -86,11 +91,11 @@ struct ManuscriptEditor: View {
         let rendered = previewBlocks
         let first = ManuscriptText(title: $draft.title, bodyText: firstBody,
                                    editing: editing, readOnly: readOnly, caret: firstFocused ? caret : nil,
-                                   editingChanged: editingChanged, scrolls: !scrollDocument, margins: scrollMargins,
+                                   formatCommands: commands, blockKey: "", editingChanged: editingChanged, scrolls: !scrollDocument, margins: scrollMargins,
                                    register: { blockFields.setObject($0, forKey: "") },
                                    crossBoundary: {
                                        if let next = otherBlocks.first { focusBlock(next, atEnd: false) }
-                                   }, initialFormat: initialFormat,
+                                   },
                                    renderRichContent: { richFocus = .init(key: "", offset: $0) })
         return Group {
             if scrollDocument {
@@ -105,12 +110,12 @@ struct ManuscriptEditor: View {
                                     if part.editable {
                                         ManuscriptText(title: nil, bodyText: $part.text,
                                                        editing: editing, readOnly: readOnly, caret: part.id == targetKey ? caret : nil,
-                                                       editingChanged: editingChanged, scrolls: false, margins: margins,
+                                                       formatCommands: commands, blockKey: part.id, editingChanged: editingChanged, scrolls: false, margins: margins,
                                                        register: { blockFields.setObject($0, forKey: part.id as NSString) },
                                                        crossBoundary: {
                                                            let previous = otherBlocks.prefix { $0 != part.id }.last
                                                            focusBlock(previous ?? "", atEnd: true)
-                                                       }, initialFormat: initialFormat, renderRichContent: { richFocus = .init(key: part.id, offset: $0) })
+                                                       }, renderRichContent: { richFocus = .init(key: part.id, offset: $0) })
                                     } else {
                                         Text(part.text).foregroundStyle(.secondary).padding(margins)
                                     }
@@ -137,11 +142,11 @@ struct ManuscriptEditor: View {
                             }
                             .padding(margins)
                         }
-                        Color.clear.frame(maxWidth: .infinity, minHeight: 52)
+                        Color.clear.frame(maxWidth: .infinity, minHeight: max(52, bottomOverlap))
                             .contentShape(Rectangle()).onTapGesture {
-                                if editing && !rendered.isEmpty { commands.beginEditing(at: nil, with: nil) }
+                                if editing && !rendered.isEmpty { commands.beginEditing(at: nil) }
                                 else if editing { focusBlock(otherBlocks.last ?? "", atEnd: true) }
-                                else if !readOnly { beginEditing(.end, nil) }
+                                else if !readOnly { beginEditing(.end) }
                             }.accessibilityHidden(true)
                     }
                     .padding(.top, ManuscriptTypography.topInset + topOverlap)
@@ -156,35 +161,193 @@ struct ManuscriptEditor: View {
         }
     }
 
+    private var scrollUnderlayEdges: Edge.Set {
+        var edges: Edge.Set = horizontalToolbar ? .top : []
+        if !editing { edges.insert(.bottom) }
+        return edges
+    }
+
     var body: some View {
         GeometryReader { safeArea in
             GeometryReader { viewport in
                 let safe = safeArea.frame(in: .global)
                 let full = viewport.frame(in: .global)
                 document(in: viewport, topOverlap: max(0, safe.minY - full.minY),
-                         bottomOverlap: max(horizontalToolbar && !editing ? 72 : 0, full.maxY - safe.maxY))
+                         bottomOverlap: max(editing ? formatBarHeight : 72, full.maxY - safe.maxY))
             }
-            .ignoresSafeArea(.container, edges: horizontalToolbar ? (editing ? .top : .vertical) : [])
+            .ignoresSafeArea(.container, edges: scrollUnderlayEdges)
         }
-        .onChange(of: editing) { _, now in if !now { richFocus = nil; inTable = false } }
-        .frame(maxWidth: .infinity)
-        .safeAreaInset(edge: .bottom, alignment: editing ? .trailing : .leading, spacing: 6) {
-            if !readOnly && (firstBody != nil || draft.parts.contains(where: \.editable)) {
-                ManuscriptFormatBar(editing: editing, inTable: inTable && editing) { format in
-                    if editing && !previewBlocks.isEmpty { commands.format(format) }
+        .background {
+            // Compare the keyboard-avoiding viewport with the same window's unobstructed layout.
+            GeometryReader { available in
+                Color.clear
+                    .onGeometryChange(for: Bool.self) { full in
+                        full.frame(in: .global).maxY > available.frame(in: .global).maxY + 1
+                    } action: { keyboardVisible = $0 }
+                    .ignoresSafeArea(.keyboard, edges: .bottom)
+            }
+        }
+        .onChange(of: editing) { _, now in
+            if !now {
+                richFocus = nil
+                inTable = false
+                formatBarHeight = 0
+                commands.panelOpen = false
+                commands.selection = .init()
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if editing, !readOnly, let equation = commands.equation {
+                EquationInput(latex: Binding(
+                    get: { commands.equation?.latex ?? equation.latex },
+                    set: { latex in
+                        guard commands.equation?.id == equation.id else { return }
+                        change(equation.key, equation.before + latex + equation.after)
+                        commands.updateEquation(equation, latex: latex)
+                    }), mathML: equation.mathML, focusRequest: equation.focusRequest, finish: finishEditing)
+                    .id(equation.id)
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { dockTop in
+                        commands.revealEquation(equation.id, above: dockTop)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(textRail)
+                    .padding(.bottom, 6)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formatBarHeight = $0 }
+                    .onDisappear { formatBarHeight = 0 }
+            } else if editing && (keyboardVisible || commands.panelOpen) && !readOnly && (firstBody != nil || draft.parts.contains(where: \.editable)) {
+                let selection = commands.selection
+                let body = selection.key.isEmpty ? firstBody?.wrappedValue : draft.parts.first { $0.id == selection.key }?.text
+                let bar = ManuscriptFormatBar(inTable: inTable, selection: selection,
+                                    styles: ManuscriptFormat.selectedStyles(in: body ?? "", range: selection.range),
+                                    panelOpen: Binding(get: { commands.panelOpen }, set: { open in
+                                        commands.panelOpen = open
+                                        commands.web?.callAsyncJavaScript("window.setManuscriptFormatPanel(open)",
+                                            arguments: ["open": open], in: nil, in: .page, completionHandler: nil)
+                                    })) { format in
+                    if !previewBlocks.isEmpty { commands.format(format) }
                     else if let field = blockFields.objectEnumerator()?.allObjects.compactMap({ $0 as? ManuscriptInput }).first(where: \.isFirstResponder) {
                         field.format?(format)
-                    } else if !editing {
-                        beginEditing(.end, format)
                     }
                 }
-                .padding(.leading, 16)
-                .padding(.trailing, editing || textRail.trailing > 0 || textRail.leading > 0 ? 16 : 72)
-                .padding(.bottom, editing ? 6 : 26)
-                .padding(textRail)
+                if commands.panelOpen {
+                    Color.clear.preference(key: ManuscriptPanelPreference.self,
+                                           value: ManuscriptPanelDock(bar: bar, height: $formatBarHeight))
+                        .allowsHitTesting(false)
+                } else {
+                    bar.padding(.horizontal, 8)
+                        .padding(textRail)
+                        .padding(.bottom, 6)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formatBarHeight = $0 }
+                        .onDisappear { if !commands.panelOpen { formatBarHeight = 0 } }
+                }
             }
         }
         .ignoresSafeArea(.container, edges: editing ? [] : .bottom)
+    }
+}
+
+private struct EquationInput: View {
+    @Binding var latex: String
+    let mathML: String
+    let focusRequest: Int
+    let finish: () -> Void
+    @FocusState private var focused: Bool
+    @ScaledMetric(relativeTo: .body) private var previewHeight: CGFloat = 58
+
+    var body: some View {
+        VStack(spacing: 0) {
+            EquationPreview(mathML: mathML, fallback: mathML.isEmpty ? latex : "")
+                .frame(height: min(previewHeight, 96))
+                .accessibilityIdentifier("equationPreview")
+            Divider().padding(.horizontal, 12)
+            HStack(spacing: 8) {
+                TextField("LaTeX", text: $latex, axis: .vertical)
+                    .accessibilityLabel(Text(verbatim: "LaTeX"))
+                    .accessibilityIdentifier("equationSource")
+                    .font(.system(.body, design: .monospaced))
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .lineLimit(1...3)
+                    .focused($focused)
+                Button(action: finish) {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(Color(uiColor: .systemBackground))
+                        .frame(width: 32, height: 32)
+                        .background(.primary, in: Circle())
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("完成编辑"))
+                .accessibilityIdentifier("finishEquation")
+            }
+            .padding(.leading, 14)
+            .padding(.trailing, 4)
+        }
+        .frame(maxWidth: 620)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .task(id: focusRequest) { focused = true }
+    }
+}
+
+// The reader supplies its last successfully typeset MathML to both views.
+// Replacing only the preview contents keeps the native source field focused.
+private struct EquationPreview: UIViewRepresentable {
+    let mathML: String
+    let fallback: String
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let web = WKWebView()
+        web.isOpaque = false
+        web.backgroundColor = .clear
+        web.scrollView.backgroundColor = .clear
+        web.scrollView.contentInsetAdjustmentBehavior = .never
+        web.navigationDelegate = context.coordinator
+        context.coordinator.load(web)
+        return web
+    }
+
+    func updateUIView(_ web: WKWebView, context: Context) {
+        let coordinator = context.coordinator
+        guard coordinator.mathML != mathML || coordinator.fallback != fallback else { return }
+        coordinator.mathML = mathML
+        coordinator.fallback = fallback
+        coordinator.render(web)
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        var mathML = ""
+        var fallback = ""
+        private var ready = false
+
+        func load(_ web: WKWebView) {
+            ready = false
+            web.loadHTMLString("""
+                <!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none';style-src 'unsafe-inline'">
+                <style>:root{color-scheme:light dark;font:-apple-system-body;color:CanvasText}
+                body{margin:0}main{box-sizing:border-box;display:grid;place-items:center;width:max-content;
+                min-width:100%;min-height:100vh;padding:4px 12px;font-size:1.15rem}</style><main></main>
+                """, baseURL: nil)
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            ready = true
+            render(webView)
+        }
+
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { load(webView) }
+
+        func render(_ web: WKWebView) {
+            guard ready else { return }
+            web.callAsyncJavaScript("""
+                const preview = document.querySelector("main");
+                if (markup) preview.innerHTML = markup;
+                else preview.textContent = fallback;
+                """, arguments: ["markup": mathML, "fallback": fallback], in: nil, in: .page, completionHandler: nil)
+        }
     }
 }
 
@@ -205,13 +368,14 @@ private struct ManuscriptText: UIViewRepresentable {
     let editing: Bool
     let readOnly: Bool
     let caret: ManuscriptCaret?
-    let editingChanged: (UITextView) -> Void
+    let formatCommands: ManuscriptPreview.Commands
+    let blockKey: String
+    let editingChanged: (_ input: UITextView, _ began: Bool) -> Void
     let scrolls: Bool
     let margins: EdgeInsets
     let register: (UITextView) -> Void
     let crossBoundary: () -> Void
 
-    var initialFormat: ManuscriptFormat?
     let renderRichContent: (Int) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -241,10 +405,20 @@ private struct ManuscriptText: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) {
         let insets = UIEdgeInsets(top: scrolls ? ManuscriptTypography.topInset + margins.top : 0, left: margins.leading,
-                                  bottom: scrolls ? ManuscriptTypography.bottomInset + margins.bottom : 0, right: margins.trailing)
+                                  bottom: scrolls ? ManuscriptTypography.bottomInset : 0, right: margins.trailing)
         if view.textContainerInset != insets { view.textContainerInset = insets }
+        // Keep the caret reachable above floating controls while text scrolls behind them.
+        let clearance = scrolls ? margins.bottom : 0
+        if view.contentInset.bottom != clearance { view.contentInset.bottom = clearance }
         let coordinator = context.coordinator
         coordinator.editor = self
+        if let field = view as? ManuscriptInput {
+            let suppressKeyboard = editing && formatCommands.panelOpen
+            if (field.inputView != nil) != suppressKeyboard {
+                field.inputView = suppressKeyboard ? UIView(frame: .zero) : nil
+                if field.isFirstResponder { field.reloadInputViews() }
+            }
+        }
         view.isEditable = !readOnly
         (view as? ManuscriptInput)?.backFromStart = title == nil ? crossBoundary : nil
         view.accessibilityIdentifier = title == nil ? "blockText" : (editing ? "manuscriptText" : "manuscriptReader")
@@ -267,7 +441,7 @@ private struct ManuscriptText: UIViewRepresentable {
             coordinator.contentSize = view.traitCollection.preferredContentSizeCategory
             coordinator.style(view)
         }
-        if editing && !coordinator.wasEditing, let caret {
+        if editing && !coordinator.wasEditing, !view.isFirstResponder, let caret {
             DispatchQueue.main.async {
                 guard view.window != nil, coordinator.editor.editing else { return }
                 view.becomeFirstResponder()
@@ -278,7 +452,6 @@ private struct ManuscriptText: UIViewRepresentable {
                 case let .position(_, position): offset = min(max(0, position), view.textStorage.length)
                 }
                 view.selectedRange = NSRange(location: offset, length: 0)
-                if let initialFormat { coordinator.apply(initialFormat, to: view) }
                 view.scrollRangeToVisible(view.selectedRange)
             }
         }
@@ -329,7 +502,7 @@ private struct ManuscriptText: UIViewRepresentable {
 
         func textViewShouldBeginEditing(_ textView: UITextView) -> Bool { !editor.readOnly }
 
-        func textViewDidBeginEditing(_ textView: UITextView) { editor.editingChanged(textView) }
+        func textViewDidBeginEditing(_ textView: UITextView) { editor.editingChanged(textView, true) }
 
         init(_ editor: ManuscriptText) { self.editor = editor }
 
@@ -342,7 +515,7 @@ private struct ManuscriptText: UIViewRepresentable {
             } else { editor.bodyText?.wrappedValue = text }
             if view.markedTextRange == nil { style(view, changed: changedFence ? nil : replacement) }
             replacement = nil
-            editor.editingChanged(view)
+            editor.editingChanged(view, false)
             // Complete the native composition before moving a newly written
             // formula to the rich surface. Preserve the caret in the Markdown.
             if view.markedTextRange == nil, let body = editor.bodyText?.wrappedValue,
@@ -374,7 +547,14 @@ private struct ManuscriptText: UIViewRepresentable {
         func textViewDidChangeSelection(_ view: UITextView) {
             guard view.markedTextRange == nil else { return }
             let source = view.textStorage.string as NSString
-            let inTitle = editor.title != nil && view.selectedRange.location <= source.range(of: "\n").location
+            let separator = source.range(of: "\n")
+            let inTitle = editor.title != nil && view.selectedRange.location <= separator.location
+            if view.isFirstResponder {
+                let start = editor.title == nil ? 0 : (inTitle ? view.selectedRange.location : NSMaxRange(separator))
+                let range = NSRange(location: view.selectedRange.location - start, length: inTitle ? 0 : view.selectedRange.length)
+                let selection = ManuscriptFormatSelection(key: editor.blockKey, range: range)
+                if editor.formatCommands.selection != selection { editor.formatCommands.selection = selection }
+            }
             view.typingAttributes = ManuscriptTypography.attributes(size: inTitle ? .title : .body, traits: view.traitCollection)
         }
     }

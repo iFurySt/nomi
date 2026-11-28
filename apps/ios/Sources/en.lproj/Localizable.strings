@@ -71,9 +71,9 @@
 "清除格式" = "Clear formatting";
 "行内公式" = "Inline equation";
 "正文" = "Body";
-"标题 1" = "Heading 1";
-"标题 2" = "Heading 2";
-"标题 3" = "Heading 3";
+"大标题" = "Title";
+"章节标题" = "Heading";
+"小标题" = "Subheading";
 "项目列表" = "Bulleted list";
 "编号列表" = "Numbered list";
 "待办事项" = "Checklist";
@@ -83,7 +83,7 @@
 "表格" = "Table";
 "公式块" = "Equation block";
 "段落样式" = "Paragraph styles";
-"文字格式" = "Text formatting";
+"格式" = "Format";
 "全部" = "All";
 "标题" = "Title";
 "搜索文稿标题和正文" = "Search note titles and text";
@@ -137,3 +137,5 @@
 "附件" = "Attachment";
 "文稿引用" = "Note reference";
 "内容块" = "Content block";
+"下划线" = "Underline";
+"插入附件链接" = "Insert attachment link";

@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 @main
 struct NomiMobileApp: App {
@@ -43,17 +44,16 @@ struct Workspace: View {
         var draft: Manuscript
         let original: Manuscript
         let caret: ManuscriptCaret?
-        let format: ManuscriptFormat?
         weak var input: UITextView?
         var canUndo = false
-        weak var richWindow: UIWindow?
+        weak var richInput: UIView?
         var richUndo: (() -> Void)?
+        fileprivate let keyboardSession = ManuscriptKeyboardSession()
 
-        init(draft: Manuscript, original: Manuscript, caret: ManuscriptCaret? = nil, format: ManuscriptFormat? = nil) {
+        init(draft: Manuscript, original: Manuscript, caret: ManuscriptCaret? = nil) {
             self.draft = draft
             self.original = original
             self.caret = caret
-            self.format = format
         }
     }
 
@@ -64,7 +64,6 @@ struct Workspace: View {
     @AppStorage("manuscriptEditLocks") private var editLockData = Data()
     @State private var searchPresented = false
     @State private var dragDistance: CGFloat?
-    @State private var closedToRight = false
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -74,9 +73,9 @@ struct Workspace: View {
 
     var body: some View {
         GeometryReader { geo in layout(in: geo) }
+        .overlayPreferenceValue(ManuscriptPanelPreference.self) { $0 }
         .background {
             WorkspaceRotationObserver {
-                editing?.input?.unmarkText()
                 finishEditing()
             }
             .allowsHitTesting(false)
@@ -89,16 +88,38 @@ struct Workspace: View {
                 do { try await Task.sleep(for: .seconds(15)) } catch { return }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.userDidTakeScreenshotNotification)) { _ in
+            editing?.keyboardSession.didCaptureScreen()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIWindow.didBecomeKeyNotification)) { _ in
+            editing?.keyboardSession.restoreCapturedInput()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+            editing?.keyboardSession.rememberResponder()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            editing?.keyboardSession.willHide()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            editing?.keyboardSession.dismissalStarted = false
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { event in
             // Commit only a completed dismissal in this editor's window. A cancelled drag
             // or a focus change between text blocks keeps the editing session alive.
-            guard let session = editing, let window = session.richWindow ?? session.input?.window,
+            func hasInputFocus(_ view: UIView) -> Bool {
+                view.isFirstResponder || view.subviews.contains(where: hasInputFocus)
+            }
+            guard scene == .active, let session = editing, session.keyboardSession.consumeDismissal(),
+                  let input = session.richInput ?? session.input, let window = input.window,
                   window.isKeyWindow,
                   (event.object as? UIScreen).map({ $0 == window.windowScene?.screen }) ?? true,
-                  session.richWindow != nil || session.input?.isFirstResponder == false else { return }
+                  !hasInputFocus(input) else { return }
             finishEditing()
         }
-        .onChange(of: scene) { _, phase in if phase != .active { cloud.pause() } }
+        .onChange(of: scene) { _, phase in
+            if phase == .active { editing?.keyboardSession.restoreCapturedInput() }
+            else { cloud.pause() }
+        }
         .onChange(of: cloud.session?.spaceID) { _, _ in
             if editing?.original.remoteID != nil { editing = nil }
         }
@@ -202,7 +223,8 @@ struct Workspace: View {
                             ToolbarItem(placement: .topBarPinnedTrailing) {
                                 Button("完成编辑", systemImage: "checkmark") { finishEditing() }
                                     .buttonStyle(.borderedProminent)
-                                    .tint(Color(red: 0.78, green: 0.62, blue: 0.18))
+                                    .tint(.primary)
+                                    .foregroundStyle(Color(uiColor: .systemBackground))
                                     .accessibilityHint("保存文稿并收起键盘")
                                     .accessibilityIdentifier("finishEditing")
                             }
@@ -253,7 +275,7 @@ struct Workspace: View {
         let usesRail = rail != nil
         let leading = rail == .leading
         let railEdges: Edge.Set = usesRail ? (leading ? .leading : .trailing) : []
-        let visibleWidth = min(sideWidth, max(0, (pinned ? sideWidth : 0) + (dragDistance ?? 0)))
+        let visibleWidth = sidebarVisibleWidth(sideWidth, open: pinned)
         let sidebarInset = leading ? min(visibleWidth, inset) : 0
         let textRail = EdgeInsets(top: 0, leading: leading ? inset - sidebarInset : 0,
                                   bottom: 0, trailing: rail == .trailing ? inset : 0)
@@ -298,21 +320,20 @@ struct Workspace: View {
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: drawer)
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: pinned)
         .background { if wide { Color.clear.contentShape(Rectangle()) } }
-        .onChange(of: wide) { _, _ in drawer = false; dragDistance = nil; closedToRight = false }
+        .onChange(of: wide) { _, _ in drawer = false; dragDistance = nil }
     }
 
     private func drawerLayer(sideWidth: CGFloat, rail: HorizontalEdge?, nativeToolbar: Bool) -> some View {
         let usesRail = rail != nil
-        let shift = drawer ? min(sideWidth, max(-sideWidth, dragDistance ?? 0)) :
-            dragDistance.map { min(sideWidth, max(0, $0)) - sideWidth } ?? (closedToRight ? sideWidth : -sideWidth)
-        let reveal = 1 - abs(shift) / max(1, sideWidth)
+        let visibleWidth = sidebarVisibleWidth(sideWidth, open: drawer)
+        let reveal = visibleWidth / max(1, sideWidth)
         return ZStack(alignment: .leading) {
             Color.black.opacity((usesRail ? 0.21 : (nativeToolbar ? 0.5 : 0.24)) * reveal)
                 .ignoresSafeArea().onTapGesture { drawer = false }
                 .allowsHitTesting(drawer).accessibilityHidden(true)
             sidebar(compact: true, usesRail: usesRail, nativeToolbar: nativeToolbar)
                 .frame(width: sideWidth)
-                .modifier(SlidingSidebar(offset: shift, width: sideWidth))
+                .modifier(SlidingSidebar(offset: visibleWidth - sideWidth, width: sideWidth))
                 .frame(width: sideWidth)
                 .mask { Rectangle().ignoresSafeArea(.container, edges: .vertical) }
                 .padding(.leading, rail == .leading ? 96 : 0)
@@ -320,6 +341,10 @@ struct Workspace: View {
                 .allowsHitTesting(drawer)
                 .accessibilityHidden(!drawer)
         }
+    }
+
+    private func sidebarVisibleWidth(_ width: CGFloat, open: Bool) -> CGFloat {
+        min(width, max(0, (open ? width : 0) + (dragDistance ?? 0)))
     }
 
     private func toggleDrawer() {
@@ -332,20 +357,17 @@ struct Workspace: View {
             dragDistance = distance
         } onRelease: { distance, velocity, cancelled in
             let projected = distance + velocity * 0.16
-            let progress = isOpen ? (wide ? -projected : abs(projected)) : projected
+            let progress = isOpen ? -projected : projected
             let settle = progress > sideWidth * 0.45
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) {
                 if !cancelled && settle {
                     if wide {
                         pinned.toggle()
                     } else {
-                        closedToRight = drawer && distance > 0
                         toggleDrawer()
                     }
                 }
                 dragDistance = nil
-            } completion: {
-                if !drawer && dragDistance == nil { closedToRight = false }
             }
         }
     }
@@ -358,6 +380,7 @@ struct Workspace: View {
 
     @discardableResult private func finishEditing() -> Bool {
         guard let editing else { return true }
+        editing.input?.unmarkText()
         do {
             lastID = try save(editing.draft, original: editing.original).uuidString
             self.editing = nil
@@ -687,10 +710,10 @@ struct Workspace: View {
                                  horizontalToolbar: nativeToolbar && !wide && toolbarEdge == nil,
                                  editing: editing != nil, readOnly: isLocked(note), caret: editing?.caret,
                                  children: outline.children[note.id] ?? [], openChild: open,
-                                 beginEditing: { caret, format in
+                                 beginEditing: { caret in
                                      guard editing == nil, !isLocked(note) else { return }
-                                     editing = EditSession(draft: note, original: note, caret: caret, format: format)
-                                 }, initialFormat: editing?.format, toggleTask: { key, offset in
+                                     editing = EditSession(draft: note, original: note, caret: caret)
+                                 }, finishEditing: { _ = finishEditing() }, toggleTask: { key, offset in
                                      guard !isLocked(note) else { return }
                                      if let editing {
                                          _ = editing.draft.toggleTask(in: key, at: offset)
@@ -701,12 +724,14 @@ struct Workspace: View {
                                          do { _ = try save(updated, original: note) }
                                          catch { library.problem = error.localizedDescription }
                                      }
-                                 }, editingChanged: { field in
-                    if editing == nil { editing = EditSession(draft: note, original: note) }
+                                 }, editingChanged: { field, began in
+                    if began && editing == nil { editing = EditSession(draft: note, original: note) }
+                    editing?.keyboardSession.observe(field)
                     editing?.input = field
                     editing?.canUndo = field.undoManager?.canUndo == true
-                }, richUndo: { enabled, window, undo in
-                    editing?.richWindow = window
+                }, richUndo: { enabled, input, undo in
+                    editing?.keyboardSession.observe(input)
+                    editing?.richInput = input
                     editing?.richUndo = undo
                     editing?.canUndo = enabled
                 }, richLayout: note.usesBlockEditor
@@ -735,6 +760,88 @@ struct Workspace: View {
     }
 }
 
+// A system overlay can temporarily take the keyboard. Only a downward
+// pan in a manuscript scroll view can complete interactive dismissal.
+final class ManuscriptKeyboardSession: NSObject {
+    private weak var input: UIView?
+    private let pans = NSHashTable<UIPanGestureRecognizer>.weakObjects()
+    private var lastDownwardPan: TimeInterval = -.infinity
+    var dismissalStarted = false
+
+    private weak var responder: UIView?
+    private var restoreAfterCapture = false
+
+    private func textResponder(in view: UIView) -> UIView? {
+        if view.isFirstResponder, view is UITextInput { return view }
+        for child in view.subviews {
+            if let found = textResponder(in: child) { return found }
+        }
+        return nil
+    }
+
+    func rememberResponder() {
+        if let window = input?.window, let current = textResponder(in: window) { responder = current }
+    }
+
+    func didCaptureScreen() {
+        rememberResponder()
+        guard let responder else { return }
+        restoreAfterCapture = true
+        // The screenshot notification can arrive before the overlay takes focus.
+        // In that order, consume the request when the editor window returns.
+        if !responder.isFirstResponder { restoreCapturedInput() }
+    }
+
+    func restoreCapturedInput() {
+        guard restoreAfterCapture, let responder, let window = responder.window, window.isKeyWindow,
+              window.windowScene?.activationState == .foregroundActive else { return }
+        restoreAfterCapture = false
+        if textResponder(in: window) == nil {
+            responder.becomeFirstResponder()
+            if let web = input as? WKWebView, responder.isDescendant(of: web) {
+                web.evaluateJavaScript("window.restoreManuscriptInput()")
+            }
+        }
+    }
+
+    func observe(_ view: UIView) {
+        guard input !== view else { return }
+        for pan in pans.allObjects { pan.removeTarget(self, action: #selector(track(_:))) }
+        pans.removeAllObjects()
+        input = view
+        rememberResponder()
+        var ancestor: UIView? = (view as? WKWebView)?.scrollView ?? view
+        while let current = ancestor {
+            if let scroll = current as? UIScrollView {
+                pans.add(scroll.panGestureRecognizer)
+                scroll.panGestureRecognizer.addTarget(self, action: #selector(track(_:)))
+            }
+            ancestor = current.superview
+        }
+    }
+
+    @objc private func track(_ pan: UIPanGestureRecognizer) {
+        guard let window = input?.window else { return }
+        let motion = pan.translation(in: window)
+        let edge = window.keyboardLayoutGuide.layoutFrame.minY
+        if pan.state == .began { lastDownwardPan = -.infinity }
+        if motion.y > abs(motion.x), motion.y > 0, pan.location(in: window).y >= edge - 24 {
+            lastDownwardPan = ProcessInfo.processInfo.systemUptime
+        }
+        if pan.state == .cancelled { lastDownwardPan = -.infinity }
+    }
+
+    func willHide() {
+        rememberResponder()
+        dismissalStarted = ProcessInfo.processInfo.systemUptime - lastDownwardPan < 0.6
+    }
+
+    func consumeDismissal() -> Bool {
+        defer { dismissalStarted = false; lastDownwardPan = -.infinity }
+        return dismissalStarted || ProcessInfo.processInfo.systemUptime - lastDownwardPan < 0.6
+    }
+}
+
 // Observe the scene transition outside the adaptive layout. The old text view
 // may already be detached by the time UIKit reports that its keyboard hid.
 private struct WorkspaceRotationObserver: UIViewControllerRepresentable {
@@ -751,7 +858,8 @@ private struct WorkspaceRotationObserver: UIViewControllerRepresentable {
 
         override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
             super.viewWillTransition(to: size, with: coordinator)
-            if !coordinator.targetTransform.isIdentity { onRotation?() }
+            let transform = coordinator.targetTransform
+            if abs(transform.b) > 0.5 || transform.a < -0.5 { onRotation?() }
         }
     }
 }
@@ -767,11 +875,11 @@ private struct SlidingSidebar: ViewModifier, Animatable {
     }
 
     func body(content: Content) -> some View {
-        if abs(offset) < width { content.offset(x: offset) }
+        if offset > -width { content.offset(x: min(0, offset)) }
     }
 }
 
-private struct CircularGlass: ViewModifier {
+struct CircularGlass: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
             content.glassEffect(.regular.interactive(), in: Circle())

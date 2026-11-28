@@ -1,5 +1,6 @@
 // Map rendered text and formulas back to their original Markdown source ranges.
 import React from "react";
+import katex from "katex";
 import { readTable, adjustTable, tableControls } from "./tableEditing";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
@@ -13,6 +14,33 @@ import { remarkTableBreaks } from "../../../packages/ui/src/writing/tableMarkdow
 
 const english = document.documentElement.lang === "en";
 
+// Underline is stored as a pair of literal HTML tags in Markdown. Only this
+// exact pair becomes a node. Other raw HTML keeps the reader's usual policy.
+function remarkUnderline() {
+  function visit(parent) {
+    if (!parent.children) return;
+    const children = [];
+    let opening = -1;
+    for (const child of parent.children) {
+      visit(child);
+      if (child.type === "html" && child.value === "<u>")
+        opening = children.length;
+      if (child.type === "html" && child.value === "</u>" && opening >= 0) {
+        const [tag, ...content] = children.splice(opening);
+        children.push({
+          type: "underline",
+          data: { hName: "u" },
+          children: content,
+          position: { start: tag.position.start, end: child.position.end },
+        });
+        opening = -1;
+      } else children.push(child);
+    }
+    parent.children = children;
+  }
+  return visit;
+}
+
 function sourcePositions({ readOnly }) {
   function formulaControl(code) {
     return readOnly
@@ -25,7 +53,7 @@ function sourcePositions({ readOnly }) {
             code?.children?.[0]?.value,
         };
   }
-  return (tree) => {
+  return (tree, file) => {
     function visit(node) {
       const start = node.position?.start.offset;
       if (node.type === "element" && start != null) {
@@ -36,17 +64,42 @@ function sourcePositions({ readOnly }) {
         }
       }
       if (!node.children) return;
-      node.children = node.children.map((child) => {
+      node.children = node.children.flatMap((child) => {
         if (child.type === "text" && child.position && child.value.trim()) {
-          return {
+          const start = child.position.start.offset;
+          const end = child.position.end.offset;
+          const span = (from, to, value) => ({
             type: "element",
             tagName: "span",
-            properties: {
-              "data-start": child.position.start.offset,
-              "data-end": child.position.end.offset,
-            },
-            children: [child],
-          };
+            properties: { "data-start": from, "data-end": to },
+            children: [{ type: "text", value }],
+          });
+          // A Markdown soft break is rendered as whitespace. Keep the newline
+          // and list/quote continuation prefix outside both editable runs.
+          const lines = child.value.split("\n");
+          const source = file.value.slice(start, end);
+          const raw = source.split(/\r\n|[\r\n]/);
+          if (
+            lines.length > 1 &&
+            lines.length === raw.length &&
+            !["pre", "code"].includes(node.tagName)
+          ) {
+            let offset = start;
+            return lines.flatMap((line, index) => {
+              const part = raw[index];
+              const prefix = part.endsWith(line)
+                ? part.length - line.length
+                : 0;
+              const run = span(offset + prefix, offset + part.length, line);
+              offset +=
+                part.length +
+                (source.slice(offset - start + part.length).startsWith("\r\n")
+                  ? 2
+                  : 1);
+              return index ? [{ type: "text", value: "\n" }, run] : [run];
+            });
+          }
+          return span(start, end, child.value);
         }
         visit(child);
         // KaTeX replaces its input node. Keep an outer element with the
@@ -78,6 +131,8 @@ const root = createRoot(document.getElementById("page"));
 let currentTitle = "";
 let locked = false;
 let active = null;
+let activeEquation = null;
+let equationID = 0;
 let sections = [];
 function sourceOffset(section, position) {
   let delta = 0;
@@ -120,6 +175,7 @@ window.showManuscript = (title, blocks, readOnly) => {
                   remarkMath,
                   remarkMathAlignment,
                   remarkTableBreaks,
+                  remarkUnderline,
                 ]}
                 rehypePlugins={[
                   [sourcePositions, { readOnly }],
@@ -192,10 +248,20 @@ function removeField() {
   active.cleanup?.();
   if (active.tableCell) notify("tableCell", false);
   active = null;
-  field.remove();
-  if (host) host.hidden = false;
+  if (activeEquation) {
+    activeEquation.preview?.remove();
+    host.classList.remove("editing-equation");
+    delete host.dataset.activeEquation;
+    host.removeAttribute("aria-pressed");
+    notify("closeEquation", activeEquation.id);
+    activeEquation = null;
+  } else {
+    field.remove();
+    if (host) host.hidden = false;
+  }
 }
 function valueOf(a) {
+  if (activeEquation) return activeEquation.latex;
   if (!a.dirty) return a.base.slice(a.start, a.end);
   const value = a.field.innerText.replace(/\r\n?/g, "\n");
   return a.tableCell
@@ -249,10 +315,33 @@ function openField(
     const raw = base.slice(start, end);
     const delimiters =
       /^(\$\$|\$|\\\(|\\\[)([\s\S]*?)(\$\$|\$|\\\)|\\\])$/.exec(raw);
-    if (delimiters) {
-      start += delimiters[1].length;
-      end -= delimiters[3].length;
+    if (!delimiters || !section || !host) return;
+    start += delimiters[1].length;
+    end -= delimiters[3].length;
+    // Preserve the surrounding line breaks of a display equation in Markdown.
+    if (host.matches(".nomi-math-block")) {
+      const body = base.slice(start, end);
+      start += /^\r?\n/.exec(body)?.[0].length ?? 0;
+      end -= /\r?\n$/.exec(base.slice(start, end))?.[0].length ?? 0;
     }
+    const latex = base.slice(start, end);
+    active = { host, field: host, section, start, end, base };
+    activeEquation = { id: ++equationID, latex };
+    host.dataset.activeEquation = "";
+    host.setAttribute("aria-pressed", "true");
+    notify("edit", start, section.key);
+    notify("undo", false);
+    notify(
+      "equation",
+      {
+        ...activeEquation,
+        mathML: host.querySelector("math")?.outerHTML ?? "",
+        before: base.slice(0, start),
+        after: base.slice(end),
+      },
+      section.key,
+    );
+    return;
   }
   const field = document.createElement("span");
   field.className = "source-field";
@@ -260,21 +349,8 @@ function openField(
   field.setAttribute("role", "textbox");
   field.setAttribute(
     "aria-label",
-    formula
-      ? "LaTeX"
-      : section
-        ? english
-          ? "Body"
-          : "正文"
-        : english
-          ? "Title"
-          : "标题",
+    section ? (english ? "Body" : "正文") : english ? "Title" : "标题",
   );
-  if (formula) {
-    field.spellcheck = false;
-    field.setAttribute("autocapitalize", "off");
-    field.setAttribute("autocorrect", "off");
-  }
   field.textContent = base.slice(start, end);
   // Nest the field inside an identical heading/paragraph style when the
   // entire element (such as the title) is the editing target.
@@ -312,7 +388,6 @@ function openField(
     notify("undo", document.queryCommandEnabled("undo"));
     if (
       section &&
-      !formula &&
       !event.isComposing &&
       (event.inputType === "insertParagraph" ||
         event.inputType === "insertLineBreak" ||
@@ -344,11 +419,37 @@ function openField(
       window.focusManuscriptAt(body.key, 0);
     }
   });
-  field.focus();
+  field.focus({ preventScroll: true });
   selectText(field, cursor - start, selectionEnd - start);
   notify("edit", start, section?.key ?? "");
   notify("undo", document.queryCommandEnabled("undo"));
 }
+window.updateManuscriptEquation = (id, latex) => {
+  if (id !== activeEquation?.id) return;
+  activeEquation.latex = latex;
+
+  // While an expression is incomplete, keep its last typeset preview.
+  try {
+    const html = katex.renderToString(latex, {
+      displayMode: active.host.matches(".nomi-math-block"),
+      output: "mathml",
+      throwOnError: true,
+      trust: false,
+      maxExpand: 200,
+      maxSize: 10,
+    });
+    if (!activeEquation.preview) {
+      activeEquation.preview = document.createElement("span");
+      activeEquation.preview.className = "equation-preview";
+      active.host.append(activeEquation.preview);
+      active.host.classList.add("editing-equation");
+    }
+    activeEquation.preview.innerHTML = html;
+    return activeEquation.preview.querySelector("math")?.outerHTML;
+  } catch {
+    /* Continue editing incomplete LaTeX. */
+  }
+};
 function articleFor(section) {
   return page.querySelector(
     `article[data-section="${sections.indexOf(section)}"]`,
@@ -508,7 +609,7 @@ window.focusManuscriptEnd = () => {
       currentTitle.length,
     );
 };
-window.manuscriptSelection = () => {
+function activeTextRange() {
   if (!active?.section) return null;
   const { section, field, start } = active;
   const selection = getSelection();
@@ -528,12 +629,105 @@ window.manuscriptSelection = () => {
   }
   return {
     key: section.key,
-    source: sourceOf(active),
     location: start + from,
     length: to - from,
   };
+}
+window.manuscriptSelection = () => {
+  const target = activeTextRange();
+  return target && { ...target, source: sourceOf(active) };
 };
+// With the panel open, the rendered article owns the selection. It can span
+// multiple runs without opening a keyboard or exposing their Markdown.
+let formatPanelOpen = false;
+let panelSelection = null;
+
+function renderedPoint(node, offset) {
+  if (node?.nodeType !== Node.TEXT_NODE) return null;
+  const run = node.parentElement.closest("span[data-start]");
+  const article = run?.closest("article");
+  if (!article || run.closest("table, math, [data-formula], .nomi-math-block"))
+    return null;
+  const section = sections[Number(article.dataset.section)];
+  return { section, position: rangeOf(run, section)[0] + offset };
+}
+
+function readPanelSelection() {
+  const selection = getSelection();
+  if (!selection.rangeCount) return null;
+  const range = selection.getRangeAt(0);
+  const from = renderedPoint(range.startContainer, range.startOffset);
+  const to = renderedPoint(range.endContainer, range.endOffset);
+  if (!from || !to || from.section !== to.section) return null;
+  return {
+    key: from.section.key,
+    location: from.position,
+    length: to.position - from.position,
+  };
+}
+
+function highlightPanelSelection() {
+  if (!CSS.highlights) return;
+  const selection = getSelection();
+  if (formatPanelOpen && selection.rangeCount && !selection.isCollapsed)
+    CSS.highlights.set(
+      "format-selection",
+      new Highlight(selection.getRangeAt(0)),
+    );
+  else CSS.highlights.delete("format-selection");
+}
+
+function displayPanelSelection(target) {
+  if (!target) return;
+  const section = sections.find((block) => block.key === target.key);
+  if (!section) return;
+  const runs = [
+    ...articleFor(section).querySelectorAll("span[data-start]"),
+  ].filter((run) => run.firstChild?.nodeType === Node.TEXT_NODE);
+  const point = (position, preferEnd) => {
+    const candidates = preferEnd ? runs : [...runs].reverse();
+    for (const run of candidates) {
+      const [a, b] = rangeOf(run, section);
+      if (position >= a && position <= b)
+        return [run.firstChild, Math.min(position - a, run.firstChild.length)];
+    }
+  };
+  const from = point(target.location, false);
+  const to = point(target.location + target.length, true);
+  if (from && to) getSelection().setBaseAndExtent(...from, ...to);
+  highlightPanelSelection();
+}
+
+window.setManuscriptFormatPanel = (open) => {
+  if (formatPanelOpen === open) return;
+  formatPanelOpen = open;
+  if (!open) highlightPanelSelection();
+  if (open) {
+    panelSelection = activeTextRange();
+    document.activeElement?.blur();
+    commitField();
+    displayPanelSelection(panelSelection);
+  } else if (panelSelection) {
+    const { key, location, length } = panelSelection;
+    panelSelection = null;
+    const section = sections.find((block) => block.key === key);
+    if (!section) return;
+    const run = leafAt(section, location, location + length);
+    if (run?.matches("span") && run.firstChild?.nodeType === Node.TEXT_NODE) {
+      const [start, end] = rangeOf(run, section);
+      openField(run, section, start, end, location, location + length);
+    } else window.focusManuscriptAt(key, location + length);
+  }
+};
+
 window.manuscriptBodySelection = (format) => {
+  if (formatPanelOpen) {
+    const target =
+      readPanelSelection() ??
+      (getSelection().isCollapsed ? panelSelection : null);
+    const section = sections.find((block) => block.key === target?.key);
+    return section ? { ...target, source: section.source } : null;
+  }
   if (active?.tableCell) {
     if (format === "table") page.querySelector(".table-handle.column")?.click();
     return null;
@@ -544,8 +738,25 @@ window.manuscriptBodySelection = (format) => {
   }
   return window.manuscriptSelection();
 };
-window.applyManuscriptFormat = (base, source, from, to) => {
-  if (locked || !active?.section || sourceOf(active) !== base) return;
+window.applyManuscriptFormat = (base, source, from, to, keyAtRequest) => {
+  if (formatPanelOpen && !locked) {
+    const section = sections.find((block) => block.key === keyAtRequest);
+    if (!section || section.source !== base) return;
+    section.source = source;
+    window.showManuscript(currentTitle, sections, locked);
+    panelSelection = { key: section.key, location: from, length: to - from };
+    displayPanelSelection(panelSelection);
+    notify("body", source, section.key);
+    reportFormatSelection(panelSelection);
+    return;
+  }
+  if (
+    locked ||
+    !active?.section ||
+    sourceOf(active) !== base ||
+    (keyAtRequest !== undefined && keyAtRequest !== active.section.key)
+  )
+    return;
   const key = active.section.key;
   active.section.source = source;
   removeField();
@@ -571,7 +782,74 @@ window.applyManuscriptFormat = (base, source, from, to) => {
   );
   notify("body", source, key);
 };
-window.endManuscriptEditing = commitField;
+window.restoreManuscriptInput = () => {
+  if (!active || activeEquation) return;
+  const field = active.field;
+  if (field === document.activeElement) return;
+  const range = active.selection;
+  field.focus({ preventScroll: true });
+  if (range && field.contains(range.commonAncestorContainer)) {
+    const selection = getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+};
+let lastFormatSelection = "";
+function reportFormatSelection(target) {
+  const value = target ? [target.location, target.length] : [0, 0];
+  const key = target?.key ?? "";
+  const signature = JSON.stringify([key, ...value]);
+  if (signature === lastFormatSelection) return;
+  lastFormatSelection = signature;
+  notify("formatSelection", value, key);
+}
+document.addEventListener("selectionchange", () => {
+  if (formatPanelOpen) {
+    const target = readPanelSelection();
+    if (target) {
+      panelSelection = target;
+      reportFormatSelection(target);
+      highlightPanelSelection();
+    } else if (!getSelection().isCollapsed) {
+      panelSelection = null;
+      CSS.highlights?.delete("format-selection");
+      reportFormatSelection(null);
+    }
+    return;
+  }
+  const selection = getSelection();
+  if (!active || activeEquation || !selection.rangeCount) return;
+  const range = selection.getRangeAt(0);
+  if (active.field.contains(range.commonAncestorContainer)) {
+    active.selection = range.cloneRange();
+    reportFormatSelection(activeTextRange());
+  }
+});
+// A long press can select a word without generating a click on iOS.
+page.addEventListener("touchend", () => {
+  const selection = getSelection();
+  if (
+    formatPanelOpen ||
+    locked ||
+    selection.isCollapsed ||
+    !selection.rangeCount
+  )
+    return;
+  const ancestor = selection.getRangeAt(0).commonAncestorContainer;
+  const run = ancestor.parentElement?.closest("span[data-start], #title");
+  if (
+    run &&
+    !active?.field.contains(ancestor) &&
+    !run.closest("a,[data-formula],.nomi-math-block")
+  )
+    run.click();
+});
+window.endManuscriptEditing = () => {
+  formatPanelOpen = false;
+  highlightPanelSelection();
+  panelSelection = null;
+  commitField();
+};
 document.addEventListener("keydown", (event) => {
   if (
     event.target.matches('[role="button"][data-start]') &&
@@ -582,7 +860,50 @@ document.addEventListener("keydown", (event) => {
   }
 });
 document.addEventListener("click", (event) => {
-  if (active?.field.contains(event.target)) return;
+  if (formatPanelOpen) {
+    event.preventDefault();
+    const selected = readPanelSelection();
+    if (
+      selected?.length &&
+      [...getSelection().getRangeAt(0).getClientRects()].some(
+        (r) =>
+          event.clientX >= r.left &&
+          event.clientX <= r.right &&
+          event.clientY >= r.top &&
+          event.clientY <= r.bottom,
+      )
+    )
+      return;
+    const caret = document.caretRangeFromPoint(event.clientX, event.clientY);
+    const hit = caret && renderedPoint(caret.startContainer, caret.startOffset);
+    if (hit) {
+      // In the keyboard-free panel, a tap picks a word for the next command.
+      // Long presses and dragged selection handles keep WebKit's native range.
+      const text = caret.startContainer.textContent;
+      const word = new Intl.Segmenter(
+        document.documentElement.lang || undefined,
+        {
+          granularity: "word",
+        },
+      )
+        .segment(text)
+        .containing(Math.max(0, Math.min(caret.startOffset, text.length - 1)));
+      panelSelection = {
+        key: hit.section.key,
+        location: word?.isWordLike
+          ? hit.position - caret.startOffset + word.index
+          : hit.position,
+        length: word?.isWordLike ? word.segment.length : 0,
+      };
+      displayPanelSelection(panelSelection);
+      reportFormatSelection(panelSelection);
+    }
+    return;
+  }
+  if (active?.field.contains(event.target)) {
+    if (activeEquation) notify("focusEquation", activeEquation.id);
+    return;
+  }
   const article = event.target.closest("article");
   let section = article ? sections[Number(article.dataset.section)] : null;
   const sectionKey = section?.key;
@@ -594,12 +915,12 @@ document.addEventListener("click", (event) => {
     notify("link", link.getAttribute("href"));
     return;
   }
-  if (
-    locked ||
-    event.target.closest("aside") ||
-    (!active && getSelection()?.toString())
-  )
-    return;
+  if (locked || event.target.closest("aside")) return;
+  const selected = getSelection();
+  const selectedRange =
+    selected.rangeCount && !selected.isCollapsed
+      ? selected.getRangeAt(0)
+      : null;
   const cell = event.target.closest("th,td");
   if (
     cell &&
@@ -665,8 +986,15 @@ document.addEventListener("click", (event) => {
       ? rangeOf(host, section)
       : [0, 0];
   let itemStart = checkbox && item ? rangeOf(item, section)[0] : 0;
-  const local =
-    range && host?.contains(range.startContainer) ? range.startOffset : 0;
+  const within =
+    selectedRange && host?.contains(selectedRange.commonAncestorContainer);
+  if (selectedRange && !within && !active) return;
+  const local = within
+    ? selectedRange.startOffset
+    : range && host?.contains(range.startContainer)
+      ? range.startOffset
+      : 0;
+  const length = within ? selectedRange.toString().length : 0;
   let target = host;
   if (active) {
     const key = active.section?.key;
@@ -694,8 +1022,12 @@ document.addEventListener("click", (event) => {
       start,
       end,
       Math.min(end, start + local),
-      undefined,
+      Math.min(end, start + local + length),
       Boolean(math),
     );
-  } else window.focusManuscriptEnd();
+  } else if (event.target === page || event.target === document.body) {
+    const last = page.lastElementChild;
+    if (last && event.clientY >= last.getBoundingClientRect().bottom)
+      window.focusManuscriptEnd();
+  }
 });

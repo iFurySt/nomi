@@ -329,14 +329,11 @@ final class ManuscriptTests: XCTestCase {
         XCTAssertTrue(app.buttons["移动文稿"].isHittable)
     }
 
-    @MainActor func testInnerDisplayScrollsBehindHorizontalButtons() throws {
+    @MainActor func testDocumentScrollsBehindFloatingButtons() throws {
         let app = XCUIApplication()
         app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
         app.launch()
         let window = app.windows.firstMatch.frame
-        guard window.width >= 600, window.height > window.width else {
-            throw XCTSkip("需要带横向工具栏的 Duo 内屏")
-        }
         let compose = app.buttons["newRoot"]
         compose.tap()
         let field = app.textViews["manuscriptText"]
@@ -344,8 +341,12 @@ final class ManuscriptTests: XCTestCase {
         app.buttons["finishEditing"].tap()
         func checkViewport(_ surface: XCUIElement) {
             XCTAssertTrue(surface.waitForExistence(timeout: 5))
-            XCTAssertLessThan(surface.frame.minY, app.buttons["打开目录"].frame.midY)
-            XCTAssertGreaterThan(surface.frame.maxY, compose.frame.midY)
+            let directory = app.buttons["打开目录"]
+            if window.width >= 600 && window.height > window.width {
+                XCTAssertLessThan(surface.frame.minY, directory.frame.midY)
+            }
+            XCTAssertGreaterThanOrEqual(surface.frame.maxY, compose.frame.maxY)
+            XCTAssertFalse(app.buttons["paragraphStyles"].exists)
         }
         checkViewport(app.textViews["manuscriptReader"])
         compose.tap()
@@ -353,7 +354,10 @@ final class ManuscriptTests: XCTestCase {
         let keyboard = app.keyboards.firstMatch
         XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
         if keyboard.frame.width >= window.width - 1 && keyboard.frame.maxY >= window.maxY - 1 {
-            XCTAssertLessThanOrEqual(field.frame.maxY, keyboard.frame.minY + 1)
+            XCTAssertEqual(field.frame.maxY, keyboard.frame.minY, accuracy: 2)
+            let styles = app.buttons["paragraphStyles"]
+            XCTAssertTrue(styles.isHittable)
+            XCTAssertGreaterThan(field.frame.maxY, styles.frame.maxY)
         }
         field.typeText("Checklist\n" + String(repeating: "- [ ] Read\n", count: 32))
         app.buttons["finishEditing"].tap()
@@ -361,6 +365,7 @@ final class ManuscriptTests: XCTestCase {
         checkViewport(web)
         web.swipeUp()
         checkViewport(web)
+        capture("document-behind-bottom-buttons")
         XCTAssertTrue(compose.isHittable)
     }
 
@@ -442,6 +447,37 @@ final class ManuscriptTests: XCTestCase {
         XCTAssertTrue(app.buttons["openSearch"].exists)
     }
 
+    @MainActor func testDrawerStopsAtLeadingEdge() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
+        app.launch()
+        let open = app.buttons["打开目录"]
+        let close = app.buttons["收起目录"]
+        let list = app.scrollViews["sidebarResults"]
+        let window = app.windows.firstMatch
+        let origin = window.coordinate(withNormalizedOffset: .zero)
+        func drag(_ from: CGFloat, _ to: CGFloat) {
+            let y = window.frame.height * 0.45
+            origin.withOffset(CGVector(dx: from, dy: y)).press(forDuration: 0.15,
+                thenDragTo: origin.withOffset(CGVector(dx: to, dy: y)),
+                withVelocity: .slow, thenHoldForDuration: 0.25)
+        }
+
+        if !open.exists { close.tap() }
+        open.tap()
+        XCTAssertTrue(list.waitForExistence(timeout: 3))
+        let frame = list.frame
+        let left = frame.minX - window.frame.minX
+        drag(left + 20, left + frame.width * 0.9)
+        XCTAssertTrue(close.isHittable)
+        XCTAssertEqual(list.frame.minX, frame.minX, accuracy: 1)
+        drag(left + frame.width * 0.85, left + 20)
+        XCTAssertTrue(open.waitForExistence(timeout: 3))
+        drag(12, frame.width * 0.9)
+        XCTAssertTrue(close.waitForExistence(timeout: 3))
+        XCTAssertEqual(list.frame.minX, frame.minX, accuracy: 1)
+    }
+
     @MainActor func testFoldedSidebarActions() throws {
         let app = XCUIApplication()
         app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
@@ -493,8 +529,7 @@ final class ManuscriptTests: XCTestCase {
         XCTAssertFalse(app.buttons["更多操作"].exists)
         capture("duo-cover-open")
         drag(from: 0.18, to: 0.72)
-        XCTAssertTrue(open.waitForExistence(timeout: 5))
-        open.tap()
+        XCTAssertTrue(close.isHittable)
         drag(from: 0.68, to: 0.1)
         XCTAssertTrue(open.waitForExistence(timeout: 5))
         open.tap()
@@ -709,6 +744,7 @@ final class ManuscriptTests: XCTestCase {
         app.launch()
         XCTAssertTrue(web.staticTexts["Dose"].waitForExistence(timeout: 8))
         XCTAssertTrue(web.staticTexts["Water"].exists)
+        web.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.75)).tap()
         app.buttons["format-numbers"].tap()
         app.typeText("Weigh beans")
         app.buttons["finishEditing"].tap()
@@ -724,15 +760,30 @@ final class ManuscriptTests: XCTestCase {
         app.launch()
         app.buttons["newRoot"].tap()
         let editor = app.textViews["manuscriptText"]
+        editor.tap()
         editor.typeText("Field guide\nOne task")
-        app.buttons["finishEditing"].tap()
         app.buttons["format-task"].tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         XCTAssertEqual(editor.value as? String, "Field guide\n- [ ] One task")
         editor.typeText(" ")
         app.buttons["paragraphStyles"].tap()
+        let panel = app.descendants(matching: .any)["manuscriptFormatPanel"]
+        XCTAssertTrue(panel.waitForExistence(timeout: 5))
+        XCTAssertTrue(panel.staticTexts["格式"].exists)
+        XCTAssertEqual(panel.buttons["format-heading1"].label, "大标题")
+        let window = app.windows.firstMatch.frame
+        let docked = NSPredicate { _, _ in
+            let frame = panel.frame
+            return abs(frame.minX - window.minX - 8) <= 1 &&
+                abs(window.maxX - frame.maxX - 8) <= 1 &&
+                abs(window.maxY - frame.maxY - 8) <= 1
+        }
+        expectation(for: docked, evaluatedWith: panel)
+        waitForExpectations(timeout: 5)
         capture("duo-format-palette")
         app.buttons["format-bold"].tap()
+        XCTAssertTrue(app.buttons["closeFormatPanel"].exists)
+        app.buttons["closeFormatPanel"].tap()
         editor.typeText("today")
         XCTAssertEqual(editor.value as? String, "Field guide\n- [ ] One task **today**")
         capture("duo-body-formatting")
@@ -759,6 +810,7 @@ final class ManuscriptTests: XCTestCase {
 
     @MainActor func testTapRenderedFormulaAndReopen() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(zh-Hans)"]
         app.launchEnvironment["NOMI_UI_LIBRARY"] = UUID().uuidString
         app.launch()
         app.buttons["newRoot"].tap()
@@ -771,8 +823,16 @@ final class ManuscriptTests: XCTestCase {
             formula.tap()
         }
         tapFormula()
-        let source = web.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "LaTeX")).firstMatch
+        let source = app.descendants(matching: .any).matching(identifier: "equationSource").firstMatch
         XCTAssertTrue(source.waitForExistence(timeout: 5))
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        XCTAssertTrue(formula.exists)
+        let preview = app.descendants(matching: .any).matching(identifier: "equationPreview").firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        XCTAssertLessThanOrEqual(preview.frame.maxY, source.frame.minY + 1)
+        XCTAssertLessThanOrEqual(source.frame.maxY, keyboard.frame.minY + 2)
+        capture("duo-equation-keyboard")
         app.typeText("y")
         app.buttons["finishEditing"].tap()
         app.terminate()

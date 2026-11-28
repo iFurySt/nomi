@@ -17,7 +17,8 @@ struct SidebarPan: UIGestureRecognizerRepresentable {
             guard abs(velocity.x) > abs(velocity.y) * 1.3 else { return false }
             let start = pan.location(in: pan.view).x - pan.translation(in: pan.view).x
             guard isOpen else { return start <= 32 && velocity.x > 0 }
-            if let columnWidth { return start <= columnWidth + 16 && velocity.x < 0 }
+            guard velocity.x < 0 else { return false }
+            if let columnWidth { return start <= columnWidth + 16 }
             return true
         }
 

@@ -115,6 +115,21 @@ enum ManuscriptTypography {
         let offset = start + text[..<content.startIndex].utf16.count
         let span = NSRange(location: offset, length: content.utf16.count)
         storage.addAttributes([.font: font, .foregroundColor: color], range: span)
+        defer {
+            if content.contains("<u>") {
+                let raw = String(content) as NSString
+                for match in underline.matches(in: raw as String, range: NSRange(location: 0, length: raw.length)) {
+                    let inner = match.range(at: 1)
+                    let absolute = offset + match.range.location
+                    let markerFont = storage.attribute(.font, at: absolute, effectiveRange: nil) as? UIFont
+                    if markerFont?.fontDescriptor.symbolicTraits.contains(.traitMonoSpace) == true { continue }
+                    conceal(storage, NSRange(location: absolute, length: 3))
+                    storage.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue,
+                                         range: NSRange(location: offset + inner.location, length: inner.length))
+                    conceal(storage, NSRange(location: offset + NSMaxRange(inner), length: 4))
+                }
+            }
+        }
         guard content.rangeOfCharacter(from: CharacterSet(charactersIn: "*_`[~\\")) != nil else { return }
         // The link command selects the URL for replacement. Keep its destination visible while typing.
         if editingSource && content.contains("](") { return }
@@ -140,6 +155,8 @@ enum ManuscriptTypography {
         }
         conceal(storage, NSRange(location: cursor, length: NSMaxRange(span) - cursor))
     }
+
+    private static let underline = try! NSRegularExpression(pattern: #"(?<!\\)<u>(.*?)</u>"#)
 
     private static func conceal(_ storage: NSTextStorage, _ range: NSRange) {
         if range.length > 0 {
