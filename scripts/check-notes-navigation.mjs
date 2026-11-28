@@ -105,16 +105,29 @@ app.whenReady().then(async()=>{
  const {x, y} = thumbPoint;
  const thumbColor = "getComputedStyle(document.querySelector('.notes-library nav'),'::-webkit-scrollbar-thumb').backgroundColor";
  const transparent = "rgba(0, 0, 0, 0)";
+ win.show();
+ app.focus({steal:true});
+ win.focus();
+ win.webContents.debugger.attach('1.3');
+ const input = params => win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', params);
+ await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled',{enabled:true});
  await until(thumbColor + " === '" + transparent + "'");
- win.webContents.sendInputEvent({type:'mouseDown',button:'left',x,y,clickCount:1});
- win.webContents.sendInputEvent({type:'mouseMove',x,y:y+60,modifiers:['leftButtonDown']});
- await until("document.querySelector('.notes-library nav').scrollTop > 0");
+ // Reveal the native thumb as a user would before grabbing it.
+ await input({type:'mouseWheel', x:x-40, y:y+40, deltaX:0, deltaY:8});
  await until("document.querySelector('.notes-library nav[data-scrolling]')");
+ const startScroll = await js("document.querySelector('.notes-library nav').scrollTop");
+ await input({type:'mouseMoved',x,y});
+ await input({type:'mousePressed',button:'left',buttons:1,x,y,clickCount:1});
+ for (let dy=10; dy<=60; dy+=10) {
+   await input({type:'mouseMoved',button:'left',buttons:1,x,y:y+dy});
+ }
+ await until("document.querySelector('.notes-library nav').scrollTop > " + startScroll);
  const pixelAt = async (x,y) => [...(await win.webContents.capturePage({x,y,width:1,height:1})).toBitmap().subarray(0,3)];
  const trackColor = await pixelAt(x+4,y+60);
  await until("getComputedStyle(document.querySelector('.notes-library nav')).getPropertyValue('--tree-thumb-color') === '" + transparent + "'");
  assert.notDeepEqual(await pixelAt(x,y+60), trackColor, 'Thumb stays visible while held');
- win.webContents.sendInputEvent({type:'mouseUp',button:'left',x,y:y+60,clickCount:1});
+ await input({type:'mouseReleased',button:'left',buttons:0,x,y:y+60,clickCount:1});
+ win.webContents.debugger.detach();
  await js('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
  assert.deepEqual(await pixelAt(x,y+60), trackColor, 'Idle thumb hides even under the pointer');
  await js("document.querySelector('.notes-library nav').scrollTop = 0");
