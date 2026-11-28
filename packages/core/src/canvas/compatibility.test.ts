@@ -51,3 +51,18 @@ it("does not treat unknown fields as permission to relax known types or programs
   ).program.futureInstruction = "fetch";
   expect(() => parseCanvasDocument(raw)).toThrow();
 });
+
+it("keeps a thousand-note library editable across the original canvas budgets", () => {
+  const doc = createCanvasDocument();
+  for (let i = 0; i < 1100; i++) {
+    const id = `entry.${i}`;
+    doc.blocks.push({ id, type: "markdown", source: "文".repeat(1000) });
+    doc.notes.push({ id: `note.${i}`, title: "Note", blocks: [id] });
+  }
+  const saved = parseCanvasDocument(JSON.stringify(doc));
+  const updated = applyCanvasCommands(saved, saved.revision, [
+    { type: "set_markdown", id: "entry.1099", source: "edited" },
+  ]);
+  expect(updated.notes).toEqual(doc.notes);
+  expect(updated.blocks.at(-1)).toMatchObject({ source: "edited" });
+});

@@ -5,6 +5,8 @@ import {
   parseCanvasDocument,
   validateDocumentJSON,
   CANVAS_ASSET_BYTES,
+  LIBRARY_COLLECTION_ITEMS,
+  LIBRARY_DOCUMENT_BYTES,
   blockAssetIds,
   type CanvasDocument,
   type CanvasBlock,
@@ -87,9 +89,9 @@ export async function readPackage(path: string): Promise<ReadPackage> {
     return bytes;
   };
   const raw = JSON.parse(
-    (await read("document.json", 4 * 1024 * 1024)).toString(),
+    (await read("document.json", 2 * LIBRARY_DOCUMENT_BYTES)).toString(),
   );
-  validateDocumentJSON(raw, 4 * 1024 * 1024);
+  validateDocumentJSON(raw, 2 * LIBRARY_DOCUMENT_BYTES, true);
   if (
     !raw ||
     raw.format !== "nomi-package" ||
@@ -104,8 +106,8 @@ export async function readPackage(path: string): Promise<ReadPackage> {
     !object(raw.assetPaths) ||
     !Array.isArray(raw.childOrder) ||
     !Array.isArray(raw.noteOrder) ||
-    raw.childOrder.length > 100 ||
-    raw.noteOrder.length > 100 ||
+    raw.childOrder.length > LIBRARY_COLLECTION_ITEMS ||
+    raw.noteOrder.length > LIBRARY_COLLECTION_ITEMS ||
     [...raw.childOrder, ...raw.noteOrder].some((x) => typeof x !== "string") ||
     typeof raw.publishedTitle !== "string" ||
     raw.publishedTitle.length > 200 ||
@@ -169,7 +171,7 @@ export async function readPackage(path: string): Promise<ReadPackage> {
   for (const [name, bytes] of files) {
     if (
       !name.startsWith("assets/") &&
-      !(await packageFile(path, name, 4 * 1024 * 1024)).equals(bytes)
+      !(await packageFile(path, name, bytes.length)).equals(bytes)
     )
       throw Error("文稿包正在被修改，请稍后重试。");
   }
@@ -257,11 +259,12 @@ export async function readPackageTree(
   const entries: ReadPackage[] = [],
     ids = new Set<string>();
   const visit = async (path: string, parentId?: string) => {
+    if (entries.length >= LIBRARY_COLLECTION_ITEMS + 1)
+      throw Error("文稿包数量超过工作区读取预算。");
     const entry = await readPackage(path);
     if (ids.has(entry.manifest.packageId))
       throw Error("发现重复文稿包身份，请使用独立副本导入。");
     ids.add(entry.manifest.packageId);
-    if (entries.length >= 101) throw Error("文稿包数量超过当前上限。");
     entry.parentId = parentId;
     entries.push(entry);
     const children = join(path, "children");
@@ -288,8 +291,8 @@ export async function readPackageTree(
   const order = new Map(board.manifest.noteOrder.map((id, i) => [id, i]));
   notes.sort(
     (a, b) =>
-      (order.get(a.manifest.packageId) ?? 1000) -
-      (order.get(b.manifest.packageId) ?? 1000),
+      (order.get(a.manifest.packageId) ?? Infinity) -
+      (order.get(b.manifest.packageId) ?? Infinity),
   );
   // A physical parent's childOrder is authoritative for that sibling group.
   for (const parentId of new Set(notes.map((e) => e.parentId))) {
@@ -301,10 +304,8 @@ export async function readPackageTree(
       .map((e, i) => (e.parentId === parentId ? i : -1))
       .filter((i) => i >= 0);
     const siblings = slots.map((i) => notes[i]);
-    const rank = (id: string) => {
-      const n = order.indexOf(id);
-      return n < 0 ? 1000 : n;
-    };
+    const ranks = new Map(order.map((id, index) => [id, index]));
+    const rank = (id: string) => ranks.get(id) ?? Infinity;
     siblings.sort(
       (a, b) => rank(a.manifest.packageId) - rank(b.manifest.packageId),
     );
@@ -420,19 +421,25 @@ export function planPackages(
       if (!e.manifest.references[b.id])
         oldOwners.set(b.id, e.manifest.packageId);
   const owners = new Map<string, string>();
-  for (const b of document.blocks) {
-    const users = document.notes.filter((n) => n.blocks.includes(b.id));
-    const old = oldOwners.get(b.id);
-    owners.set(
-      b.id,
-      users.find((n) => n.id === old)?.id ?? users[0]?.id ?? document.id,
-    );
+  const blocksById = new Map(document.blocks.map((b) => [b.id, b]));
+  const notesById = new Map(document.notes.map((n) => [n.id, n]));
+  const previousById = new Map(
+    previous?.entries.map((e) => [e.manifest.packageId, e]),
+  );
+  for (const note of document.notes) {
+    for (const id of note.blocks) {
+      if (!owners.has(id) || oldOwners.get(id) === note.id)
+        owners.set(id, note.id);
+    }
+  }
+  for (const block of document.blocks) {
+    if (!owners.has(block.id)) owners.set(block.id, document.id);
   }
   const paths = new Map<string, string>([[document.id, "画布.nomi"]]);
   const used = new Map<string, Set<string>>([["", new Set(["画布.nomi"])]]);
   const pathFor = (id: string): string => {
     if (paths.has(id)) return paths.get(id)!;
-    const note = document.notes.find((n) => n.id === id)!;
+    const note = notesById.get(id)!;
     const parent = note.parentId ? pathFor(note.parentId) + "/children" : "";
     const names = used.get(parent) ?? new Set<string>();
     used.set(parent, names);
@@ -472,9 +479,7 @@ export function planPackages(
     ),
   });
   for (const n of document.notes) {
-    const blocks = n.blocks.map((id) =>
-      document.blocks.find((b) => b.id === id)!,
-    );
+    const blocks = n.blocks.map((id) => blocksById.get(id)!);
     const assetIds = new Set(blocks.flatMap(blockAssetIds));
     if (n.icon?.type === "image") assetIds.add(n.icon.asset);
     const { parentId: _, ...note } = n;
@@ -483,9 +488,7 @@ export function planPackages(
       contents.has(p.content),
     );
     const ids = new Set(placements.map((p) => p.id));
-    const oldPackage = previous?.entries.find(
-      (e) => e.manifest.packageId === n.id,
-    );
+    const oldPackage = previousById.get(n.id);
     const doc: CanvasDocument = {
       ...oldPackage?.document,
       schema: document.schema,

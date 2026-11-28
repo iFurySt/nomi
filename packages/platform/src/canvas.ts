@@ -7,6 +7,7 @@ import {
   CANVAS_ASSET_BYTES,
   type CanvasDocument,
   type CanvasCamera,
+  type MarkdownChange,
   type CanvasAsset,
 } from "@nomi/core";
 export interface CanvasAssetWrite {
@@ -16,11 +17,12 @@ export interface CanvasAssetWrite {
 export interface CanvasRepository {
   externalChanges?: boolean;
   backup?(document: CanvasDocument, assets: CanvasAssetWrite[]): Promise<void>;
-  load(): Promise<CanvasDocument | undefined>;
+  load(knownRevision?: number): Promise<CanvasDocument | undefined>;
   save(
     document: CanvasDocument,
     assets: CanvasAssetWrite[],
     baseRevision: number | null,
+    changes?: MarkdownChange[],
   ): Promise<void>;
   asset(id: string): Promise<Blob | undefined>;
 }
@@ -244,12 +246,13 @@ export function createCanvasRepository(
         ),
       });
     },
-    async load() {
-      const saved = await documentRequest<CanvasDocument | undefined>(
-        "load",
-        scope,
-      );
+    async load(knownRevision) {
+      const saved = await documentRequest<CanvasDocument | undefined>("load", {
+        ...scope,
+        knownRevision,
+      });
       if (saved) return parseCanvasDocument(saved);
+      if (knownRevision !== undefined) return;
       const previous = await legacy.load();
       if (!previous) return;
       const assets = await Promise.all(
@@ -277,7 +280,16 @@ export function createCanvasRepository(
       }
       return previous;
     },
-    async save(document, assets, baseRevision) {
+    async save(document, assets, baseRevision, changes) {
+      if (changes?.length && baseRevision !== null && !assets.length) {
+        await documentRequest("save-markdown", {
+          ...scope,
+          baseRevision,
+          revision: document.revision,
+          changes,
+        });
+        return;
+      }
       await documentRequest("save", {
         ...scope,
         document,

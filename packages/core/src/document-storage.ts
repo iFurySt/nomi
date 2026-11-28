@@ -7,6 +7,7 @@ export const documentStorageMethods = [
   "reveal-note",
   "load",
   "save",
+  "save-markdown",
   "backup",
   "asset",
 ] as const;
@@ -25,4 +26,16 @@ export interface DocumentStorageSave {
   document: CanvasDocument;
   assets: DocumentAssetBytes[];
   baseRevision: number | null;
+}
+
+export interface MarkdownChange {
+  id: string;
+  source: string;
+}
+export interface DocumentMarkdownSave {
+  profile: string;
+  documentId: string;
+  baseRevision: number;
+  revision: number;
+  changes: MarkdownChange[];
 }

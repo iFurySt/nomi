@@ -3,10 +3,16 @@ import { mkdir, readdir, lstat, rename, rm, cp } from "node:fs/promises";
 import { join, basename } from "node:path";
 import {
   parseCanvasDocument,
+  LIBRARY_COLLECTION_ITEMS,
   type CanvasDocument,
   type CanvasNote,
 } from "../../core/src/canvas/index";
-import { atomicFile, directory, regularFile } from "./document-files";
+import {
+  atomicFile,
+  directory,
+  regularFile,
+  snapshotJSON,
+} from "./document-files";
 
 const markerName = ".nomi-note.json";
 const digest = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -97,7 +103,8 @@ export async function scanTree(
       if (ids.has(marker.id))
         throw Error("发现重复文稿身份，请勿直接复制带身份文件的文稿文件夹。");
       ids.add(marker.id);
-      if (entries.length >= 100) throw Error("当前工作区最多支持 100 篇文稿。");
+      if (entries.length >= LIBRARY_COLLECTION_ITEMS)
+        throw Error("文稿数量超过工作区读取预算。");
       entries.push({ path: child, parentId, marker });
       await visit(child, marker.id, depth + 1);
     }
@@ -339,10 +346,7 @@ export async function commitTree(
     throw Error("Finder 中的目录已改变，请先读取最新层级。");
   if (!previous && (await exists(join(root, folder))))
     throw Error("文稿目录已存在，不能覆盖。");
-  await atomicFile(
-    join(transaction, "snapshot.json"),
-    JSON.stringify(snapshot, null, 2) + "\n",
-  );
+  await atomicFile(join(transaction, "snapshot.json"), snapshotJSON(snapshot));
   await atomicFile(
     join(root, "workspaces", `${snapshotFile}.tree-journal`),
     JSON.stringify({

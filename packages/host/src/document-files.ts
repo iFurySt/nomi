@@ -32,3 +32,14 @@ export async function directory(path: string) {
   if (!stat.isDirectory() || stat.isSymbolicLink())
     throw Error("文稿目录不可用，或包含符号链接。");
 }
+
+// Snapshots include the attachment index as well as the document. Keep every published
+// projection within the existing on-disk reader and transaction recovery limit.
+export function snapshotJSON(snapshot: unknown) {
+  const pretty = JSON.stringify(snapshot, null, 2) + "\n";
+  if (Buffer.byteLength(pretty) <= 32 * 1024 * 1024) return pretty;
+  const compact = JSON.stringify(snapshot);
+  if (Buffer.byteLength(compact) > 32 * 1024 * 1024)
+    throw Error("本地资料库快照过大。");
+  return compact;
+}

@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   mkdtemp,
   mkdir,
@@ -23,6 +23,7 @@ import {
   bpeDiagramProgram,
   temperatureProgram,
 } from "../../core/src/interactive";
+import * as files from "./document-files";
 import { DocumentStore } from "./document-store";
 import { readPackage, readPackageTree, packageHash } from "./nomi-package";
 import { commitTree } from "./note-directory-tree";
@@ -186,8 +187,8 @@ it("round trips embedded native scenes, nested sources and originals through ext
       (b) => b.id === "canvas.inline",
     ),
   ).toMatchObject({ scene: { assets: [asset] } });
-// This integration test performs several durable package saves, imports and
-// directory scans; shared Intel runners can exceed the unit-test 5s budget.
+  // This integration test performs several durable package saves, imports and
+  // directory scans; shared Intel runners can exceed the unit-test 5s budget.
 }, 15_000);
 it("round trips all existing document semantics and standalone notes with physical children", async () => {
   const f = await fixture();
@@ -417,42 +418,45 @@ it("portable title names handle duplicates and invalid filename characters", asy
   ]);
   expect(await f.load()).toEqual(f.doc);
 });
-it("resumes an interrupted file transaction without overwriting later external writes", async () => {
-  const f = await fixture();
-  const key =
-      packageHash(JSON.stringify(["local-device", f.doc.id])) + ".nomi.json",
-    token = "00000000-0000-4000-8000-000000000001";
-  const source = `.nomi-history/${token}/staged/0`,
-    target = "文稿/A.nomi/text/" + f.doc.notes[0].blocks[0] + ".md";
-  await mkdir(join(f.root, ".nomi-history", token, "staged"), {
-    recursive: true,
-  });
-  const old = await readFile(join(f.root, target));
-  const next = Buffer.from("Recovered edit");
-  await writeFile(join(f.root, source), next);
-  const journal = {
-    version: 1,
-    token,
-    cursor: 0,
-    operations: [
-      {
-        type: "write",
-        path: target,
-        source,
-        before: packageHash(old),
-        after: packageHash(next),
-      },
-    ],
-  };
-  const pointer = join(f.root, "workspaces", key + ".package-journal");
-  await writeFile(pointer, JSON.stringify(journal));
-  await recoverPackages(f.root, key);
-  expect(await readFile(join(f.root, target), "utf8")).toBe("Recovered edit");
-  await writeFile(pointer, JSON.stringify(journal));
-  await writeFile(join(f.root, target), "Newer external");
-  await expect(recoverPackages(f.root, key)).rejects.toThrow("外部修改");
-  expect(await readFile(join(f.root, target), "utf8")).toBe("Newer external");
-});
+it.each([1, 2])(
+  "resumes an interrupted v%i transaction without overwriting later external writes",
+  async (version) => {
+    const f = await fixture();
+    const key =
+        packageHash(JSON.stringify(["local-device", f.doc.id])) + ".nomi.json",
+      token = "00000000-0000-4000-8000-000000000001";
+    const source = `.nomi-history/${token}/staged/0`,
+      target = "文稿/A.nomi/text/" + f.doc.notes[0].blocks[0] + ".md";
+    await mkdir(join(f.root, ".nomi-history", token, "staged"), {
+      recursive: true,
+    });
+    const old = await readFile(join(f.root, target));
+    const next = Buffer.from("Recovered edit");
+    await writeFile(join(f.root, source), next);
+    const journal = {
+      version,
+      token,
+      cursor: 0,
+      operations: [
+        {
+          type: "write",
+          path: target,
+          source,
+          before: packageHash(old),
+          after: packageHash(next),
+        },
+      ],
+    };
+    const pointer = join(f.root, "workspaces", key + ".package-journal");
+    await writeFile(pointer, JSON.stringify(journal));
+    await recoverPackages(f.root, key);
+    expect(await readFile(join(f.root, target), "utf8")).toBe("Recovered edit");
+    await writeFile(pointer, JSON.stringify(journal));
+    await writeFile(join(f.root, target), "Newer external");
+    await expect(recoverPackages(f.root, key)).rejects.toThrow("外部修改");
+    expect(await readFile(join(f.root, target), "utf8")).toBe("Newer external");
+  },
+);
 it("opens a detached board with its complete note fallback, shapes, connectors and interaction sources", async () => {
   const f = await fixture(false);
   f.doc.blocks.push({
@@ -678,4 +682,147 @@ it("round trips note reference blocks and remaps only imported targets", async (
       }),
     ]),
   );
+});
+
+it("saves, edits and reopens a library past the original package and child-order limits", async () => {
+  const { store, input, config, root } = await fixture(false);
+  const doc = input.document;
+  for (let i = 0; i < 110; i++) {
+    doc.notes.push({
+      id: `child.${i}`,
+      title: `Child ${i}`,
+      parentId: doc.notes[0].id,
+      blocks: [],
+    });
+  }
+  await store.save(input);
+  const reopened = new DocumentStore(config, root);
+  expect(await reopened.load(input.profile, doc.id)).toEqual(doc);
+  await reopened.load(input.profile, doc.id, doc.revision);
+  expect(
+    await reopened.load(input.profile, doc.id, doc.revision),
+  ).toBeUndefined();
+  const edited = applyCanvasCommands(doc, doc.revision, [
+    { type: "rename_note", id: "child.109", title: "Edited" },
+  ]);
+  await reopened.save({
+    ...input,
+    document: edited,
+    baseRevision: doc.revision,
+  });
+  expect(await reopened.load(input.profile, doc.id, doc.revision)).toEqual(
+    edited,
+  );
+}, 30000);
+
+it("checkpoints just the changed Markdown and updates every portable copy", async () => {
+  const f = await fixture(false);
+  const block = f.doc.blocks.find(
+    (b) => b.type === "markdown" && f.doc.notes[0].blocks.includes(b.id),
+  )!;
+  f.doc.notes[1].blocks.push(block.id);
+  await f.store.save(f.input);
+  const key = (await readdir(join(f.root, "workspaces")))[0];
+  const snapshot = join(f.root, "workspaces", key);
+  const base = await stat(snapshot);
+  const changes = [{ id: block.id, source: "Edited\n\n正文 📝" }];
+  const request = {
+    ...f.input,
+    baseRevision: f.doc.revision,
+    revision: f.doc.revision + 2,
+    changes,
+  };
+  const saved = await f.store.saveMarkdown(request);
+  for (const dir of ["画布.nomi", "A.nomi", "A.nomi/children/B.nomi"]) {
+    expect(
+      await readFile(join(f.tree, dir, "text", block.id + ".md"), "utf8"),
+    ).toBe(changes[0].source);
+  }
+  expect((await stat(snapshot)).ino).toBe(base.ino);
+  expect(
+    await new DocumentStore(f.config, f.root).load(f.input.profile, f.doc.id),
+  ).toEqual(saved);
+  await expect(f.store.saveMarkdown(request)).rejects.toThrow();
+  const target = join(f.path, "moved");
+  await mkdir(target);
+  await f.store.relocate(target);
+  expect(await f.load()).toEqual(saved);
+  const changed = applyCanvasCommands(saved, saved.revision, [
+    { type: "rename_note", id: f.doc.notes[0].id, title: "Renamed" },
+  ]);
+  await f.put(changed, saved.revision);
+  expect(await f.load()).toEqual(changed);
+});
+
+it("preserves external changes across incremental edits and structural checkpoints", async () => {
+  const f = await fixture();
+  const block = f.doc.blocks.find(
+    (b) => b.type === "markdown" && f.doc.notes[0].blocks.includes(b.id),
+  )!;
+  const owner = join(f.tree, "A.nomi", "text", block.id + ".md");
+  const request = {
+    ...f.input,
+    baseRevision: f.doc.revision,
+    revision: f.doc.revision + 1,
+    changes: [{ id: block.id, source: "Local" }],
+  };
+  await writeFile(owner, "External");
+  await expect(f.store.saveMarkdown(request)).rejects.toThrow(/外部/);
+  expect(await readFile(owner, "utf8")).toBe("External");
+  const external = await f.load();
+  const saved = await f.store.saveMarkdown({
+    ...request,
+    baseRevision: external.revision,
+    revision: external.revision + 1,
+  });
+  const snapshot = (await readdir(join(f.root, "workspaces"))).find((p) =>
+    p.endsWith(".nomi.json"),
+  )!;
+  await rm(join(f.root, "workspaces", snapshot));
+  expect(await f.load()).toEqual(saved);
+  const next = applyCanvasCommands(saved, saved.revision, [
+    { type: "rename_note", id: f.doc.notes[0].id, title: "Updated" },
+  ]);
+  await f.put(next, saved.revision);
+  expect(await readdir(join(f.root, "workspaces"))).toEqual([snapshot]);
+  expect(await f.load()).toEqual(next);
+});
+
+it("recovers a text transaction interrupted after publishing its Markdown", async () => {
+  const f = await fixture();
+  const block = f.doc.blocks.find((b) => b.type === "markdown")!;
+  const request = {
+    ...f.input,
+    baseRevision: f.doc.revision,
+    revision: f.doc.revision + 1,
+    changes: [{ id: block.id, source: "Recovered" }],
+  };
+  const realWrite = files.atomicFile;
+  const fault = vi
+    .spyOn(files, "atomicFile")
+    .mockImplementation(async (path, bytes) => {
+      if (path.endsWith(".markdown/head"))
+        throw Error("simulated interruption");
+      await realWrite(path, bytes);
+    });
+  try {
+    await expect(f.store.saveMarkdown(request)).rejects.toThrow(
+      "simulated interruption",
+    );
+  } finally {
+    fault.mockRestore();
+  }
+  const reopened = await new DocumentStore(f.config, f.root).load(
+    f.input.profile,
+    f.doc.id,
+  );
+  expect(reopened?.revision).toBe(request.revision);
+  expect(reopened?.blocks.find((b) => b.id === block.id)).toMatchObject({
+    source: "Recovered",
+  });
+  expect(
+    (await readdir(join(f.root, "workspaces"))).some((f) =>
+      f.endsWith(".package-journal"),
+    ),
+  ).toBe(false);
 });

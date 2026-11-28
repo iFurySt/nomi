@@ -3,6 +3,7 @@ import type { DocumentStore } from "../../../packages/host/src/document-store";
 import {
   documentStorageMethods,
   type DocumentStorageMethod,
+  type DocumentMarkdownSave,
   type DocumentStorageSave,
 } from "../../../packages/core/src/document-storage";
 
@@ -34,6 +35,7 @@ export function registerDocumentStorage(
               documentId: string;
               id: string;
               children?: boolean;
+              knownRevision?: number;
             }
           | undefined;
         if (method === "status") value = await documents.status();
@@ -41,6 +43,7 @@ export function registerDocumentStorage(
           const document = await documents.load(
             request?.profile!,
             request?.documentId!,
+            request?.knownRevision,
           );
           value = document;
           const key = `${request?.profile}:${request?.documentId}`;
@@ -48,6 +51,15 @@ export function registerDocumentStorage(
             observedRevisions.set(key, document.revision);
             saved?.(document);
           }
+        } else if (method === "save-markdown") {
+          const document = await documents.saveMarkdown(
+            params as DocumentMarkdownSave,
+          );
+          observedRevisions.set(
+            `${request?.profile}:${request?.documentId}`,
+            document.revision,
+          );
+          saved?.(document);
         } else if (method === "save" || method === "backup") {
           if (!request) throw Error("Invalid save request.");
           if (method === "backup")

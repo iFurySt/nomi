@@ -12,6 +12,7 @@ import {
 } from "react";
 import {
   applyCanvasCommands,
+  MarkdownEdits,
   parseCanvasDocument,
   createCanvasDocument,
   type CanvasDocument,
@@ -32,6 +33,8 @@ function useCanvasDocumentState(profile: string) {
   const alive = useRef(false),
     base = useRef<number | null>(null),
     running = useRef(false);
+  const markdownEdits = useRef<MarkdownEdits | undefined>(undefined);
+  const pendingText = useRef<Map<string, string> | null>(new Map());
   const pending = useRef<CanvasDocument | undefined>(undefined),
     originals = useRef(new Map<string, CanvasAssetWrite>());
   const history = useRef<{
@@ -62,14 +65,26 @@ function useCanvasDocumentState(profile: string) {
         while (pending.current) {
           const snapshot = pending.current;
           pending.current = undefined;
+          const text = pendingText.current;
+          pendingText.current = new Map();
           const assets = [...originals.current.values()].filter((item) =>
             snapshot.assets.some((meta) => meta.id === item.asset.id),
           );
           try {
-            await repository.save(snapshot, assets, base.current);
+            await repository.save(
+              snapshot,
+              assets,
+              base.current,
+              text && text.size
+                ? Array.from(text, ([id, source]) => ({ id, source }))
+                : undefined,
+            );
             base.current = snapshot.revision;
             for (const a of assets) originals.current.delete(a.asset.id);
           } catch (error) {
+            if (text && pendingText.current) {
+              pendingText.current = new Map([...text, ...pendingText.current]);
+            } else pendingText.current = null;
             pending.current = current.current;
             if (alive.current) setSaveError((error as Error).message);
             break;
@@ -90,7 +105,14 @@ function useCanvasDocumentState(profile: string) {
     return inFlight.current;
   };
   persistRef.current = persist;
-  const queue = (doc: CanvasDocument, debounce = false) => {
+  const queue = (
+    doc: CanvasDocument,
+    debounce = false,
+    commands?: CanvasCommand[],
+  ) => {
+    if (commands?.length && commands.every((c) => c.type === "set_markdown")) {
+      for (const c of commands) pendingText.current?.set(c.id, c.source);
+    } else pendingText.current = null;
     pending.current = doc;
     setDirty(true);
     if (debounce) delayed.schedule();
@@ -168,15 +190,14 @@ function useCanvasDocumentState(profile: string) {
       checking = true;
       const before = current.current;
       try {
-        const saved = await repository.load();
+        const saved = await repository.load(base.current ?? undefined);
         if (
           !cancelled &&
           current.current === before &&
           !pending.current &&
-          !running.current &&
-          saved
+          !running.current
         ) {
-          if (saved.revision !== base.current) {
+          if (saved && saved.revision !== base.current) {
             acceptExternal(saved);
             setExternalNotice("");
           }
@@ -214,6 +235,7 @@ function useCanvasDocumentState(profile: string) {
       if (current.current !== before)
         throw Error("正在继续编辑，请暂停输入后重新读取。");
       pending.current = undefined;
+      pendingText.current = new Map();
       originals.current.clear();
       acceptExternal(saved);
       setDirty(false);
@@ -225,10 +247,14 @@ function useCanvasDocumentState(profile: string) {
       setSaveError((e as Error).message);
     }
   };
-  const install = (doc: CanvasDocument, debounce = false) => {
+  const install = (
+    doc: CanvasDocument,
+    debounce = false,
+    commands?: CanvasCommand[],
+  ) => {
     current.current = doc;
     setDocument(doc);
-    queue(doc, debounce);
+    queue(doc, debounce, commands);
     window.nomiDesktop?.notifySyncActivity?.();
   };
   const edit = (
@@ -239,7 +265,19 @@ function useCanvasDocumentState(profile: string) {
   ) => {
     const before = current.current;
     if (!before) throw Error("画布尚未载入。");
-    const after = applyCanvasCommands(before, before.revision, commands);
+    let after: CanvasDocument;
+    if (
+      commands.length &&
+      commands.length <= 600 &&
+      commands.every((c) => c.type === "set_markdown")
+    ) {
+      if (markdownEdits.current?.document !== before)
+        markdownEdits.current = new MarkdownEdits(before);
+      after = markdownEdits.current.apply(before.revision + 1, commands);
+    } else {
+      markdownEdits.current = undefined;
+      after = applyCanvasCommands(before, before.revision, commands);
+    }
     if (!group || history.current.group !== group) {
       history.current.undo.push(before);
       if (history.current.undo.length > 40) history.current.undo.shift();
@@ -247,7 +285,7 @@ function useCanvasDocumentState(profile: string) {
     history.current.group = group;
     history.current.redo = [];
     for (const asset of assets) originals.current.set(asset.asset.id, asset);
-    install(after, options.debounce);
+    install(after, options.debounce, commands);
     renderHistory((n) => n + 1);
     return after;
   };
@@ -280,7 +318,40 @@ function useCanvasDocumentState(profile: string) {
     const next = stack.pop()!;
     history.current[direction === "undo" ? "redo" : "undo"].push(doc);
     history.current.group = undefined;
-    install({ ...next, revision: doc.revision + 1 });
+    const restored = { ...next, revision: doc.revision + 1 };
+    // Markdown edits share all structure with the history entry, including extension fields.
+    const sameStructure =
+      (Object.keys(doc) as (keyof CanvasDocument)[]).every(
+        (k) =>
+          k === "revision" ||
+          k === "blocks" ||
+          (Object.hasOwn(next, k) && doc[k] === next[k]),
+      ) &&
+      Object.keys(doc).length === Object.keys(next).length &&
+      doc.blocks.length === next.blocks.length;
+    let commands: CanvasCommand[] | undefined;
+    if (sameStructure) {
+      commands = [];
+      for (const [i, block] of next.blocks.entries()) {
+        const previous = doc.blocks[i];
+        if (block === previous) continue;
+        if (
+          block.type !== "markdown" ||
+          previous.type !== "markdown" ||
+          stableJSON({ ...block, source: "" }) !==
+            stableJSON({ ...previous, source: "" })
+        ) {
+          commands = undefined;
+          break;
+        }
+        commands.push({
+          type: "set_markdown",
+          id: block.id,
+          source: block.source,
+        });
+      }
+    }
+    install(restored, false, commands);
     renderHistory((n) => n + 1);
   };
   // Host requests join the same live session and Undo stack as local editing.

@@ -1,7 +1,12 @@
 import { mkdir, lstat, rename, rm } from "node:fs/promises";
 import { join, dirname, relative } from "node:path";
 import { randomUUID } from "node:crypto";
-import { atomicFile, directory, regularFile } from "./document-files";
+import {
+  atomicFile,
+  directory,
+  regularFile,
+  snapshotJSON,
+} from "./document-files";
 import {
   packageFile,
   packageHash,
@@ -21,7 +26,7 @@ type Operation =
     }
   | { type: "mkdir"; path: string };
 interface Journal {
-  version: 1;
+  version: 1 | 2;
   token: string;
   cursor: number;
   operations: Operation[];
@@ -64,7 +69,7 @@ export async function recoverPackages(root: string, key: string) {
     (await regularFile(pointer, 8 * 1024 * 1024)).toString(),
   ) as Journal;
   if (
-    j.version !== 1 ||
+    (j.version !== 1 && j.version !== 2) ||
     !/^[-a-f0-9]{36}$/.test(j.token) ||
     !Array.isArray(j.operations) ||
     !Number.isInteger(j.cursor) ||
@@ -72,6 +77,28 @@ export async function recoverPackages(root: string, key: string) {
     j.cursor > j.operations.length
   )
     throw Error("文稿包恢复日志无效。");
+  // Large imports have thousands of operations. Checkpoint only the cursor after each
+  // idempotent step, keeping the validated operation list immutable while recovering.
+  const progress = `.nomi-history/${j.token}/cursor`;
+  if (j.version === 2) {
+    await safeParents(root, progress);
+    if (await exists(join(root, progress))) {
+      j.cursor = JSON.parse((await packageFile(root, progress, 32)).toString());
+      if (
+        !Number.isSafeInteger(j.cursor) ||
+        j.cursor < 0 ||
+        j.cursor > j.operations.length
+      )
+        throw Error("文稿包恢复进度无效。");
+    }
+  }
+  // A short batch of independent atomic writes can be replayed from its beginning.
+  const replayFromStart =
+    j.version === 2 &&
+    j.operations.length <= 32 &&
+    j.operations.every((op) => op.type === "write") &&
+    new Set(j.operations.map((op) => op.type === "write" && op.path)).size ===
+      j.operations.length;
   for (; j.cursor < j.operations.length; j.cursor++) {
     const op = j.operations[j.cursor];
     if (op.type === "mkdir") await safeMkdir(root, op.path);
@@ -101,9 +128,71 @@ export async function recoverPackages(root: string, key: string) {
         await atomicFile(join(root, op.path), bytes);
       }
     } else throw Error("未知恢复操作。");
-    await atomicFile(pointer, JSON.stringify({ ...j, cursor: j.cursor + 1 }));
+    if (j.version === 2 && !replayFromStart)
+      await atomicFile(join(root, progress), String(j.cursor + 1));
+    else if (j.version === 1)
+      await atomicFile(pointer, JSON.stringify({ ...j, cursor: j.cursor + 1 }));
   }
   await rm(pointer);
+  if (j.version === 2) await rm(join(root, progress), { force: true });
+}
+interface FileChange {
+  path: string;
+  bytes: Buffer;
+  before?: Buffer;
+}
+async function beginTransaction(root: string, key: string) {
+  const token = randomUUID(),
+    base = `.nomi-history/${token}`,
+    ops: Operation[] = [];
+  await safeMkdir(root, base + "/staged");
+  let serial = 0;
+  const write = async (
+    path: string,
+    bytes: Buffer,
+    before: Buffer | undefined,
+    createParent = true,
+  ) => {
+    if (before?.equals(bytes)) return;
+    const source = `${base}/staged/${serial++}`;
+    await atomicFile(join(root, source), bytes);
+    if (before) await atomicFile(join(root, base, `before-${serial}`), before);
+    if (createParent)
+      ops.push({ type: "mkdir", path: dirname(path).replaceAll("\\", "/") });
+    ops.push({
+      type: "write",
+      path,
+      source,
+      before: before ? packageHash(before) : null,
+      after: packageHash(bytes),
+    });
+  };
+  async function commit(check: () => Promise<void>) {
+    await check();
+    const journal: Journal = { version: 2, token, cursor: 0, operations: ops };
+    const encoded = JSON.stringify(journal);
+    if (Buffer.byteLength(encoded) > 8 * 1024 * 1024)
+      throw Error("修改超过单次文件事务预算。");
+    await atomicFile(
+      join(root, "workspaces", key + ".package-journal"),
+      encoded,
+    );
+    await recoverPackages(root, key);
+  }
+  return { base, ops, write, commit };
+}
+
+export async function commitTextFiles(
+  root: string,
+  key: string,
+  changes: FileChange[],
+  check: () => Promise<void>,
+) {
+  const tx = await beginTransaction(root, key);
+  await safeMkdir(root, "workspaces/" + key + ".markdown");
+  for (const change of changes)
+    await tx.write(change.path, change.bytes, change.before, false);
+  await tx.commit(check);
 }
 /** Journal only changed files. Directory renames preserve package inode and all unowned files. */
 export async function commitPackages(
@@ -116,33 +205,9 @@ export async function commitPackages(
   originals: Map<string, Buffer>,
   check: () => Promise<void>,
 ) {
-  const token = randomUUID(),
-    base = `.nomi-history/${token}`,
-    ops: Operation[] = [];
-  await safeMkdir(root, base + "/staged");
+  const { base, ops, write, commit } = await beginTransaction(root, key);
   await safeMkdir(root, base + "/hold");
   const plan = planPackages(document, previous, originals);
-  let serial = 0;
-  const write = async (
-    path: string,
-    bytes: Buffer,
-    before: Buffer | undefined,
-  ) => {
-    if (before?.equals(bytes)) return;
-    const source = `${base}/staged/${serial++}`;
-    await atomicFile(join(root, source), bytes);
-    if (before) await atomicFile(join(root, base, `before-${serial}`), before);
-    ops.push(
-      { type: "mkdir", path: dirname(path).replaceAll("\\", "/") },
-      {
-        type: "write",
-        path,
-        source,
-        before: before ? packageHash(before) : null,
-        after: packageHash(bytes),
-      },
-    );
-  };
   const cachePath = "workspaces/" + key;
   let beforeCache: Buffer | undefined;
   try {
@@ -187,16 +252,10 @@ export async function commitPackages(
     for (const [name, bytes] of p.files)
       await write(target + "/" + name, bytes, old.get(id)?.files.get(name));
   }
-  await write(
-    cachePath,
-    Buffer.from(JSON.stringify(snapshot, null, 2) + "\n"),
-    beforeCache,
-  );
-  await check();
-  const journal: Journal = { version: 1, token, cursor: 0, operations: ops };
-  await atomicFile(
-    join(root, "workspaces", key + ".package-journal"),
-    JSON.stringify(journal),
-  );
-  await recoverPackages(root, key);
+  await write(cachePath, Buffer.from(snapshotJSON(snapshot)), beforeCache);
+  const overlay = cachePath + ".markdown";
+  if (await exists(join(root, overlay)))
+    ops.push({ type: "move", from: overlay, to: base + "/previous-markdown" });
+  await commit(check);
+  return plan;
 }

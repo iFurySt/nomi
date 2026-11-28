@@ -71,7 +71,7 @@ node apps/mcp/dist/main.mjs --connection /absolute/path/to/mcp/connection.json
 - `packages/ui/src/canvas/useCanvasDocument.ts`：读取前 flush；提交检查当前快照对象、版本及输入法状态。一次 MCP 修改接入既有 Undo，不替换整套编辑器。
 - `apps/mcp/`：官方 SDK stdio 适配，构建结果随桌面包携带；stdout 只输出协议消息。
 
-journal 保存在当前 App userData 的 `mcp/history/<workspaceId>/`，不写进正文。小型 automationReceipt 随全库存储，导出时移除。原件与回收资料不自动清理，首版无历史 GC、回收站 GUI、离线 App 写入或通用 CLI。原有 100 篇文稿、200 块、64 附件、2 MiB 文档等预算继续生效。
+journal 保存在当前 App userData 的 `mcp/history/<workspaceId>/`，不写进正文。小型 automationReceipt 随全库存储，导出时移除。原件与回收资料不自动清理，首版无历史 GC、回收站 GUI、离线 App 写入或通用 CLI。桌面本地文稿库使用统一的 16 MiB 正文与元数据预算。MCP 分页、单次批量操作与传输的限制仍独立生效。
 
 ## 安全边界
 

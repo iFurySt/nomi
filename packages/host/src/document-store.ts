@@ -1,5 +1,5 @@
 import { stableJSON } from "../../core/src/sync/protocol";
-import { readPackageTree, packageHash } from "./nomi-package";
+import { readPackageTree, packageHash, packageFile } from "./nomi-package";
 import { commitPackages, recoverPackages } from "./package-transaction";
 import {
   treeFolder,
@@ -8,10 +8,20 @@ import {
   recoverTree,
   copySafe,
 } from "./note-directory-tree";
-import { atomicFile, directory, regularFile } from "./document-files";
+import {
+  atomicFile,
+  directory,
+  regularFile,
+  snapshotJSON,
+} from "./document-files";
+import {
+  MarkdownCheckpoint,
+  readMarkdownCheckpoint,
+} from "./markdown-checkpoint";
+import { watch, type FSWatcher } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, realpath, rm } from "node:fs/promises";
-import { join, dirname, resolve, sep } from "node:path";
+import { join, dirname, resolve, relative, sep } from "node:path";
 import {
   parseCanvasDocument,
   CANVAS_ASSET_BYTES,
@@ -20,6 +30,7 @@ import {
 } from "../../core/src/canvas/index";
 import type {
   DocumentDirectoryStatus,
+  DocumentMarkdownSave,
   DocumentStorageSave,
 } from "../../core/src/document-storage";
 
@@ -41,6 +52,16 @@ interface Snapshot {
 export class DocumentStore {
   private tail: Promise<unknown> = Promise.resolve();
   private root?: string;
+  private markdown?: MarkdownCheckpoint;
+  // The renderer polls for external edits. Only cache large libraries, and only for reads.
+  private observed?: {
+    key: string;
+    watcher: FSWatcher;
+    generation: number;
+    changed: Set<string>;
+    written: Map<string, string>;
+    cached?: { revision: number; expires: number };
+  };
   constructor(
     private configFile: string,
     readonly defaultPath: string,
@@ -144,7 +165,13 @@ export class DocumentStore {
       throw Error("文稿目录格式版本无效。");
     if (value.packageVersion !== undefined && value.packageVersion !== 1)
       throw Error("不支持此文件包版本。");
-    value.document = parseCanvasDocument(value.document);
+    value.document = parseCanvasDocument(
+      await readMarkdownCheckpoint(
+        root,
+        this.key(profile, documentId),
+        value.document,
+      ),
+    );
     if (value.document.id !== documentId) throw Error("文稿标识与文件不一致。");
     for (const [id, meta] of Object.entries(value.originals)) {
       if (
@@ -192,7 +219,12 @@ export class DocumentStore {
       saved = {
         format: "nomi-library-document/1",
         profile,
-        document: tree.document,
+        document: await readMarkdownCheckpoint(
+          root,
+          this.key(profile, documentId),
+          tree.document,
+          true,
+        ),
         originals: Object.fromEntries(
           tree.document.assets.map((a) => [a.id, a]),
         ),
@@ -205,7 +237,12 @@ export class DocumentStore {
         );
       await atomicFile(
         join(root, "workspaces", this.key(profile, documentId)),
-        JSON.stringify(saved, null, 2),
+        snapshotJSON(saved),
+      );
+      saved.document = await readMarkdownCheckpoint(
+        root,
+        this.key(profile, documentId),
+        saved.document,
       );
     }
     const folder = treeFolder(profile, documentId),
@@ -217,7 +254,7 @@ export class DocumentStore {
       }
       const originals = await this.originalBytes(root, saved.document);
       saved.packageVersion = 1;
-      await commitPackages(
+      const plan = await commitPackages(
         root,
         folder,
         key,
@@ -227,19 +264,19 @@ export class DocumentStore {
         originals,
         async () => {},
       );
+      await this.indexPlan(root, folder, key, saved.document, plan);
       return saved;
     }
     const tree = await readPackageTree(join(root, folder));
     const external = tree.document;
-    const semantic = (d: CanvasDocument) =>
-      stableJSON({ ...d, revision: 0 });
+    const semantic = (d: CanvasDocument) => stableJSON({ ...d, revision: 0 });
     if (semantic(external) !== semantic(saved.document)) {
       const history = join(root, ".nomi-history");
       await mkdir(history, { recursive: true });
       await directory(history);
       await atomicFile(
         join(history, `external-${randomUUID()}-${key}`),
-        JSON.stringify(saved, null, 2),
+        snapshotJSON(saved),
       );
       for (const asset of external.assets) {
         const old = saved.originals[asset.id];
@@ -261,7 +298,7 @@ export class DocumentStore {
         id: documentId,
         revision: saved.document.revision + 1,
       };
-      await commitPackages(
+      const plan = await commitPackages(
         root,
         folder,
         key,
@@ -277,8 +314,37 @@ export class DocumentStore {
             throw Error("文稿包仍在修改，请稍后重试。");
         },
       );
+      await this.indexPlan(root, folder, key, saved.document, plan);
+    } else {
+      this.markdown = await MarkdownCheckpoint.create(
+        root,
+        key,
+        saved.document,
+        tree.entries.map((e) => ({
+          path: relative(root, e.path),
+          files: e.files,
+          manifest: e.manifest,
+        })),
+      );
     }
     return saved;
+  }
+  private async indexPlan(
+    root: string,
+    folder: string,
+    key: string,
+    document: CanvasDocument,
+    plan: Awaited<ReturnType<typeof commitPackages>>,
+  ) {
+    this.markdown = await MarkdownCheckpoint.create(
+      root,
+      key,
+      document,
+      Array.from(plan.values(), (p) => ({
+        path: join(folder, p.path),
+        files: p.files,
+      })),
+    );
   }
   private async originalBytes(root: string, document: CanvasDocument) {
     const originals = new Map<string, Buffer>();
@@ -293,93 +359,204 @@ export class DocumentStore {
     }
     return originals;
   }
-  load(profile: string, documentId: string) {
-    return this.serial(
-      async () =>
-        (await this.current(await this.initialize(), profile, documentId))
-          ?.document,
-    );
-  }
-  save(input: DocumentStorageSave) {
+  load(profile: string, documentId: string, knownRevision?: number) {
     return this.serial(async () => {
       const root = await this.initialize();
-      const key = this.key(input.profile, input.documentId);
-      const document = parseCanvasDocument(input.document);
-      if (document.id !== input.documentId || !Array.isArray(input.assets))
-        throw Error("文稿保存请求无效。");
-      const previous = await this.current(
-        root,
-        input.profile,
-        input.documentId,
-      );
-      if ((previous?.document.revision ?? null) !== input.baseRevision)
-        throw Error("另一处修改已保存，请重新读取文稿。");
-      if (previous && document.revision <= previous.document.revision)
-        throw Error("不能用旧版本覆盖文稿。");
-      const originals = Object.assign(
-        Object.create(null) as Record<string, CanvasAsset>,
-        previous?.originals,
-      );
-      for (const meta of document.assets) {
-        const old = originals[meta.id];
-        if (
-          old &&
-          (old.sha256 !== meta.sha256 ||
-            old.mime !== meta.mime ||
-            old.bytes !== meta.bytes)
-        )
-          throw Error("附件原件不可覆盖。");
-        const incoming = input.assets.find(
-          (item) => item.asset?.id === meta.id,
-        );
-        const path = join(root, "assets", meta.sha256);
-        if (incoming) {
-          if (
-            !(incoming.bytes instanceof Uint8Array) ||
-            incoming.bytes.byteLength !== meta.bytes ||
-            digest(incoming.bytes) !== meta.sha256 ||
-            incoming.asset.sha256 !== meta.sha256 ||
-            incoming.asset.mime !== meta.mime
-          )
-            throw Error("附件原件与声明不一致。");
-          await atomicFile(path, incoming.bytes);
-        } else {
-          const bytes = await regularFile(path, CANVAS_ASSET_BYTES);
-          if (bytes.length !== meta.bytes || digest(bytes) !== meta.sha256)
-            throw Error("附件缺失或已损坏。");
-        }
-        originals[meta.id] = meta;
+      const workspaceKey = this.key(profile, documentId);
+      const key = join(root, "workspaces", workspaceKey);
+      if (this.observed && this.observed.key !== key) {
+        this.observed.watcher.close();
+        this.observed = undefined;
       }
-      const snapshot: Snapshot = {
-        format: "nomi-library-document/1",
-        profile: input.profile,
-        document,
-        originals,
-        packageVersion: 1,
-      };
-      const folder = treeFolder(input.profile, input.documentId);
-      const tree = previous
-        ? await readPackageTree(join(root, folder))
-        : undefined;
-      const bytes = await this.originalBytes(root, document);
-      await commitPackages(
-        root,
-        folder,
-        key,
-        snapshot,
-        document,
-        tree,
-        bytes,
-        async () => {
+      const observed = this.observed;
+      if (
+        observed?.cached &&
+        observed.cached.revision === knownRevision &&
+        observed.cached.expires > Date.now()
+      ) {
+        if (!observed.changed.size) return undefined;
+        // File events may arrive after our own atomic renames. Check just those paths.
+        const generation = observed.generation;
+        let own = true;
+        for (const eventPath of observed.changed) {
+          const path =
+            eventPath === "workspaces/" + workspaceKey + ".markdown"
+              ? eventPath + "/head"
+              : eventPath;
+          const expected = observed.written.get(path);
           if (
-            tree &&
-            (await readPackageTree(join(root, folder))).fingerprint !==
-              tree.fingerprint
-          )
-            throw Error("文稿包已被外部修改，请重新读取。");
-        },
-      );
+            !expected ||
+            !(await packageFile(root, path, 2 * 1024 * 1024)
+              .then((b) => digest(b) === expected)
+              .catch(() => false))
+          ) {
+            own = false;
+            break;
+          }
+        }
+        if (own && generation === observed.generation) {
+          observed.changed.clear();
+          return undefined;
+        }
+      }
+      const generation = observed?.generation;
+      const doc = (await this.current(root, profile, documentId))?.document;
+      if (doc && observed && generation === observed.generation) {
+        observed.changed.clear();
+        observed.written.clear();
+        observed.cached = {
+          revision: doc.revision,
+          expires: Date.now() + 60_000,
+        };
+      } else if (
+        doc &&
+        !observed &&
+        (doc.notes.length > 100 || doc.assets.length > 64)
+      ) {
+        try {
+          const watcher = watch(root, { recursive: true, persistent: false });
+          const state: NonNullable<typeof this.observed> = {
+            key,
+            watcher,
+            generation: 0,
+            changed: new Set(),
+            written: new Map(),
+            cached: { revision: doc.revision, expires: Date.now() + 60_000 },
+          };
+          this.observed = state;
+          watcher.on("change", (_, file) => {
+            const path = file?.toString().split(sep).join("/");
+            if (
+              path?.startsWith(".nomi-history/") ||
+              path === ".nomi-history" ||
+              path?.endsWith(".package-journal") ||
+              /\.[a-f0-9-]{36}\.tmp$/.test(path ?? "")
+            )
+              return;
+            state.generation++;
+            state.changed.add(path ?? "");
+          });
+          watcher.on("error", () => {
+            watcher.close();
+            if (this.observed === state) this.observed = undefined;
+          });
+        } catch {
+          // Some filesystems do not support recursive watching. Keep polling on those.
+        }
+      }
+      return doc?.revision === knownRevision ? undefined : doc;
     });
+  }
+  saveMarkdown(input: DocumentMarkdownSave) {
+    return this.serial(async () => {
+      const root = await this.initialize(),
+        key = this.key(input.profile, input.documentId);
+      await recoverPackages(root, key);
+      if (this.markdown?.key !== key || this.markdown.root !== root)
+        await this.current(root, input.profile, input.documentId);
+      const checkpoint = this.markdown;
+      if (!checkpoint || checkpoint.key !== key || checkpoint.root !== root)
+        throw Error("请重新读取文稿。");
+      try {
+        const normalized = checkpoint.normalizedDocument(input);
+        if (normalized) {
+          await this.saveFull({ ...input, document: normalized, assets: [] });
+          return normalized;
+        }
+        const { document, written } = await checkpoint.save(input);
+        const observed = this.observed;
+        if (observed && observed.key === join(root, "workspaces", key)) {
+          for (const [path, hash] of written) observed.written.set(path, hash);
+          observed.cached = {
+            revision: document.revision,
+            expires: Date.now() + 60_000,
+          };
+        }
+        return document;
+      } catch (e) {
+        this.markdown = undefined;
+        if (this.observed) this.observed.cached = undefined;
+        throw e;
+      }
+    });
+  }
+  save(input: DocumentStorageSave) {
+    return this.serial(() => this.saveFull(input));
+  }
+  private async saveFull(input: DocumentStorageSave) {
+    if (this.observed) this.observed.cached = undefined;
+    const root = await this.initialize();
+    const key = this.key(input.profile, input.documentId);
+    const document = parseCanvasDocument(input.document);
+    if (document.id !== input.documentId || !Array.isArray(input.assets))
+      throw Error("文稿保存请求无效。");
+    const previous = await this.current(root, input.profile, input.documentId);
+    if ((previous?.document.revision ?? null) !== input.baseRevision)
+      throw Error("另一处修改已保存，请重新读取文稿。");
+    if (previous && document.revision <= previous.document.revision)
+      throw Error("不能用旧版本覆盖文稿。");
+    const originals = Object.assign(
+      Object.create(null) as Record<string, CanvasAsset>,
+      previous?.originals,
+    );
+    for (const meta of document.assets) {
+      const old = originals[meta.id];
+      if (
+        old &&
+        (old.sha256 !== meta.sha256 ||
+          old.mime !== meta.mime ||
+          old.bytes !== meta.bytes)
+      )
+        throw Error("附件原件不可覆盖。");
+      const incoming = input.assets.find((item) => item.asset?.id === meta.id);
+      const path = join(root, "assets", meta.sha256);
+      if (incoming) {
+        if (
+          !(incoming.bytes instanceof Uint8Array) ||
+          incoming.bytes.byteLength !== meta.bytes ||
+          digest(incoming.bytes) !== meta.sha256 ||
+          incoming.asset.sha256 !== meta.sha256 ||
+          incoming.asset.mime !== meta.mime
+        )
+          throw Error("附件原件与声明不一致。");
+        await atomicFile(path, incoming.bytes);
+      } else {
+        const bytes = await regularFile(path, CANVAS_ASSET_BYTES);
+        if (bytes.length !== meta.bytes || digest(bytes) !== meta.sha256)
+          throw Error("附件缺失或已损坏。");
+      }
+      originals[meta.id] = meta;
+    }
+    const snapshot: Snapshot = {
+      format: "nomi-library-document/1",
+      profile: input.profile,
+      document,
+      originals,
+      packageVersion: 1,
+    };
+    const folder = treeFolder(input.profile, input.documentId);
+    const tree = previous
+      ? await readPackageTree(join(root, folder))
+      : undefined;
+    const bytes = await this.originalBytes(root, document);
+    const plan = await commitPackages(
+      root,
+      folder,
+      key,
+      snapshot,
+      document,
+      tree,
+      bytes,
+      async () => {
+        if (
+          tree &&
+          (await readPackageTree(join(root, folder))).fingerprint !==
+            tree.fingerprint
+        )
+          throw Error("文稿包已被外部修改，请重新读取。");
+      },
+    );
+    await this.indexPlan(root, folder, key, document, plan);
   }
   backup(input: DocumentStorageSave) {
     return this.serial(async () => {
@@ -599,7 +776,7 @@ export class DocumentStore {
               ).test(name)
             )
               continue;
-            const bytes = await regularFile(
+            let bytes = await regularFile(
               join(root, folder, name),
               32 * 1024 * 1024,
             );
@@ -609,7 +786,12 @@ export class DocumentStore {
               const value = JSON.parse(bytes.toString()) as Snapshot;
               if (this.key(value.profile, value.document?.id) !== name)
                 throw Error("文稿文件标识无效。");
-              await this.snapshot(root, value.profile, value.document.id);
+              const merged = await this.snapshot(
+                root,
+                value.profile,
+                value.document.id,
+              );
+              bytes = Buffer.from(snapshotJSON(merged));
               for (const meta of value.document.assets) {
                 const original = await regularFile(
                   join(root, "assets", meta.sha256),

@@ -183,6 +183,9 @@ export interface CanvasCamera {
   zoom: number;
 }
 export const CANVAS_DOCUMENT_BYTES = 2 * 1024 * 1024;
+// Local libraries aggregate many independent notes. Embedded scenes keep the smaller canvas budget.
+export const LIBRARY_DOCUMENT_BYTES = 16 * 1024 * 1024;
+export const LIBRARY_COLLECTION_ITEMS = 65_536;
 export const CANVAS_ASSET_BYTES = 20 * 1024 * 1024;
 const bad = (message: string): never => {
   throw Error(message);
@@ -214,18 +217,23 @@ const finite = (v: unknown, lo: number, hi: number) => {
 export function validateDocumentJSON(
   raw: unknown,
   maxBytes = CANVAS_DOCUMENT_BYTES,
+  library = false,
 ): void {
   // Reject non-JSON values / unsafe keys before cloning or interpreting nested programs.
+  const maxValues = library ? 1_000_000 : 40_000;
+  const maxArray = library ? LIBRARY_COLLECTION_ITEMS : 2048;
   let visited = 0;
   const json = (v: unknown, depth = 0): void => {
-    if (depth > 48 || ++visited > 40000) bad("文档嵌套或对象数量过大。");
+    if (depth > 48 || ++visited > maxValues) bad("文档嵌套或对象数量过大。");
+    if (typeof v === "string" && v.length >= CANVAS_DOCUMENT_BYTES)
+      bad("单个文档字段过长。");
     if (v === null || typeof v === "string" || typeof v === "boolean") return;
     if (typeof v === "number") {
       if (!Number.isFinite(v)) bad("文档中存在无效数字。");
       return;
     }
     if (Array.isArray(v)) {
-      if (v.length > 2048) bad("数组过长。");
+      if (v.length > maxArray) bad("数组过长。");
       v.forEach((x) => json(x, depth + 1));
       return;
     }
@@ -250,15 +258,16 @@ function validateCanvasDocument(
   clone: boolean,
   embedded = false,
 ): CanvasDocument {
+  const maxBytes = embedded ? CANVAS_DOCUMENT_BYTES : LIBRARY_DOCUMENT_BYTES;
   if (typeof raw === "string") {
-    if (raw.length > CANVAS_DOCUMENT_BYTES) bad("文档超过 2 MiB。");
+    if (raw.length > maxBytes) bad("文档超过 JSON 大小限制。");
     try {
       raw = JSON.parse(raw);
     } catch {
       bad("文档不是合法 JSON。");
     }
   }
-  validateDocumentJSON(raw);
+  validateDocumentJSON(raw, maxBytes, !embedded);
   const input = raw as CanvasDocument;
   if (
     Array.isArray(input.blocks) &&
@@ -288,7 +297,7 @@ function validateCanvasDocument(
     ids.add(value as string);
   };
   identity(p.id);
-  const assets = list(p.assets, 64);
+  const assets = list(p.assets, embedded ? 64 : LIBRARY_COLLECTION_ITEMS);
   const assetIds = new Set<string>();
   for (const a of assets) {
     const asset = record(a);
@@ -302,7 +311,7 @@ function validateCanvasDocument(
     if (asset.width !== undefined) finite(asset.width, 1, 32768);
     if (asset.height !== undefined) finite(asset.height, 1, 32768);
   }
-  const blocks = list(p.blocks);
+  const blocks = list(p.blocks, embedded ? 200 : LIBRARY_COLLECTION_ITEMS);
   const contentIds = new Set<string>();
   for (const entry of blocks) {
     const b = record(entry);
@@ -407,7 +416,8 @@ function validateCanvasDocument(
         bad("图片格式不支持安全预览。");
     } else bad("不支持此内容类型，不能丢弃后保存。");
   }
-  const notes = list(p.notes, 100);
+  const notes = list(p.notes, embedded ? 100 : LIBRARY_COLLECTION_ITEMS);
+  const blockIds = new Set(contentIds);
   for (const entry of notes) {
     const n = record(entry);
     if (n.icon !== undefined) {
@@ -436,23 +446,26 @@ function validateCanvasDocument(
     identity(n.id);
     contentIds.add(n.id);
     text(n.title, 200);
-    const children = list(n.blocks);
+    const children = list(n.blocks, embedded ? 200 : LIBRARY_COLLECTION_ITEMS);
     if (
       new Set(children).size !== children.length ||
-      children.some((b) => !blocks.some((x) => x.id === b))
+      children.some((b) => !blockIds.has(b))
     )
       bad("笔记包含无效或重复内容引用。");
   }
+  const byId = new Map(notes.map((n) => [n.id, n]));
+  const verified = new Set<string>();
   for (const note of notes) {
     const seen = new Set<string>([note.id]);
     let parent = note.parentId;
-    while (parent !== undefined) {
+    while (parent !== undefined && !verified.has(parent)) {
       if (seen.has(parent)) bad("文稿层级不能循环引用。");
       seen.add(parent);
-      const ancestor = notes.find((n) => n.id === parent);
+      const ancestor = byId.get(parent);
       if (!ancestor) bad("父文稿已不存在。");
       parent = ancestor.parentId;
     }
+    for (const id of seen) verified.add(id);
   }
   const board = record(p.board);
   identity(board.id);
