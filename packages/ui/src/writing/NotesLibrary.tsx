@@ -59,6 +59,21 @@ export function NotesLibrary({
     }
   });
   const nav = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const tree = nav.current;
+    if (!tree) return;
+    let hideTimer: number | undefined;
+    const showThumb = () => {
+      tree.dataset.scrolling = "true";
+      window.clearTimeout(hideTimer);
+      hideTimer = window.setTimeout(() => delete tree.dataset.scrolling, 450);
+    };
+    tree.addEventListener("scroll", showThumb, { passive: true });
+    return () => {
+      tree.removeEventListener("scroll", showThumb);
+      window.clearTimeout(hideTimer);
+    };
+  }, []);
   const path = selected
     ? noteAncestors(notes, selected)
         .map((note) => note.id)
@@ -208,7 +223,9 @@ export function NotesLibrary({
                     .length + 1
                 : 0
             }
-            onToggle={() => toggle(note.id)}
+            onToggle={
+              children && !query.trim() ? () => toggle(note.id) : undefined
+            }
             onChoose={() => onChoose(note.id)}
             onCreate={() => onCreate(note.id)}
             onMove={() => onMove(note.id)}

@@ -4,6 +4,7 @@ import {
   ipcMain,
   powerMonitor,
   safeStorage,
+  session,
   shell,
 } from "electron";
 import { hostname } from "node:os";
@@ -36,7 +37,9 @@ export async function registerCloudSync(
   let host: CloudSyncHost | undefined;
   let startupError: string | undefined;
   try {
+    const network = session.fromPartition("nomi-cloud-sync");
     host = await CloudSyncHost.open({
+      request: (url, options) => network.fetch(url, options),
       folder: join(app.getPath("userData"), "cloud-sync"),
       deviceName: `${hostname()} · ${app.getName()}`,
       codec: {
@@ -99,15 +102,17 @@ export async function registerCloudSync(
       }
       if (method === "cancelSignIn") return host.cancelSignIn();
       if (method === "signIn") {
-        await host.signIn(
+        const signedIn = await host.signIn(
           (url) => shell.openExternal(url),
           app.getName() === "Nomi(Dev)" ||
             app.getName().startsWith("Nomi(Dev) "),
         );
+        if (!signedIn) return host.status;
         const window = BrowserWindow.fromWebContents(event.sender);
         if (!window || !(await flush(window)))
           throw Error("请先保存当前文稿，再继续同步。");
         if (host.status.binding) return host.enabled(true);
+        if (host.status.confirmAccountMerge) return host.status;
         const spaces = await host.spaces();
         if (spaces.length > 1) return host.status;
         return spaces.length
@@ -119,7 +124,8 @@ export async function registerCloudSync(
         return host.login(p?.server, p?.email, p?.password);
       if (method === "logout") return host.logout();
       if (method === "spaces") return host.spaces();
-      if (method === "bind") return host.bind(p?.mode, p?.space);
+      if (method === "bind")
+        return host.bind(p?.mode, p?.space, p?.confirmed === true);
       if (method === "enabled") {
         if (typeof p?.enabled !== "boolean")
           throw Error("Invalid sync setting");

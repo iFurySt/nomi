@@ -25,7 +25,7 @@ export async function launchSyncDesktop(output, name) {
   await mkdir(folder, { recursive: true });
   const main = `
 const {app,BrowserWindow,ipcMain,Menu,shell}=require('electron');
-let browserURL,web,appReturn; shell.openExternal=async url=>{browserURL=url;};
+let browserURL,web,appReturn,browserOpens=0; shell.openExternal=async url=>{browserURL=url;browserOpens++;};
 require('node:os').hostname=()=> 'Test Mac';
 const {DocumentStore}=require(${JSON.stringify(join(root, "packages/host/src/document-store.ts"))});
 const {createCanvasDocument}=require(${JSON.stringify(join(root, "packages/core/src/canvas/document.ts"))});
@@ -36,11 +36,10 @@ const path=require('node:path'),fs=require('node:fs/promises'),{pathToFileURL}=r
 const folder=${JSON.stringify(folder)};
 app.setName('Nomi(Dev) Sync ${name}');app.setPath('userData',path.join(folder,'profile'));
 let win,automation,host,loseAck=false,deviceDelay=0,deviceFailure=false,deviceRequests=0;
-const realFetch=globalThis.fetch;
-globalThis.fetch=async (...args)=>{if(String(args[0]).endsWith('/v1/sessions')){deviceRequests++;await new Promise(r=>setTimeout(r,deviceDelay));if(deviceFailure)throw Error('Synthetic device network unavailable');}const response=await realFetch(...args);if(loseAck&&String(args[0]).endsWith('/commit')&&response.ok){loseAck=false;await response.arrayBuffer();throw Error('Synthetic response lost after real commit');}return response;};
 process.on('message',async m=>{try{let value;
 if(m.action==='deviceRequests')value=deviceRequests;
 else if(m.action==='appReturn')value=appReturn;
+else if(m.action==='browserOpens')value=browserOpens;
 else if(m.action==='browserURL')value=browserURL;
 else if(m.action==='webOpen'){web=new BrowserWindow({width:800,height:720,show:false,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});web.webContents.on('will-navigate',(event,url)=>{if(url.startsWith('nomi')){event.preventDefault();appReturn=url;}});await web.loadURL(browserURL);await fs.writeFile(path.join(folder,'browser-login.png'),(await web.webContents.capturePage()).toPNG());value=true;}
 else if(m.action==='webEval')value=await web.webContents.executeJavaScript(m.source,true);
@@ -56,9 +55,16 @@ else if(m.action==='undo'){win.webContents.undo();value=true;}
 else if(m.action==='quit'){host.stop();win.destroy();app.quit();return;}
 process.send({id:m.id,value});}catch(e){process.send({id:m.id,error:e.message});}});
 app.whenReady().then(async()=>{
+const network=require('electron').session.fromPartition('nomi-cloud-sync');
+const realFetch=network.fetch.bind(network);
+network.fetch=async (...args)=>{if(String(args[0]).endsWith('/v1/sessions')){deviceRequests++;await new Promise(r=>setTimeout(r,deviceDelay));if(deviceFailure)throw Error('Synthetic device network unavailable');}const response=await realFetch(...args);if(loseAck&&String(args[0]).endsWith('/commit')&&response.ok){loseAck=false;await response.arrayBuffer();throw Error('Synthetic response lost after real commit');}return response;};
  const store=new DocumentStore(path.join(folder,'directory.json'),path.join(folder,'library'));
  if(!await store.load('local-device','document.home')){
   const d={...createCanvasDocument(),notes:[{id:'note.sync',title:'同步测试',blocks:['text.one','text.two']}],blocks:[{id:'text.one',type:'markdown',source:${JSON.stringify("# 双端同步\n\n本机文稿。")}},{id:'text.two',type:'markdown',source:'另一段文字。'}],assets:[],board:{id:'board.home',placements:[]}};
+  if (${name === "mac-b"}) {
+    d.notes.push({id:'note.offline', title:'Local note', blocks:['text.offline']});
+    d.blocks.push({id:'text.offline',type:'markdown',source:'Written before sign-in'});
+  }
   await store.save({profile:'local-device',documentId:d.id,document:d,baseRevision:null,assets:[]});
  }
  const expected=pathToFileURL(${JSON.stringify(join(root, "apps/web/dist/index.html"))}).href;

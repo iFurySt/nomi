@@ -85,3 +85,26 @@ it("a canceled request never opens a browser after a delayed start", async () =>
   ).rejects.toThrow();
   expect(open).not.toHaveBeenCalled();
 });
+
+it("recovers from a connection drop before opening the browser and while waiting for sign-in", async () => {
+  const start = vi
+    .spyOn(SyncClient.prototype, "browserStart")
+    .mockRejectedValueOnce(new TypeError("fetch failed"))
+    .mockResolvedValue(request);
+  const exchange = vi
+    .spyOn(SyncClient.prototype, "browserExchange")
+    .mockRejectedValueOnce(new Error("net::ERR_CONNECTION_RESET"))
+    .mockResolvedValue(login);
+  const open = vi.fn(async () => {});
+  const result = await new SyncBrowserLogin().run(
+    "",
+    "device.fixture",
+    "Test Mac",
+    true,
+    open,
+  );
+  expect(result.login).toEqual(login);
+  expect(start).toHaveBeenCalledTimes(2);
+  expect(exchange.mock.calls[0]).toEqual(exchange.mock.calls[1]);
+  expect(open).toHaveBeenCalledTimes(1);
+});

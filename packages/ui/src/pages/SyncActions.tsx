@@ -25,6 +25,7 @@ export function SyncActions({
     [error, setError] = useState("");
   const [spaces, setSpaces] = useState<SyncSpace[]>(),
     [space, setSpace] = useState("");
+  const [mergeAccount, setMergeAccount] = useState<string>();
   const [conflict, setConflict] = useState<CloudSyncConflictView>();
   const [choices, setChoices] = useState<Record<string, "local" | "remote">>(
     {},
@@ -59,7 +60,9 @@ export function SyncActions({
       return;
     }
     const list = (await request("spaces")) as SyncSpace[];
-    if (list.length > 1) {
+    if (status.confirmAccountMerge || list.length > 1) {
+      if (status.confirmAccountMerge) setMergeAccount(status.account?.email);
+      if (list.length === 1) setSpace(list[0].id);
       setSpaces(list);
       return;
     }
@@ -108,33 +111,43 @@ export function SyncActions({
       )}
       {spaces && (
         <>
-          <label className="cloud-sync-download">
-            Documents
-            <select
-              aria-label="Cloud documents"
-              value={space}
-              onChange={(e) => setSpace(e.target.value)}
-              disabled={busy}
-            >
-              <option value="">Choose…</option>
-              {spaces.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p>本机内容会先备份。</p>
+          {spaces.length > 1 && (
+            <label className="cloud-sync-download">
+              Documents
+              <select
+                aria-label="Cloud documents"
+                value={space}
+                onChange={(e) => setSpace(e.target.value)}
+                disabled={busy}
+              >
+                <option value="">Choose…</option>
+                {spaces.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <p>
+            {mergeAccount
+              ? `将本机文稿与 ${mergeAccount} 的文稿合并同步？`
+              : "本机和云端文稿将合并同步。"}
+          </p>
           <div className="cloud-sync-connect-actions">
             <Button disabled={busy} variant="ghost" onClick={onClose}>
               Cancel
             </Button>
             <Button
               variant="primary"
-              disabled={busy || !space}
+              disabled={busy || (spaces.length > 0 && !space)}
               onClick={() =>
                 void run(async () => {
-                  await request("bind", { mode: "download", space });
+                  await request("bind", {
+                    mode: spaces.length ? "download" : "upload",
+                    space,
+                    confirmed: !!mergeAccount,
+                  });
                   onClose();
                 })
               }

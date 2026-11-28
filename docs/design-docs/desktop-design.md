@@ -124,8 +124,8 @@ Selected ticker chips are small outlined pills. Forms show validation inline.
 
 ### Navigation
 
-76px outer tool rail and a 248px stock sidebar inside the workspace panel. Rail
-buttons are 64×56px with an icon and short label. Stocks, Chat, Agents,
+The current Nomi desktop shell uses a 44px outer icon rail with 36px targets.
+The following stock navigation describes the earlier AIFi layout. Stocks, Chat, Agents,
 Watchlist, Portfolio, and Library live only in that single column; Settings
 lives in the avatar popup. Stocks is the starting route. The inner sidebar
 contains searchable stock rows with ticker/security name and exchange label, never a second
@@ -152,10 +152,10 @@ Use Radix primitives for those behaviors, not a large visual component library.
 
 ### Page Composition
 
-- App shell: neutral outer chrome, 76px tool rail, and a single inset panel
+- App shell: neutral outer chrome, 44px tool rail, and a single inset panel
   containing sidebar and main canvas. Panel radius 16px, outline 1px, outer gap
   8px. The frame and sidebar stay still while main content scrolls internally.
-- Electron: 48px draggable outer toolbar with native Mac traffic lights,
+- Electron: 40px draggable outer toolbar with native Mac traffic lights,
   back/forward, sidebar toggle, adjacent divider and page-specific breadcrumb,
   search, and theme. Controls use consistent 18px icons. Reserve 96px before navigation at the
   left on macOS; interactive controls are no-drag. Do not draw traffic lights.
@@ -422,11 +422,7 @@ a vertical divider, independent of the sidebar's width/collapse state.
 
 ## 13. Workspace Search And Shortcuts
 
-Keep the search dialog at most 560px high or viewport height minus 48px. The
-header, 40px input and compact footer stay visible; only results scroll. Desktop
-rows are 40px, mobile 44px; names stay on one line with ellipsis/full-name titles.
-Use neutral focus feedback and keyboard arrow selection, Enter to open and Esc
-for dismissal. The footer opens shortcut help with Command/Control+/.
+Workspace search opens with focus in a full-width input at the top of a translucent panel. Page destinations share a Pages heading and use their navigation icons. Desktop results are 35px high and mobile results are 44px high. The results scroll independently of the input and shortcut-help footer. Typing filters the pages. Arrow keys move the highlight while focus stays in the input, Enter opens the highlighted page and Escape dismisses search.
 
 Command/Control+[ and ] use the existing session-bounded history. B toggles the
 sidebar (drawer on narrow screens), K opens search and comma opens Settings.

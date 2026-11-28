@@ -62,11 +62,17 @@ async function readBounded(response: Response, limit: number): Promise<Buffer> {
   }
   return Buffer.concat(chunks);
 }
+export type SyncFetch = (
+  url: string,
+  options: RequestInit,
+) => Promise<Response>;
+
 export class SyncClient {
   readonly baseURL: string;
   constructor(
     url: string,
     private token?: string,
+    private request: SyncFetch = fetch,
   ) {
     this.baseURL = syncServerURL(url);
   }
@@ -75,11 +81,14 @@ export class SyncClient {
     method = "GET",
     body?: unknown,
     raw = false,
+    signal = AbortSignal.timeout(60_000),
   ): Promise<Response> {
-    const response = await fetch(`${this.baseURL}${path}`, {
+    const response = await this.request(`${this.baseURL}${path}`, {
       method,
       redirect: "error",
-      signal: AbortSignal.timeout(60_000),
+      credentials: "omit",
+      cache: "no-store",
+      signal,
       headers: {
         ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
         ...(body === undefined
@@ -126,10 +135,14 @@ export class SyncClient {
     path: string,
     method = "GET",
     body?: unknown,
+    signal?: AbortSignal,
   ): Promise<T> {
     return JSON.parse(
       (
-        await readBounded(await this.send(path, method, body), 8 * 1024 * 1024)
+        await readBounded(
+          await this.send(path, method, body, false, signal),
+          8 * 1024 * 1024,
+        )
       ).toString(),
     ) as T;
   }
@@ -146,11 +159,13 @@ export class SyncClient {
     deviceId: string,
     deviceName: string,
     scheme: "nomi" | "nomi-dev",
+    signal?: AbortSignal,
   ) {
     return this.json<{ id: string; expiresAt: string }>(
       "/auth/desktop/start",
       "POST",
       { challenge, deviceId, deviceName, scheme },
+      signal,
     );
   }
   browserExchange(id: string, verifier: string) {

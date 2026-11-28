@@ -57,6 +57,16 @@ export function ResizableNotesLayout({
     resize.observe(element);
     return () => resize.disconnect();
   }, []);
+  useEffect(() => {
+    if (!resizing) return;
+    // The window may lose focus before Chromium delivers the release.
+    const finish = () => {
+      drag.current = undefined;
+      setResizing(false);
+    };
+    window.addEventListener("blur", finish);
+    return () => window.removeEventListener("blur", finish);
+  }, [resizing]);
   const shown = clamp(width);
   return (
     <div
@@ -81,8 +91,6 @@ export function ResizableNotesLayout({
         }}
         onPointerDown={(event) => {
           if (event.button !== 0) return;
-          event.preventDefault();
-          event.currentTarget.focus();
           drag.current = {
             x: event.clientX,
             width: shown,

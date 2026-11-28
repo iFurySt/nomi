@@ -167,6 +167,64 @@ function textIDs(doc: CanvasDocument) {
   return doc.blocks.filter((b) => b.type === "markdown").map((b) => b.id);
 }
 describe("durable sync engine", () => {
+  it("joins existing desktop and phone libraries and uploads the local-only manuscripts", async () => {
+    const cloud = new Remote(),
+      a = await device(cloud, "phone"),
+      b = await device(cloud, "desktop");
+    const author = (d: CanvasDocument, id: string) => {
+      d.notes = [
+        { id: "note." + id, title: "相同标题", blocks: ["text." + id] },
+      ];
+      d.blocks = [{ id: "text." + id, type: "markdown", source: id }];
+      d.board.placements = [
+        { id: "place." + id, content: "note." + id, x: 0, y: 0, width: 220 },
+      ];
+    };
+    author(a.doc, "cloud");
+    a.doc.title = "文稿";
+    a.doc.board.id = "board.home";
+    author(b.doc, "local");
+    await a.init("upload");
+    await a.engine.run();
+    await b.init("download");
+    expect(b.engine.status.conflict).toBeUndefined();
+    expect(b.doc.notes.map((n) => n.id)).toEqual(["note.cloud", "note.local"]);
+    expect(b.doc.board.placements).toHaveLength(2);
+    b.edit("text.local", "offline");
+    await b.reopen();
+    await b.init("download");
+    await b.engine.run();
+    await a.engine.run(false);
+    expect(a.text("text.local")).toBe("offline");
+    expect(a.text("text.cloud")).toBe("cloud");
+  });
+
+  it("retains divergent blocks on first join until reviewed across restart", async () => {
+    const remote = new Remote(),
+      a = await device(remote, "a"),
+      b = await device(remote, "b");
+    const [id] = textIDs(a.doc);
+    a.edit(id, "cloud");
+    b.edit(id, "local");
+    await a.init("upload");
+    await a.engine.run();
+    await b.init("download");
+    await b.reopen();
+    await b.engine.run();
+    expect(b.text(id)).toBe("local");
+    expect(remote.records.get("block:" + id)?.data?.source).toBe("cloud");
+    expect(b.engine.status.conflict?.conflicts.map((c) => c.key)).toEqual([
+      "block:" + id,
+    ]);
+    await b.engine.resolve(
+      { ["block:" + id]: "local" },
+      undefined,
+      b.engine.status.conflict?.reviewId,
+    );
+    await b.engine.run();
+    expect(remote.records.get("block:" + id)?.data?.source).toBe("local");
+  });
+
   it("merges separate offline edits and resolves same-block conflicts without losing either version", async () => {
     const remote = new Remote(),
       a = await device(remote, "a");
@@ -224,6 +282,8 @@ describe("durable sync engine", () => {
     ).pending;
     expect(queue.mutations[0].data.source).toBe("sent generation");
     await a.reopen();
+    await a.init("download");
+    expect(a.engine.status.pending).toBe(true);
     await a.engine.run();
     expect(a.text(id)).toBe("newer generation");
     expect(a.engine.status.pending).toBe(false);

@@ -233,7 +233,7 @@ async function createWindow() {
     backgroundColor: "#f0f0f0",
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     ...(process.platform === "darwin"
-      ? { trafficLightPosition: { x: 14, y: 17 } }
+      ? { trafficLightPosition: { x: 14, y: 13 } }
       : {}),
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),

@@ -348,7 +348,10 @@ export class SyncEngine {
       return snapshot;
     }
   }
-  private async reconcile(remote: SyncSnapshot) {
+  private async reconcile(
+    remote: SyncSnapshot,
+    initialized = this.state.initialized,
+  ) {
     const before = await this.local.read(),
       local = documentToSync(before);
     this.observe(before);
@@ -356,6 +359,7 @@ export class SyncEngine {
     if (result.structuralError) {
       await this.persist({
         ...this.state,
+        initialized,
         conflict: this.conflictBundle(
           local,
           remote,
@@ -386,10 +390,16 @@ export class SyncEngine {
       for (const record of this.state.base)
         if (keys.has(syncKey(record))) base.set(syncKey(record), record);
       // Retain the old cursor while conflicted ancestors remain; replays are idempotent.
-      await this.persist({ ...this.state, base: [...base.values()], conflict });
+      await this.persist({
+        ...this.state,
+        initialized,
+        base: [...base.values()],
+        conflict,
+      });
     } else
       await this.persist({
         ...this.state,
+        initialized,
         base: remote.records,
         cursor: remote.cursor,
         conflict: undefined,
@@ -470,34 +480,24 @@ export class SyncEngine {
       }
     }
   }
-  /** New cloud library only. Existing libraries require an explicit download/backup path. */
+  /** Connect once; a returning binding keeps its ancestor and immutable outbox. */
   async initialize(mode: "upload" | "download") {
     await this.observationWrite;
-    if (this.running || this.state.pending || this.state.base.length)
-      throw Error("资料库已绑定或同步中。");
+    if (this.running) throw Error("资料库正在同步。");
+    if (this.state.initialized) return;
     this.running = true;
     try {
       const snapshot = await this.remote.snapshot(this.state.binding.space);
-      if (mode === "upload") {
-        if (snapshot.records.length)
-          throw Error("云库已有内容，请选择下载，不能直接覆盖。");
+      documentFromSync(snapshot.records, 1);
+      if (mode === "upload" && snapshot.records.length)
+        throw Error("云库已有内容，请选择已有资料库。");
+      if (snapshot.records.length) await this.reconcile(snapshot, true);
+      else
         await this.persist({
           ...this.state,
-          cursor: snapshot.cursor,
           initialized: true,
-        });
-      } else {
-        const document = documentFromSync(snapshot.records, 1);
-        if (!document) throw Error("云库尚无文稿。");
-        const before = await this.local.read();
-        await this.apply(before, documentToSync(document));
-        await this.persist({
-          ...this.state,
-          base: snapshot.records,
           cursor: snapshot.cursor,
-          initialized: true,
         });
-      }
     } finally {
       this.running = false;
     }

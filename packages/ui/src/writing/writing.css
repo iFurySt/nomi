@@ -12,12 +12,13 @@
   grid-template-columns: 220px minmax(0, 1fr);
 }
 .notes-library {
+  --library-inset: 12px;
   display: flex;
   flex-direction: column;
   min-height: 0;
   border-right: 1px solid var(--border);
   background: var(--sidebar);
-  padding: 20px 12px 12px;
+  padding: 20px var(--library-inset) 12px;
   gap: 14px;
 }
 .notes-library header {
@@ -58,6 +59,41 @@
 .notes-library nav {
   flex: 1;
   overflow: auto;
+}
+@property --tree-thumb-color {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+@media (width > 600px) {
+  .notes-library nav {
+    --tree-scrollbar-width: 10px;
+    margin-inline-end: calc(-1 * var(--library-inset));
+    padding-inline-end: calc(var(--library-inset) - var(--tree-scrollbar-width));
+    scrollbar-gutter: stable;
+    transition: --tree-thumb-color 160ms ease-out;
+  }
+  .notes-library nav[data-scrolling] {
+    --tree-thumb-color: color-mix(in srgb, var(--text) 12%, transparent);
+    transition-duration: 0s;
+  }
+  .notes-library nav::-webkit-scrollbar {
+    width: var(--tree-scrollbar-width);
+    background: transparent;
+  }
+  .notes-library nav::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--tree-thumb-color) padding-box;
+  }
+  .notes-library nav::-webkit-scrollbar-thumb:active {
+    background-color: color-mix(in srgb, var(--text) 24%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notes-library nav {
+    transition: none;
+  }
 }
 .notes-library nav button {
   width: 100%;
@@ -1074,9 +1110,10 @@
   z-index: 12;
   top: 0;
   bottom: 0;
-  left: calc(var(--notes-library-width, 240px) - 4px);
+  left: calc(var(--notes-library-width, 240px) - 1px);
   width: 8px;
   cursor: col-resize;
+  user-select: none;
   touch-action: none;
 }
 .notes-library-resizer::after {
@@ -1084,12 +1121,11 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 3px;
+  left: 0;
   width: 1px;
   background: transparent;
   transition: background 120ms;
 }
-.notes-library-resizer:hover::after,
 .notes-library-resizer:focus-visible::after,
 .notes-workspace[data-resizing] .notes-library-resizer::after {
   background: color-mix(in srgb, var(--border) 65%, var(--muted));
@@ -1111,19 +1147,6 @@
 }
 .notes-library nav .notes-list-select > svg {
   flex-shrink: 0;
-}
-.notes-library nav .notes-row-toggle {
-  width: 18px;
-  min-width: 18px;
-  justify-content: center;
-  padding: 0;
-  min-height: 28px;
-  margin: 0;
-  flex-shrink: 0;
-}
-.notes-library nav .notes-row-toggle:disabled {
-  opacity: 0;
-  pointer-events: none;
 }
 .notes-library nav .notes-row-add {
   width: 24px;
@@ -1257,10 +1280,6 @@
     width: 0;
     min-width: 0;
     max-width: none;
-  }
-  .notes-library nav .notes-row-toggle {
-    min-width: 18px;
-    max-width: 18px;
   }
   .notes-library nav .notes-row-add {
     min-width: 24px;
@@ -1399,7 +1418,7 @@ body.notes-tree-dragging * {
 .notes-list-row[data-note-drop="after"]::after {
   content: "";
   position: absolute;
-  left: calc(var(--notes-tree-inset) + 18px + min(var(--note-drop-depth), 12) * 14px);
+  left: calc(var(--notes-tree-inset) + 2px + min(var(--note-drop-depth), 12) * 14px);
   right: 3px;
   height: 2px;
   border-radius: 2px;
@@ -1465,8 +1484,8 @@ body.notes-tree-dragging * {
   display: none;
 }
 
-/* Icon editing has its own hit target; only the title starts a tree drag. */
-.notes-library nav .notes-icon-button {
+/* Disclosure and icon editing occupy the same leading slot. */
+.notes-library nav :is(.notes-row-toggle, .notes-icon-button) {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1484,6 +1503,18 @@ body.notes-tree-dragging * {
 .notes-library nav .notes-icon-button:focus-visible,
 .notes-library nav .notes-icon-button[data-state="open"] {
   background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.notes-row-toggle > svg {
+  display: none;
+}
+.notes-row-toggle[aria-expanded="true"] > svg {
+  transform: rotate(90deg);
+}
+.notes-list-row:is(:hover, :has(:focus-visible)) .notes-row-toggle > svg {
+  display: block;
+}
+.notes-list-row:is(:hover, :has(:focus-visible)) .notes-row-toggle > .note-icon-image {
+  display: none;
 }
 .note-icon-image {
   display: inline-flex;
@@ -1786,6 +1817,8 @@ body.notes-tree-dragging * {
 }
 .notes-save::before {
   content: "";
+  /* Optically center the dot against the ink of the breadcrumb text. */
+  translate: 0 1px;
   width: 4px;
   height: 4px;
   border-radius: 50%;

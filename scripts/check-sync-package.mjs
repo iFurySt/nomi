@@ -78,6 +78,12 @@ try {
     env,
     input: password,
   });
+  if (process.argv.includes("--desktop"))
+    run(
+      binary,
+      ["create-user", "--email", "second@example.invalid", "--password-stdin"],
+      { env, input: password },
+    );
   const socket = createServer();
   await new Promise((r) => socket.listen(0, "127.0.0.1", r));
   const port = socket.address().port;

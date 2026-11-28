@@ -8,14 +8,13 @@ import {
   Menu,
   Sun,
   Moon,
-  FolderOpen,
   ArrowLeft,
   ArrowRight,
   PanelLeft,
   Settings,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { workspacePages } from "@nomi/core";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { workspacePages, type WorkspacePage } from "@nomi/core";
 import { useWorkspace, pageLabels } from "../workspace-context";
 import { IconButton, Logo, Modal } from "./primitives";
 import type { ReactNode, KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -68,6 +67,98 @@ function AppNavigation({
     </nav>
   );
 }
+function WorkspaceSearch({
+  onChoose,
+}: {
+  onChoose: (page: WorkspacePage) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [index, setIndex] = useState(0);
+  const matches = workspacePages.filter((page) =>
+    pageLabels[page].toLowerCase().includes(query.trim().toLowerCase()),
+  );
+  const selected = matches[index];
+  function handleKey(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (
+      !selected ||
+      event.nativeEvent.isComposing ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey
+    )
+      return;
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onChoose(selected);
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const next =
+        (index + (event.key === "ArrowDown" ? 1 : -1) + matches.length) %
+        matches.length;
+      setIndex(next);
+      document
+        .getElementById("workspace-result-" + matches[next])
+        ?.scrollIntoView({ block: "nearest" });
+    }
+  }
+  return (
+    <>
+      <input
+        className="workspace-search-input"
+        role="combobox"
+        aria-expanded={true}
+        aria-controls="workspace-search-results"
+        aria-autocomplete="list"
+        aria-activedescendant={
+          selected ? "workspace-result-" + selected : undefined
+        }
+        aria-label="Search workspace content"
+        placeholder="Search Nomi"
+        value={query}
+        onKeyDown={handleKey}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setIndex(0);
+        }}
+      />
+      <div className="search-results">
+        {matches.length > 0 && (
+          <div className="search-group-label" aria-hidden="true">
+            Pages
+          </div>
+        )}
+        <div id="workspace-search-results" role="listbox" aria-label="Pages">
+          {matches.map((page, i) => {
+            const Icon =
+              destinations.find((item) => item.page === page)?.icon ?? Settings;
+            return (
+              <button
+                type="button"
+                role="option"
+                id={"workspace-result-" + page}
+                key={page}
+                aria-selected={page === selected}
+                tabIndex={-1}
+                title={pageLabels[page]}
+                onPointerMove={() => setIndex(i)}
+                onClick={() => onChoose(page)}
+              >
+                <Icon size={16} strokeWidth={1.7} />
+                <span>{pageLabels[page]}</span>
+              </button>
+            );
+          })}
+        </div>
+        {matches.length === 0 && (
+          <p role="status" className="search-empty">
+            No matches.
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
 export function Shell({ children }: { children: ReactNode }) {
   const {
     resolvedTheme,
@@ -114,9 +205,7 @@ export function Shell({ children }: { children: ReactNode }) {
     return () => query.removeEventListener("change", closeWideDrawer);
   }, [drawerQuery]);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [search, setSearch] = useState("");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const searchResults = useRef<HTMLDivElement>(null);
   const modifier = shortcutModifier();
   useEffect(() => {
     function keydown(event: KeyboardEvent) {
@@ -142,9 +231,6 @@ export function Shell({ children }: { children: ReactNode }) {
       setShortcutsOpen(action === "help" ? !shortcutsOpen : false);
       setMobileOpen(false);
       switch (action) {
-        case "search":
-          if (!searchOpen) setSearch("");
-          break;
         case "settings":
           navigate("settings");
           break;
@@ -172,49 +258,11 @@ export function Shell({ children }: { children: ReactNode }) {
     shortcutsOpen,
     mobileOpen,
   ]);
-  function searchKeys(event: ReactKeyboardEvent) {
-    if (
-      event.altKey ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.nativeEvent.isComposing
-    )
-      return;
-    const buttons = [
-      ...(searchResults.current?.querySelectorAll<HTMLButtonElement>(
-        "button:not(:disabled)",
-      ) ?? []),
-    ];
-    if (!buttons.length) return;
-    const current = buttons.indexOf(
-      document.activeElement as HTMLButtonElement,
-    );
-    if (event.key === "Enter" && current < 0) {
-      event.preventDefault();
-      buttons[0].click();
-    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      const next =
-        current < 0
-          ? event.key === "ArrowDown"
-            ? 0
-            : buttons.length - 1
-          : (current + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) %
-            buttons.length;
-      buttons[next].focus();
-      buttons[next].scrollIntoView({ block: "nearest" });
-    }
-  }
-  const matches = workspacePages.filter((p) =>
-    pageLabels[p].toLowerCase().includes(search.toLowerCase()),
-  );
   const toolbarActions = (
     <div className="topbar-actions">
       <button
         className="search-trigger"
         onClick={() => {
-          setSearch("");
           setSearchOpen(true);
         }}
         aria-label="Search workspace"
@@ -323,7 +371,6 @@ export function Shell({ children }: { children: ReactNode }) {
                 className="rail-button rail-search"
                 aria-label="Search the workspace"
                 onClick={() => {
-                  setSearch("");
                   setSearchOpen(true);
                 }}
               >
@@ -396,37 +443,16 @@ export function Shell({ children }: { children: ReactNode }) {
           onOpenChange={setSearchOpen}
           title="Search"
           className="workspace-search-dialog"
+          overlayClassName="workspace-search-overlay"
+          hideHeader
+          initialFocus="input"
         >
-          <label className="search-field" onKeyDown={searchKeys}>
-            <Search size={18} />
-            <input
-              autoFocus
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Canvas, 文稿, Settings…"
-              aria-label="Search workspace content"
-            />
-          </label>
-          <div
-            className="search-results"
-            ref={searchResults}
-            onKeyDown={searchKeys}
-          >
-            {matches.map((target) => (
-              <button
-                key={target}
-                onClick={() => {
-                  navigate(target);
-                  setSearchOpen(false);
-                }}
-              >
-                <FolderOpen size={17} />
-                <span>{pageLabels[target]}</span>
-                <small>Page</small>
-              </button>
-            ))}
-            {matches.length === 0 && <p className="muted">No matches.</p>}
-          </div>
+          <WorkspaceSearch
+            onChoose={(target) => {
+              navigate(target);
+              setSearchOpen(false);
+            }}
+          />
           <footer className="search-footer">
             <button
               onClick={() => {

@@ -37,6 +37,35 @@ describe("three-way sync", () => {
     expect(result.conflicts[0].local?.data.custom).toBe("local");
     expect(result.conflicts[0].remote?.data?.custom).toBe("competing");
   });
+  it("keeps the relative order of independent insertions made offline on both devices", () => {
+    const base = fixture(),
+      local = createCanvasDocument(),
+      cloud = createCanvasDocument();
+    for (const [d, id] of [
+      [local, "local"],
+      [cloud, "other"],
+    ] as const) {
+      d.notes.splice(1, 0, { id: "note." + id, title: "New", blocks: [] });
+      d.notes[0].blocks.unshift("text." + id);
+      d.blocks.push({ id: "text." + id, type: "markdown", source: id });
+    }
+    const records = documentToSync(cloud).map((e) => ({
+      ...e,
+      version: 2,
+      updatedAt: "",
+      deleted: false,
+    }));
+    const result = reconcileSync(base, documentToSync(local), records);
+    expect(result.structuralError).toBeUndefined();
+    expect(result.conflicts).toEqual([]);
+    expect(
+      result.entities.find((e) => e.kind === "document")?.data.noteOrder,
+    ).toEqual(["note.start", "note.other", "note.local", "note.questions"]);
+    expect(
+      result.entities.find((e) => e.kind === "order" && e.id === "note.start")
+        ?.data.blocks,
+    ).toEqual(["text.other", "text.local", "text.start"]);
+  });
   it("keeps delete-versus-edit conflicts and accepts matching changes", () => {
     const base = fixture(),
       local = documentToSync(createCanvasDocument()),

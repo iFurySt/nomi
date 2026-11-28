@@ -176,7 +176,7 @@ svg {
 }
 .app-shell {
   --sidebar-width: 248px;
-  --rail-width: 52px;
+  --rail-width: 44px;
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -209,8 +209,8 @@ svg {
   flex: 0 0 var(--rail-width);
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 4px 6px 0;
+  gap: 4px;
+  padding: 4px 4px 0;
 }
 .rail-button {
   width: 40px;
@@ -446,7 +446,7 @@ svg {
 }
 .window-toolbar {
   display: flex;
-  flex: 0 0 48px;
+  flex: 0 0 40px;
   align-items: center;
   gap: 8px;
   padding: 0 12px;
@@ -2160,79 +2160,87 @@ kbd {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.workspace-search-dialog {
+.workspace-search-overlay {
+  background: color-mix(in srgb, var(--overlay) 55%, transparent);
+}
+.dialog-content.workspace-search-dialog {
   display: flex;
   flex-direction: column;
-  max-height: min(560px, calc(100dvh - 48px));
+  top: min(20dvh, 144px);
+  transform: translateX(-50%);
+  width: min(720px, calc(100vw - 24px));
+  max-height: min(560px, calc(80dvh - 12px));
   overflow: hidden;
+  padding: 0;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--sidebar) 90%, transparent);
+  backdrop-filter: blur(22px);
+  box-shadow: 0 12px 44px rgb(0 0 0 / 14%);
 }
-.workspace-search-dialog > .dialog-header,
-.workspace-search-dialog > .search-field,
-.workspace-search-dialog > .search-footer {
-  flex-shrink: 0;
+.workspace-search-input {
+  flex: none;
+  width: 100%;
+  height: 50px;
+  padding: 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
 }
-.workspace-search-dialog > .search-field {
-  height: 40px;
-  margin-top: 16px;
-  padding: 8px 10px;
+.workspace-search-input::placeholder {
+  color: var(--muted);
 }
 .search-results {
-  display: grid;
-  align-content: start;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: none;
-  gap: 3px;
-  margin-top: 12px;
+  padding: 5px;
 }
-.search-results::-webkit-scrollbar {
-  display: none;
+.search-group-label,
+.search-empty {
+  padding: 6px 11px;
+  color: var(--secondary);
+  font-size: 12px;
 }
 .search-results button {
   display: flex;
-  min-width: 0;
-  height: 40px;
-  flex-shrink: 0;
+  width: 100%;
+  height: 35px;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 8px;
+  gap: 9px;
+  padding: 0 11px;
+  border-radius: 9px;
+  color: var(--secondary);
   text-align: left;
 }
-.search-results button:hover,
-.search-results button:focus-visible {
+.search-results button[aria-selected="true"] {
   background: var(--interaction-hover);
+  color: var(--text);
 }
 .search-results button span {
-  flex: 1;
-  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 13px;
-}
-.search-results button small {
-  flex-shrink: 0;
-  color: var(--muted);
-  font-size: 10px;
+  font-size: 14px;
 }
 .search-footer {
+  flex: none;
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-top: 12px;
-  margin-top: 10px;
+  margin: 0 5px;
   border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 11px;
+  padding: 4px 0;
 }
 .search-footer button {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 10px;
+  border-radius: 7px;
   color: var(--secondary);
+  font-size: 12px;
 }
 .search-footer kbd {
   font-size: 10px;
@@ -2647,15 +2655,10 @@ kbd {
   text-underline-offset: 3px;
 }
 
-/* Global navigation lives in the outer rail; the document sidebar selects stocks. */
-.app-shell {
-  --rail-width: 52px;
-}
 .rail-brand {
-  height: 40px;
+  height: 36px;
   display: grid;
   place-items: center;
-  margin-bottom: 4px;
 }
 .rail-brand .brand-mark {
   width: 24px;
@@ -2667,7 +2670,7 @@ kbd {
 .rail-destinations {
   display: grid;
   justify-items: center;
-  gap: 8px;
+  gap: 4px;
   width: 100%;
 }
 .rail-button {

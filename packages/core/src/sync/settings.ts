@@ -21,6 +21,7 @@ export type SyncAction =
 export interface CloudSyncStatus {
   enabled: boolean;
   signingIn?: boolean;
+  confirmAccountMerge?: boolean;
   devices?: CloudSyncSession[];
   server?: string;
   account?: { email: string; server: string };

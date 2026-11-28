@@ -1,5 +1,4 @@
 import { SyncActions } from "../pages/SyncActions";
-import { Button, Modal } from "./primitives";
 import { Tooltip } from "./Tooltip";
 import { useEffect, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -10,53 +9,57 @@ import type { CloudSyncStatus } from "../../../core/src/sync/settings";
 import { workspaceShortcut, shortcutModifier } from "./workspace-shortcuts";
 
 export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
-  const { navigate } = useWorkspace();
+  const { navigate, notify } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [syncAction, setSyncAction] = useState<"connect" | "conflict">();
   const [loggingOut, setLoggingOut] = useState(false);
-  const [errorAction, setErrorAction] = useState<"signIn" | "logout">("signIn");
-  const [signingIn, setSigningIn] = useState(false);
-  const [error, setError] = useState("");
+  const [status, setStatus] = useState<CloudSyncStatus>();
+  const [pendingRequests, setPendingRequests] = useState(0);
   async function signIn() {
-    if (signingIn || status?.signingIn) return;
-    setSigningIn(true);
-    setErrorAction("signIn");
-    setError("");
+    setPendingRequests((count) => count + 1);
     try {
       const next = (await window.nomiDesktop?.requestSync?.("signIn")) as
         CloudSyncStatus | undefined;
       if (next) {
         setStatus(next);
-        if (!next.binding || !next.enabled) setSyncAction("connect");
+        if (next.account && !next.signingIn && (!next.binding || !next.enabled))
+          setSyncAction("connect");
       }
     } catch (e) {
-      const message =
-        e instanceof Error ? e.message : "Couldn’t sign in. Try again.";
-      if (!/abort/i.test(message)) setError(message);
+      const message = e instanceof Error ? e.message : "";
+      if (/AbortError:|The operation was aborted/i.test(message)) return;
+      const current = (await window.nomiDesktop
+        ?.requestSync?.("status")
+        .catch(() => undefined)) as CloudSyncStatus | undefined;
+      if (current?.account && current.phase !== "auth")
+        notify("Signed in. Open the account menu to continue syncing.");
+      else if (/fetch failed|net::ERR_|timed? ?out|timeout/i.test(message))
+        notify(
+          "Couldn’t reach the sync server. Check your connection and try again.",
+        );
+      else if (/expired/i.test(message))
+        notify("Sign-in expired. Sign in again from the account menu.");
+      else notify("Couldn’t sign in. Try again from the account menu.");
     } finally {
-      setSigningIn(false);
+      setPendingRequests((count) => count - 1);
       window.dispatchEvent(new Event("nomi-account-changed"));
     }
   }
   async function logout() {
     if (loggingOut) return;
     setLoggingOut(true);
-    setError("");
-    setErrorAction("logout");
     try {
       setStatus(
         (await window.nomiDesktop?.requestSync?.("logout")) as CloudSyncStatus,
       );
       setSyncAction(undefined);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn’t log out.");
+    } catch {
+      notify("Couldn’t log out. Try again from the account menu.");
     } finally {
       setLoggingOut(false);
       window.dispatchEvent(new Event("nomi-account-changed"));
     }
   }
-  const [status, setStatus] = useState<CloudSyncStatus>();
-  const pending = signingIn || status?.signingIn;
   useEffect(() => {
     let active = true,
       generation = 0;
@@ -80,11 +83,7 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
     };
   }, []);
   const connected = !!status?.account && status.phase !== "auth";
-  const name = pending
-    ? "Signing in…"
-    : connected
-      ? status.account!.email
-      : "Sign in to Nomi";
+  const name = connected ? status.account!.email : "Sign in to Nomi";
   const initials = connected ? name.trim().slice(0, 1).toLocaleUpperCase() : "";
   const avatar = (
     <span
@@ -102,7 +101,13 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
   return (
     <>
       <DropdownMenu.Root open={open} onOpenChange={setOpen}>
-        <Tooltip label={name} side="right" disabled={mobile || open}>
+        <Tooltip
+          label={name}
+          side="right"
+          disabled={
+            mobile || open || pendingRequests > 0 || !!status?.signingIn
+          }
+        >
           <DropdownMenu.Trigger asChild>
             <button
               className={`profile-trigger ${mobile ? "mobile-profile" : "rail-profile"}`}
@@ -136,7 +141,7 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
             ) : (
               <DropdownMenu.Item
                 className="workspace-menu-identity dropdown-item"
-                disabled={!!pending || loggingOut}
+                disabled={loggingOut}
                 onSelect={() => void signIn()}
               >
                 {avatar}
@@ -148,7 +153,7 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
             {connected && (!status.binding || !status.enabled) && (
               <DropdownMenu.Item
                 className="dropdown-item"
-                disabled={!!pending || loggingOut}
+                disabled={loggingOut}
                 onSelect={() => setSyncAction("connect")}
               >
                 Continue sign-in
@@ -160,16 +165,6 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
                 onSelect={() => setSyncAction("conflict")}
               >
                 Review changes
-              </DropdownMenu.Item>
-            )}
-            {pending && (
-              <DropdownMenu.Item
-                className="dropdown-item"
-                onSelect={() => {
-                  void window.nomiDesktop?.requestSync?.("cancelSignIn");
-                }}
-              >
-                Cancel sign-in
               </DropdownMenu.Item>
             )}
             <DropdownMenu.Separator className="workspace-menu-separator" />
@@ -202,7 +197,7 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
                 <DropdownMenu.Separator className="workspace-menu-separator" />
                 <DropdownMenu.Item
                   className="dropdown-item"
-                  disabled={loggingOut || !!pending}
+                  disabled={loggingOut}
                   onSelect={() => void logout()}
                 >
                   <LogOut size={17} strokeWidth={1.7} />
@@ -219,23 +214,6 @@ export function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
           onClose={() => setSyncAction(undefined)}
         />
       )}
-      <Modal
-        open={!!error}
-        onOpenChange={(value) => {
-          if (!value) setError("");
-        }}
-        title={
-          errorAction === "logout" ? "Couldn’t log out" : "Couldn’t sign in"
-        }
-      >
-        <p role="alert">{error}</p>
-        <Button
-          variant="primary"
-          onClick={() => void (errorAction === "logout" ? logout() : signIn())}
-        >
-          Try again
-        </Button>
-      </Modal>
     </>
   );
 }

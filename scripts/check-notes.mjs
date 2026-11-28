@@ -493,6 +493,10 @@ async function checks(phase) {
     window.canvasFixture.widthBefore = Number(
       divider.getAttribute("aria-valuenow"),
     );
+    window.canvasFixture.idleDividerColor = getComputedStyle(
+      divider,
+      "::after",
+    ).backgroundColor;
     window.canvasFixture.widthEvents = [];
     for (const type of [
       "pointerdown",
@@ -532,7 +536,11 @@ async function checks(phase) {
     await until(
       () => !document.querySelector(".notes-workspace").dataset.resizing,
     );
-    await wait(40);
+    await until(
+      () =>
+        getComputedStyle(divider, "::after").backgroundColor ===
+        window.canvasFixture.idleDividerColor,
+    );
     assert(
       Number(divider.getAttribute("aria-valuenow")) ===
         window.canvasFixture.widthBefore + 90,

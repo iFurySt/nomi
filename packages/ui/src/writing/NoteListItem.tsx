@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CornerDownRight,
 } from "lucide-react";
+import { NoteIcon } from "./NoteIcon";
 import { NoteIconPicker, type ChangeNoteIcon } from "./NoteIconPicker";
 import type { CanvasRepository } from "@nomi/platform";
 import type { CanvasNote } from "@nomi/core";
@@ -44,7 +45,7 @@ export function NoteListItem({
   dragging?: boolean;
   dropPosition?: NoteDropPosition;
   dropDepth?: number;
-  onToggle: () => void;
+  onToggle?: () => void;
   onCreate: () => void;
   onMove: () => void;
   onReveal?: (children: boolean) => void;
@@ -98,25 +99,23 @@ export function NoteListItem({
               setKeyboardFocus(false);
           }}
         >
-          <button
-            className="notes-row-toggle"
-            aria-label={`${expanded ? "收起" : "展开"}${note.title || "未命名文稿"}`}
-            disabled={!hasChildren}
-            tabIndex={-1}
-            onClick={onToggle}
-          >
-            {hasChildren && (
-              <ChevronRight
-                size={13}
-                style={{ transform: expanded ? "rotate(90deg)" : undefined }}
-              />
-            )}
-          </button>
-          <NoteIconPicker
-            note={note}
-            repository={repository}
-            onChange={onIcon}
-          />
+          {onToggle ? (
+            <button
+              className="notes-row-toggle"
+              aria-label={`${expanded ? "收起" : "展开"}${title}`}
+              aria-expanded={expanded}
+              onClick={onToggle}
+            >
+              <NoteIcon note={note} repository={repository} />
+              <ChevronRight size={14} aria-hidden="true" />
+            </button>
+          ) : (
+            <NoteIconPicker
+              note={note}
+              repository={repository}
+              onChange={onIcon}
+            />
+          )}
           <button
             className="notes-list-select"
             aria-current={selected ? "page" : undefined}

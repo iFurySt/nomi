@@ -1,3 +1,4 @@
+import type { SyncFetch } from "./sync-client";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
@@ -33,6 +34,7 @@ interface Config {
   server?: string;
   enabled: boolean;
   binding?: SyncBinding;
+  confirmAccountMerge?: boolean;
   pendingSince?: number;
   lastStarted?: number;
   retryAt?: number;
@@ -46,6 +48,7 @@ interface Options {
   library(): Promise<string>;
   backup(): Promise<void>;
   now?: () => number;
+  request?: SyncFetch;
 }
 /** Host-owned settings and scheduler. Login credentials never enter portable documents. */
 export class CloudSyncHost {
@@ -112,7 +115,11 @@ export class CloudSyncHost {
         syncServerURL(host.account.server) !== host.account.server
       )
         throw Error("同步登录信息无效。");
-      host.client = new SyncClient(host.account.server, host.account.token);
+      host.client = new SyncClient(
+        host.account.server,
+        host.account.token,
+        options.request,
+      );
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
         host.error = "无法读取同步登录信息，请重新登录。";
@@ -233,6 +240,7 @@ export class CloudSyncHost {
       enabled: this.config.enabled,
       devices: this.authExpired ? undefined : this.devices?.value,
       signingIn: !!this.browserLogin,
+      confirmAccountMerge: this.config.confirmAccountMerge,
       server: syncWebsiteURL(this.config.server ?? this.account?.server ?? ""),
       account: this.account
         ? { email: this.account.email, server: this.account.server }
@@ -302,11 +310,15 @@ export class CloudSyncHost {
     return this.exclusive(async () => {
       if (typeof server !== "string" || server.length > 2048)
         throw Error("服务地址无效。");
-      if (this.browserLogin)
-        throw Error("Cancel sign-in before changing servers.");
       const url = syncWebsiteURL(server);
       if (this.account && syncWebsiteURL(this.account.server) !== url)
         throw Error("请先从左下角退出登录，再更换服务地址。");
+      if (
+        url !== this.status.server &&
+        this.browserLogin &&
+        !this.browserLogin.cancel()
+      )
+        throw Error("Please wait a moment and try again.");
       this.config.server = url;
       await this.save();
       return this.status;
@@ -323,18 +335,22 @@ export class CloudSyncHost {
       )
         throw Error("登录信息无效。");
       const url = syncServerURL(server);
-      const login = await new SyncClient(url).login(
-        email,
-        password,
-        this.config.deviceId,
-        this.options.deviceName,
-      );
+      const login = await new SyncClient(
+        url,
+        undefined,
+        this.options.request,
+      ).login(email, password, this.config.deviceId, this.options.deviceName);
       return this.acceptLogin(url, login);
     });
   }
   async signIn(open: (url: string) => Promise<void>, development: boolean) {
-    if (this.browserLogin) throw Error("Sign-in is already in progress.");
-    const flow = (this.browserLogin = new SyncBrowserLogin());
+    if (this.browserLogin) {
+      await this.browserLogin.reopen(open);
+      return false;
+    }
+    const flow = (this.browserLogin = new SyncBrowserLogin(
+      this.options.request,
+    ));
     try {
       const result = await flow.run(
         this.status.server!,
@@ -343,9 +359,8 @@ export class CloudSyncHost {
         development,
         open,
       );
-      return await this.exclusive(() =>
-        this.acceptLogin(result.server, result.login),
-      );
+      await this.exclusive(() => this.acceptLogin(result.server, result.login));
+      return true;
     } finally {
       if (this.browserLogin === flow) this.browserLogin = undefined;
     }
@@ -379,13 +394,14 @@ export class CloudSyncHost {
       (this.config.binding.server !== url ||
         this.config.binding.user !== account.user)
     ) {
+      this.config.confirmAccountMerge = true;
       this.config.binding = undefined;
       this.config.enabled = false;
     }
     this.config.server = syncWebsiteURL(url);
     this.account = account;
     await this.devices.reset(this.deviceScope());
-    this.client = new SyncClient(url, login.token);
+    this.client = new SyncClient(url, login.token, this.options.request);
     this.engine = undefined;
     this.authExpired = false;
     this.error = undefined;
@@ -454,14 +470,16 @@ export class CloudSyncHost {
       return this.status;
     });
   }
-  async bind(mode: "upload" | "download", space?: string) {
+  async bind(mode: "upload" | "download", space?: string, confirmed = false) {
     return this.exclusive(async () => {
       const client = this.requireClient();
       if (mode !== "upload" && mode !== "download")
         throw Error("同步方式无效。");
       if (mode === "download" && (!space || typeof space !== "string"))
         throw Error("请选择云端资料库。");
-      // Always protect the local durable library before first download or a rebind.
+      if (this.config.confirmAccountMerge && !confirmed)
+        throw Error("请确认将本机文稿同步到此账号。");
+      // Take a recovery snapshot before joining the libraries.
       await this.options.backup();
       const library = await this.options.library();
       const target =
@@ -484,7 +502,12 @@ export class CloudSyncHost {
         this.options.local,
       );
       await engine.initialize(mode);
-      this.config = { ...this.config, binding, enabled: true };
+      this.config = {
+        ...this.config,
+        binding,
+        enabled: true,
+        confirmAccountMerge: undefined,
+      };
       await this.save();
       this.engine = engine;
       this.schedule = new SyncSchedule();

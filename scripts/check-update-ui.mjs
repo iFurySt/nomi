@@ -45,7 +45,9 @@ app.whenReady().then(async()=>{
  try{
  await win.loadFile(${JSON.stringify(join(output, "index.html"))});
  await until("document.querySelector('.rail-update')");
- assert.equal(await js("document.querySelector('.tool-rail').getBoundingClientRect().width"),52);
+ assert.equal(await js("document.querySelector('.tool-rail').getBoundingClientRect().width"),44);
+ assert.equal(await js("document.querySelector('.window-toolbar').getBoundingClientRect().height"),40);
+ assert.equal(await js("document.querySelector('.rail-destinations .rail-button').getBoundingClientRect().width"),36);
  assert.equal(await js("document.querySelector('.rail-profile .profile-avatar').getBoundingClientRect().width"),24);
  assert.equal(await js("document.querySelector('.rail-destinations').innerText.trim()"),'');
  assert.equal(await js("window.updateFixture.actions.length"),0);

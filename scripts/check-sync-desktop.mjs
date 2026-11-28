@@ -62,9 +62,13 @@ try {
     );
   };
   const click = (d, text) =>
-    d.ui("eval", {
-      source: `[...document.querySelectorAll('button,[role=menuitem]')].find(b=>b.textContent===${JSON.stringify(text)}).click();true`,
-    });
+    until(
+      () =>
+        d.ui("eval", {
+          source: `(()=>{const el=[...document.querySelectorAll('button,[role=menuitem]')].find(b=>b.textContent===${JSON.stringify(text)}); if(!el || el.disabled) return false; el.click();return true})()`,
+        }),
+      "click " + text,
+    );
   const fill = (d, values) =>
     d.ui("eval", {
       source: `(()=>{for(const [name,value] of Object.entries(${JSON.stringify(values)})){const input=document.querySelector('[aria-label="'+name+'"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));}return true})()`,
@@ -152,6 +156,23 @@ try {
   await assert.rejects(
     a.request("configure", { server: "https://user:pass@example.invalid" }),
   );
+  // An unreachable server should leave the normal sign-in entry available.
+  await a.request("configure", { server: "http://127.0.0.1:1" });
+  await openAccount(a);
+  await click(a, "Sign in to Nomi");
+  await until(
+    () =>
+      a.ui("eval", {
+        source:
+          "document.querySelector('.toast.visible')?.textContent.includes('Couldn’t reach the sync server')",
+      }),
+    "connection failure toast",
+  );
+  assert.equal(
+    await a.ui("eval", { source: "!!document.querySelector('[role=dialog]')" }),
+    false,
+  );
+  await a.request("configure", { server: url });
   await a.stop();
   await a.launch();
   assert.equal((await a.request("status")).server, url);
@@ -184,6 +205,31 @@ try {
     }),
     false,
   );
+  const originalPage = await until(
+    () => a.ui("browserURL"),
+    "first login page",
+  );
+  await openAccount(a);
+  assert.equal(
+    await a.ui("eval", {
+      source:
+        "document.querySelector('.workspace-menu-identity').textContent.trim()",
+    }),
+    "Sign in to Nomi",
+  );
+  assert.equal(
+    await a.ui("eval", {
+      source:
+        "/Cancel sign-in|Signing in/.test(document.querySelector('[role=menu]').textContent)",
+    }),
+    false,
+  );
+  await click(a, "Sign in to Nomi");
+  await until(
+    async () => (await a.ui("browserOpens")) === 2,
+    "reopen login page",
+  );
+  assert.equal(await a.ui("browserURL"), originalPage);
   await signIn(a, true);
   await until(
     async () => !!(await a.request("status")).binding,
@@ -213,6 +259,16 @@ try {
     await b.ui("eval", { source: "!!document.querySelector('[role=dialog]')" }),
     false,
   );
+  await b.request("sync");
+  await a.request("sync");
+  for (const client of [a, b]) {
+    const doc = await client.ui("snapshot");
+    assert(doc.notes.some((n) => n.id === "note.offline"));
+    assert.equal(
+      doc.blocks.find((b) => b.id === "text.offline")?.source,
+      "Written before sign-in",
+    );
+  }
   successes.push(
     "Base URL persists and validates; profile opens Nomi account; login automatically connects new or existing documents; changing servers while signed in is rejected",
   );
@@ -310,7 +366,10 @@ try {
   );
   assert.equal((await c.request("status")).account, undefined);
   assert.equal((await c.request("status")).server, url);
-  await c.request("configure", { server: "https://example.invalid/api" });
+  await until(
+    () => c.request("configure", { server: "https://example.invalid/api" }),
+    "configure after logout completes",
+  );
   await c.stop();
   successes.push(
     "multiple collections require selection; cancel preserves local data; device API retains current-device/revocation support; menu logout permits URL change",
@@ -509,12 +568,22 @@ try {
   await b.request("sync");
   assert.equal((await b.request("status")).phase, "auth");
   await b.ui("edit", { block: "text.two", text: "登录过期仍可编辑" });
-  await b.request("login", {
-    server: url + "/api",
-    email: "test@example.invalid",
-    password,
-  });
+  await a.ui("edit", { block: "text.one", text: "另一台设备的新内容" });
+  await a.request("sync");
+  await signIn(b);
   await b.request("sync");
+  await a.request("sync");
+  for (const device of [a, b]) {
+    const { blocks } = await device.ui("snapshot");
+    assert.equal(
+      blocks.find((b) => b.id === "text.two").source,
+      "登录过期仍可编辑",
+    );
+    assert.equal(
+      blocks.find((b) => b.id === "text.one").source,
+      "另一台设备的新内容",
+    );
+  }
   successes.push(
     "device revocation pauses sync while local editing survives; reauthentication resumes the same binding",
   );
@@ -522,7 +591,7 @@ try {
   await b.launch();
   assert.equal(
     (await b.ui("snapshot")).blocks.find((b) => b.id === "text.one").source,
-    "恢复后新输入",
+    "另一台设备的新内容",
   );
   assert((await b.request("status")).account);
   await b.request("enabled", { enabled: false });
@@ -601,6 +670,18 @@ try {
   );
   successes.push(
     "direct menu logout clears identity and disables sync while preserving local documents",
+  );
+  await a.request("login", {
+    server: url + "/api",
+    email: "second@example.invalid",
+    password,
+  });
+  assert.equal((await a.request("status")).confirmAccountMerge, true);
+  await assert.rejects(a.request("bind", { mode: "upload" }), /请确认/);
+  assert.equal((await a.request("spaces")).length, 0);
+  assert.deepEqual((await a.ui("snapshot")).blocks, beforeLogout.blocks);
+  successes.push(
+    "switching accounts requires explicit confirmation before publishing the local library",
   );
   await writeFile(
     join(output, "desktop-report.json"),

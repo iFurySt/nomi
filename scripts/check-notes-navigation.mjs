@@ -67,6 +67,7 @@ app.whenReady().then(async()=>{
         blocks: [],
         icon: { type: "emoji", value: "💡" },
       },
+      ...Array.from({ length: 24 }, (_, i) => ({ id: "nav.extra" + i, title: "文稿 " + i, blocks: [] })),
     ];
     d.board.placements = [];
     d.board.connectors = [];
@@ -80,6 +81,64 @@ app.whenReady().then(async()=>{
  assert.equal(await js("document.querySelector('.workspace-title-slot .notes-breadcrumb')!==null"),true);
  assert.equal(await js("document.querySelectorAll('.notes-breadcrumb').length"),1);
  assert.equal(await js("document.querySelector('.notes-topbar')===null"),true);
+ const sidebarScroll = await js(\`(() => {
+   const sidebar = document.querySelector('.notes-library');
+   const tree = sidebar.querySelector('nav');
+   const innerRight = sidebar.getBoundingClientRect().right - parseFloat(getComputedStyle(sidebar).borderRightWidth);
+   const end = tree.getBoundingClientRect().right;
+   const divider = document.querySelector('.notes-library-resizer').getBoundingClientRect();
+   tree.scrollTop = tree.scrollHeight;
+   const scrolled = tree.scrollTop > 0;
+   tree.scrollTop = 0;
+   return { flush: end === innerRight, accessible: divider.left >= end, scrolled };
+ })()\`);
+ assert.deepEqual(sidebarScroll, { flush: true, accessible: true, scrolled: true });
+ const thumbPoint = await js(\`(() => {
+   const tree = document.querySelector('.notes-library nav');
+   const rect = tree.getBoundingClientRect();
+   const width = parseFloat(getComputedStyle(tree, '::-webkit-scrollbar').width);
+   const thumb = getComputedStyle(tree, '::-webkit-scrollbar-thumb');
+   return { x: Math.floor(rect.right - width / 2), y: Math.ceil(rect.top + 12),
+     visibleWidth: width - parseFloat(thumb.borderLeftWidth) - parseFloat(thumb.borderRightWidth) };
+ })()\`);
+ assert.equal(thumbPoint.visibleWidth, 6);
+ const {x, y} = thumbPoint;
+ const thumbColor = "getComputedStyle(document.querySelector('.notes-library nav'),'::-webkit-scrollbar-thumb').backgroundColor";
+ const transparent = "rgba(0, 0, 0, 0)";
+ await until(thumbColor + " === '" + transparent + "'");
+ win.webContents.sendInputEvent({type:'mouseDown',button:'left',x,y,clickCount:1});
+ win.webContents.sendInputEvent({type:'mouseMove',x,y:y+60,modifiers:['leftButtonDown']});
+ await until("document.querySelector('.notes-library nav').scrollTop > 0");
+ await until("document.querySelector('.notes-library nav[data-scrolling]')");
+ const pixelAt = async (x,y) => [...(await win.webContents.capturePage({x,y,width:1,height:1})).toBitmap().subarray(0,3)];
+ const trackColor = await pixelAt(x+4,y+60);
+ await until("getComputedStyle(document.querySelector('.notes-library nav')).getPropertyValue('--tree-thumb-color') === '" + transparent + "'");
+ assert.notDeepEqual(await pixelAt(x,y+60), trackColor, 'Thumb stays visible while held');
+ win.webContents.sendInputEvent({type:'mouseUp',button:'left',x,y:y+60,clickCount:1});
+ await js('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+ assert.deepEqual(await pixelAt(x,y+60), trackColor, 'Idle thumb hides even under the pointer');
+ await js("document.querySelector('.notes-library nav').scrollTop = 0");
+ await until(thumbColor + " !== '" + transparent + "'");
+ await until(thumbColor + " === '" + transparent + "'");
+ const parentRow = "document.querySelector('[data-note-row$=root]')";
+ const leafRow = "document.querySelector('[data-note-row$=leaf]')";
+ const icon = parentRow + ".querySelector('.notes-row-toggle .note-icon-image')";
+ const arrow = parentRow + ".querySelector('.notes-row-toggle > svg')";
+ const title = parentRow + ".querySelector('.notes-list-select')";
+ const hoverRow = async row => {
+   const point = await js("(() => { const r = " + row + ".getBoundingClientRect(); return {x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2)} })()");
+   win.webContents.sendInputEvent({type: 'mouseMove', ...point});
+   await until(row + ".matches(':hover')");
+ };
+ await hoverRow(leafRow);
+ assert.equal(await js(leafRow + ".querySelector('.notes-row-toggle') === null"), true);
+ assert.equal(await js(icon + ".checkVisibility()"), true);
+ assert.equal(await js(arrow + ".checkVisibility()"), false);
+ const titleLeft = await js(title + ".getBoundingClientRect().left");
+ await hoverRow(parentRow);
+ assert.equal(await js(arrow + ".checkVisibility()"), true);
+ assert.equal(await js(icon + ".checkVisibility()"), false);
+ assert.equal(await js(title + ".getBoundingClientRect().left"), titleLeft);
  await js("(async()=>{window.navRevision=(await window.canvasFixture.repository('local-device').load()).revision})()");
  await shot('breadcrumb-light');
  await js("document.querySelector('.notes-breadcrumb button').click()");
@@ -120,7 +179,7 @@ app.whenReady().then(async()=>{
    await until("document.querySelector('.canvas-workspace')");
    await js("location.hash='/notes?note=nav.leaf'");
    await until("[...document.querySelectorAll('[data-note-row][data-selected]')].some(e=>e.dataset.noteRow==='nav.leaf')");
-   assert.equal(await js("document.querySelectorAll('[data-note-row]').length"),3);
+   assert.equal(await js("document.querySelectorAll('[data-note-row]').length"),27);
  }
  // A new launch URL has no hash; restore the saved note instead of Canvas.
  await until("localStorage.getItem('nomi.last-route')==='#/notes?note=nav.leaf'");
@@ -132,6 +191,29 @@ app.whenReady().then(async()=>{
  await win.loadFile(${JSON.stringify(join(output, "index.html"))});
  await until("document.querySelector('.canvas-workspace')");
  assert.equal(await js('location.hash'), '#/canvas');
+ win.setSize(1120,820);await until("innerWidth===1120");
+ const openSearch = async () => {
+   await js("document.querySelector('.search-trigger').click()");
+   await until("document.activeElement?.matches('.workspace-search-input')");
+ };
+ await openSearch();
+ await shot('workspace-search');
+ await js("document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}))");
+ assert.equal(await js("document.activeElement.getAttribute('aria-activedescendant')"),'workspace-result-notes');
+ await win.webContents.insertText('zzz');
+ await until("document.querySelector('.search-empty')?.textContent==='No matches.'");
+ await js("document.activeElement.select()");
+ await win.webContents.insertText('sett');
+ await until("document.querySelectorAll('.search-results [role=option]').length===1");
+ await js("document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))");
+ await until("location.hash.startsWith('#/settings') && !document.querySelector('.workspace-search-dialog')");
+ await openSearch();
+ win.setSize(390,600);await until("innerWidth===390");
+ await js("document.documentElement.dataset.theme='dark'");
+ await shot('workspace-search-narrow-dark');
+ assert.equal(await js("document.querySelector('.workspace-search-dialog').getBoundingClientRect().right <= innerWidth"),true);
+ await js("document.querySelector('.search-footer button').click()");
+ await until("document.querySelector('[role=dialog] h2')?.textContent==='Keyboard shortcuts'");
  console.log('Notes navigation: PASS (ancestor/current icons, root, parent navigation, revision unchanged, dark/narrow, settings always visible, shortcut ignored, collapse preference retained)');
  app.exit(0);
  }catch(e){console.error(e);await shot('failure');app.exit(1);}
