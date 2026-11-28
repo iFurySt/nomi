@@ -182,3 +182,9 @@ Host 回归检查 IPC 主 frame / URL 限制、非法操作、点击下载后自
 桌面 0.4.1 于 2026-11-19（台北时间）发布，标签对应 `330c176`。Apple Silicon 和 Intel 均通过 467 项单测、桌面回归、Developer ID 签名、Apple 公证及独立 App 更新初始化检查。[公开 Release](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.4.1) · [发布流水线](https://github.com/iFurySt/nomi/actions/runs/44339613587)
 
 从公开地址下载两个 DMG 和对应的 Sparkle 清单，核验了 SHA-256、文件长度、Ed25519 签名、公证票据、版本和下载地址。本机只读挂载 arm64 安装包，App 通过严格签名、Gatekeeper 和内嵌版本检查后卸载验证卷。记录保存在 ignored `.artifacts/desktop-041-verification/`。
+
+## 0.4.2 发布验收
+
+桌面 0.4.2 于 2026-11-28 发布，标签对应 `fc464c7`。两种架构均通过应用回归、Developer ID 签名、Apple 公证和独立应用的更新初始化检查。[版本下载](https://github.com/iFurySt/nomi/releases/tag/desktop-v0.4.2) · [发布流水线](https://github.com/iFurySt/nomi/actions/runs/46124887630)
+
+公开的 Apple Silicon 与 Intel 安装包均通过 SHA-256、长度、Sparkle Ed25519 签名和公证票据检查。两份稳定更新清单均通过仓库公钥验签，指向本版本对应架构。只读挂载 Apple Silicon 安装包后，Nomi.app 的版本、应用标识、严格签名、公证票据和 Gatekeeper 均通过，验证卷已卸载。
